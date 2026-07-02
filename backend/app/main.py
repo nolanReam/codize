@@ -8,11 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
-from app.routers import health
+from app.routers import archetypes, health
+from app.services import template_service
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    template_service.validate_at_startup()  # broken templates must fail here, not at first request
     app = FastAPI(
         title="Codize API",
         docs_url="/docs" if settings.app_env == "development" else None,
@@ -27,6 +29,7 @@ def create_app() -> FastAPI:
     )
     register_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(archetypes.router)
     return app
 
 
