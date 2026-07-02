@@ -152,9 +152,9 @@ def test_users_cannot_see_each_others_intake_state(client):
 
 def test_intake_responses_contain_no_secrets(client, monkeypatch):
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "fake-service-role-key-for-tests")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-anthropic-key-for-tests")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-gemini-key-for-tests")
     answer_all_five(client)
     for method, path in (*ALL_ROUTES[:2], ("POST", "/intake/complete")):
         text = client.request(method, path, headers=auth_headers()).text
         assert "fake-service-role-key-for-tests" not in text
-        assert "fake-anthropic-key-for-tests" not in text
+        assert "fake-gemini-key-for-tests" not in text

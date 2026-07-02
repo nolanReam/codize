@@ -23,9 +23,17 @@ class Settings(BaseSettings):
     # invalid CORS anyway, and wildcard is forbidden by the milestone spec).
     cors_origins: str = "http://localhost:3000"
 
+    # --- LLM provider config (M7). Provider order: Gemini primary, OpenRouter
+    # fallback, deterministic stub when no key is configured. Anthropic is
+    # intentionally not supported. ---
+    llm_provider: str = "gemini"  # gemini | openrouter | stub
+    gemini_model: str = "gemini-2.5-flash-lite"
+    openrouter_model: str = "cohere/north-mini-code:free"
+
     # --- SERVER-ONLY secrets ---
     supabase_service_role_key: SecretStr = SecretStr("")
-    anthropic_api_key: SecretStr = SecretStr("")
+    gemini_api_key: SecretStr = SecretStr("")
+    openrouter_api_key: SecretStr = SecretStr("")
 
     @property
     def cors_origin_list(self) -> list[str]:

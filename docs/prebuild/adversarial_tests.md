@@ -41,4 +41,4 @@ Spec requirement ("Pre-Build Artifacts Required — Artifact 2"): the six system
 
 ## Live testing plan (blocked on API key)
 
-When an `ANTHROPIC_API_KEY` is available, run each case above against the real prompts (evaluator at temperature 0, turns at 0.3) with 2–3 phrasing variants per case, and record verdicts here. Hard requirement before Milestone 9; recommended before Milestone 2.
+When a live LLM provider key is available (`GEMINI_API_KEY` or `OPENROUTER_API_KEY` — Anthropic is intentionally not supported), run each case above against the real prompts via `backend/app/services/llm_service.py` (evaluator at temperature 0, turns at 0.3) with 2–3 phrasing variants per case, and record verdicts here. Hard requirement before Milestone 9; recommended before Milestone 2.

@@ -7,8 +7,8 @@ docs/db/schema.md). Completion requires all five answers and triggers
 archetype classification into exactly one of the three archetypes.
 
 Classification here is the deterministic fallback: the spec's real
-classification is a temperature-0 LLM call (later milestone, needs the LLM
-service + ANTHROPIC_API_KEY). The seam is `classify_archetype` — the future
+classification is a temperature-0 LLM call (later milestone, via the M7
+llm_service + a live provider key). The seam is `classify_archetype` — the future
 LLM call replaces `_derive_classification_signals`; the tiebreaker mapping
 itself (`template_service.resolve_archetype`) is fixed and never changes.
 """

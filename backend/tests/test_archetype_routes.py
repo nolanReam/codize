@@ -84,8 +84,10 @@ def test_non_integer_archetype_id_returns_controlled_error(client):
 
 def test_archetype_responses_contain_no_secrets(client, monkeypatch):
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "fake-service-role-key-for-tests")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-anthropic-key-for-tests")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-gemini-key-for-tests")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake-openrouter-key-for-tests")
     for path in ("/archetypes", "/archetypes/1"):
         text = client.get(path, headers=auth_headers()).text
         assert "fake-service-role-key-for-tests" not in text
-        assert "fake-anthropic-key-for-tests" not in text
+        assert "fake-gemini-key-for-tests" not in text
+        assert "fake-openrouter-key-for-tests" not in text
