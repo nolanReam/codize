@@ -6,12 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Codize is an educational platform that helps students understand the projects they build with AI — it teaches real dev workflows and reasoning about your own code, using AI as a tool rather than a crutch. It is a benign educational product about architecture understanding and project reasoning. It is **not** a cybersecurity, exploit, malware, or offensive-security tool.
 
-**Current state: Milestone 2 complete** (Supabase schema + RLS, on top of Milestone 1's pre-build artifacts). The three archetype JSON templates live in `backend/app/templates/` and the six system prompts in `backend/app/prompts/` (see its README for call parameters). The database schema (4 tables: `profiles`, `projects`, `gate_sessions`, `unlocks`) is live in Supabase project `tadkbymxkdncqahzshml` with RLS verified — see `docs/db/schema.md` and `supabase/migrations/`. No backend application code yet.
+**Current state: Milestone 3 complete** (auth foundation, on top of M2's schema+RLS and M1's pre-build artifacts). The three archetype JSON templates live in `backend/app/templates/` and the six system prompts in `backend/app/prompts/` (see its README for call parameters). The database schema (4 tables: `profiles`, `projects`, `gate_sessions`, `unlocks`) is live in Supabase project `tadkbymxkdncqahzshml` with RLS verified — see `docs/db/schema.md` and `supabase/migrations/`. Supabase Auth is verified end-to-end with real JWTs (signup trigger, password login, RLS through PostgREST) — see `docs/auth.md` for the audit and the Milestone-4 backend auth enforcement design; env contract in `.env.example`. No backend application code yet.
 
 ## Commands
 
 - `python scripts/validate_prebuild_artifacts.py` — validates templates + prompts against the spec's invariants (run after any edit to either).
 - `scripts/verify_rls.sql` — RLS/ownership audit queries; run via Supabase MCP `execute_sql` after any schema change (sections 6–8 expect permission errors; run per-section).
+- `scripts/verify_auth.sql` + `python scripts/verify_auth.py` — end-to-end auth/RLS check over the real Auth+PostgREST APIs with real JWTs: run the SQL SETUP via MCP, run the script with `SUPABASE_URL`/`SUPABASE_ANON_KEY` set, then run the SQL CLEANUP. Run after any auth or RLS change.
 
 ## Where the durable context lives
 
