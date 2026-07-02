@@ -1,0 +1,27 @@
+# Secrets — never committed
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node / frontend (Milestone 13+)
+node_modules/
+.next/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Claude Code local settings
+.claude/settings.local.json

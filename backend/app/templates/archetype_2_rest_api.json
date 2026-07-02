@@ -1,0 +1,170 @@
+{
+  "archetype_id": 2,
+  "archetype_name": "REST API Backend",
+  "description": "A server-side application exposing data through HTTP endpoints. Examples: task manager API, user authentication system, data pipeline, portfolio backend, sports stats tracker.",
+  "default_stack": "Python + FastAPI + Supabase (Postgres)",
+  "phases": [
+    {
+      "phase": 1,
+      "phase_title": "API Design & Resource Modeling",
+      "core_concept": "REST semantics — resources, verbs, and status codes, and why professionals design the API surface for [PROJECT_PURPOSE] before writing any code",
+      "ai_appropriate_tasks": [
+        "Generate an OpenAPI-style outline from your finished resource list",
+        "Generate example request/response payloads for each planned endpoint"
+      ],
+      "human_required_tasks": [
+        "List the resources in [PROJECT_PURPOSE] and the operations each one supports",
+        "Decide the URL structure and HTTP method for every endpoint",
+        "Define what 401, 403, and 404 each mean in your API and when each one is returned"
+      ],
+      "explanation_gate_targets": [
+        "Why these resources and operations model [PROJECT_PURPOSE], and what you deliberately left out",
+        "The difference between 401, 403, and 404 in your API, with a concrete endpoint example of each",
+        "The full lifecycle of one request through your planned API, from arrival to response"
+      ],
+      "gate_depth": "light",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-configured FastAPI skeleton matching your resource list — skip project scaffolding at the start of Phase 2"
+    },
+    {
+      "phase": 2,
+      "phase_title": "Server Foundation",
+      "core_concept": "FastAPI structure — routers, Pydantic validation, startup config, and the service layer where all database and external calls live",
+      "ai_appropriate_tasks": [
+        "Generate router boilerplate from your endpoint list",
+        "Generate Pydantic models from your payload examples"
+      ],
+      "human_required_tasks": [
+        "Structure the app — models, services, routers, config — and decide what lives where and why",
+        "Write the config module that validates every environment variable at startup",
+        "Wire the first endpoint end to end and test it in the auto-generated /docs"
+      ],
+      "explanation_gate_targets": [
+        "Why service logic is separated from route handlers in your project, with an example from your code",
+        "What Pydantic rejects automatically on your endpoints, and what you still have to check yourself",
+        "How your config module behaves if an environment variable is missing, and why it fails at startup"
+      ],
+      "gate_depth": "medium",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-configured logging and error-handler middleware — skip that setup in Phase 6"
+    },
+    {
+      "phase": 3,
+      "phase_title": "Database Schema & RLS",
+      "core_concept": "Schema design with security first — Row Level Security and ownership policies before any query code is written",
+      "ai_appropriate_tasks": [
+        "Generate the SQL for your schema after tables and ownership columns are decided",
+        "Generate seed data for testing"
+      ],
+      "human_required_tasks": [
+        "Enable RLS on this table and write an ownership policy before continuing. Do not proceed until this is done.",
+        "Design the tables with a user_id ownership column and the relationships [PROJECT_PURPOSE] needs",
+        "Decide where the anon key and the service-role key are each used. NOTE: The service-role key bypasses RLS — it exists only in backend environment variables, never in any client or committed file."
+      ],
+      "explanation_gate_targets": [
+        "What your RLS policy actually enforces, and why 'user is logged in' is not sufficient — ownership must be verified",
+        "What happens if the ownership check were removed from your main table — what anyone with your anon key could do",
+        "Why the service-role key can never appear in client code, and where yours actually lives",
+        "Why you modeled the relationships this way for [PROJECT_PURPOSE]"
+      ],
+      "gate_depth": "heavy",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Based on how you explained your schema, you've unlocked the advanced query builder — pre-written complex queries for your specific schema"
+    },
+    {
+      "phase": 4,
+      "phase_title": "Authentication & Authorization",
+      "core_concept": "Server-side auth — JWT verification middleware, and ownership checks on every route that touches user data",
+      "ai_appropriate_tasks": [
+        "Generate the JWT decoding boilerplate once the verification design is decided",
+        "Generate scripts that create test users"
+      ],
+      "human_required_tasks": [
+        "Write the auth verification middleware and attach it to every route that touches user data. NOTE: Hiding this in the UI does not protect it. This check must happen here, in the backend, on every request.",
+        "Decide the 401 versus 403/404 behavior for each protected endpoint",
+        "Run the two-account test: create Users A and B; with B's token, request A's resource ID. You must get 403 or 404, not data. Do not proceed until this passes."
+      ],
+      "explanation_gate_targets": [
+        "What happens if the auth middleware is removed from one route — who can then do what in your API",
+        "Why hiding endpoints from documentation or a UI does not protect them",
+        "How your middleware gets from the Authorization header to a trusted user identity, step by step",
+        "What your two-account test proved, exactly, and what it did not prove"
+      ],
+      "gate_depth": "heavy",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-configured auth test suite for your endpoints — skip writing the protected-route tests manually in Phase 6"
+    },
+    {
+      "phase": 5,
+      "phase_title": "CRUD & Input Validation",
+      "core_concept": "Business logic on protected resources — validation at the boundary, parameterized queries, and consistent error shapes",
+      "ai_appropriate_tasks": [
+        "Generate the repetitive CRUD handlers after the first one is written and fully understood",
+        "Generate validation test cases from your rules"
+      ],
+      "human_required_tasks": [
+        "Write the first full CRUD path yourself: validate input, check ownership, query with parameters, shape the response",
+        "Validate every user input that reaches the database and use parameterized queries — never string concatenation",
+        "Define the error response shape used consistently across the whole API"
+      ],
+      "explanation_gate_targets": [
+        "What breaks if input validation is removed from your create endpoint — demonstrate what a malicious payload could do",
+        "Why parameterized queries stop injection where string concatenation does not, using your own query code",
+        "Where ownership is checked in your update path, and what happens without it",
+        "Why your error responses share one shape, and what leaks if they don't"
+      ],
+      "gate_depth": "medium",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-built pagination and filtering module for your list endpoints — skip the manual offset/limit work"
+    },
+    {
+      "phase": 6,
+      "phase_title": "Error Handling, Testing & Documentation",
+      "core_concept": "Making the API trustworthy — exception handling, a pytest suite that proves auth and ownership, and docs that expose nothing internal",
+      "ai_appropriate_tasks": [
+        "Generate additional test cases patterned on your happy-path tests",
+        "Generate endpoint descriptions for the OpenAPI docs"
+      ],
+      "human_required_tasks": [
+        "Write the pytest suite covering: no token → 401, wrong user → 403/404, invalid payload → 422",
+        "Decide how unexpected exceptions are caught and exactly what the client sees instead of a stack trace",
+        "Review the auto-generated /docs and confirm nothing internal (fields, keys, admin routes) is exposed"
+      ],
+      "explanation_gate_targets": [
+        "Which failure cases your test suite actually proves, and which it doesn't",
+        "What the client sees when your database call throws, and why not a stack trace",
+        "How you'd know if a future change silently broke an ownership check"
+      ],
+      "gate_depth": "medium",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-configured CI workflow that runs your test suite on every push — skip the pipeline setup"
+    },
+    {
+      "phase": 7,
+      "phase_title": "Pre-Deployment Security Checklist",
+      "core_concept": "Verification, not learning — confirming against your actual running API that every security constraint you built is really enforced before you ship",
+      "ai_appropriate_tasks": [
+        "Generate a search script for secret patterns (api_key, secret, sk_live, token, password) across the codebase"
+      ],
+      "human_required_tasks": [
+        "Search the entire codebase for api_key, secret, sk_live, token, password. Confirm none appear in any frontend file or any file committed to the public repo.",
+        "Open browser DevTools Network tab. Make requests in the app. Confirm no secrets appear in any request or response payload.",
+        "Confirm all external API calls with secrets are made from backend functions, not frontend code.",
+        "Open Supabase Authentication → Policies. Confirm RLS is enabled on every table. Confirm every policy checks ownership, not just login status.",
+        "Attempt to access a protected route directly via URL or curl without being logged in. Confirm it returns 401, not data.",
+        "Attempt to access another user's data by manipulating a resource ID in a request. Confirm it returns 403 or 404, not the other user's data.",
+        "Confirm every user input that reaches the database uses parameterized queries, not string concatenation.",
+        "Confirm every user input that gets rendered in the UI is sanitized or escaped before rendering.",
+        "Run the app URL with /api, /admin, /dashboard, and other common paths appended. Document what responds and confirm nothing sensitive is exposed unintentionally."
+      ],
+      "explanation_gate_targets": [
+        "Walk me through one item on this checklist. Tell me what you checked, what you found, and what you did or confirmed as a result.",
+        "Which checklist item surprised you or failed on first check in your API, and what you changed",
+        "Which single checklist item would be most damaging to skip for [PROJECT_PURPOSE], and what a stranger could do if you had skipped it"
+      ],
+      "gate_depth": "heavy",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Your gate scores across this project qualify you for the system design review — a full written architectural critique of your codebase you can reference in interviews"
+    }
+  ]
+}

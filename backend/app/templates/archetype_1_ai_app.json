@@ -1,0 +1,171 @@
+{
+  "archetype_id": 1,
+  "archetype_name": "AI-Powered App",
+  "description": "A web application where the core feature calls an LLM API. Examples: AI chatbot, document summarizer, code explainer, AI tutor clone, prompt-based content generator.",
+  "default_stack": "Python + FastAPI + Vanilla HTML/JS",
+  "phases": [
+    {
+      "phase": 1,
+      "phase_title": "Architecture & Scope",
+      "core_concept": "Three-tier architecture — why every AI app is frontend, your backend, then the LLM API, and what each tier is responsible for in [PROJECT_PURPOSE]",
+      "ai_appropriate_tasks": [
+        "Generate the initial project scaffold (folder structure, .gitignore, README outline)",
+        "Generate a requirements.txt / dependency list for the chosen stack"
+      ],
+      "human_required_tasks": [
+        "Draw the three-tier architecture for [PROJECT_PURPOSE]: frontend, your backend, the LLM API — and mark where the API key lives. NOTE: The key lives in your backend only. If your diagram shows the frontend talking to the LLM API directly, you are doing it wrong.",
+        "Define the core user loop in one paragraph: what the user does, what your backend does, what the LLM returns",
+        "Create the .env file locally and confirm it is listed in .gitignore before the first commit"
+      ],
+      "explanation_gate_targets": [
+        "Why the frontend cannot call the LLM API directly, and what specifically someone could do if it did",
+        "What each of the three tiers is responsible for in [PROJECT_PURPOSE], in your own words",
+        "The exact path one user request takes through your planned system, from click to rendered response"
+      ],
+      "gate_depth": "light",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-configured environment setup script (venv, dependencies, .env template) — skip the manual setup walkthrough at the start of Phase 2"
+    },
+    {
+      "phase": 2,
+      "phase_title": "Backend Foundation",
+      "core_concept": "How a FastAPI backend is structured — routes, request/response models, startup config validation, and why all external calls live in a service layer instead of route handlers",
+      "ai_appropriate_tasks": [
+        "Generate FastAPI route boilerplate once the endpoint surface is decided",
+        "Generate Pydantic model stubs from your request/response field list"
+      ],
+      "human_required_tasks": [
+        "Decide the endpoint surface: which routes exist, their methods, and their request/response shapes for [PROJECT_PURPOSE]",
+        "Write the config module that loads and validates every environment variable at startup",
+        "Decide what belongs in the service layer versus route handlers, and why"
+      ],
+      "explanation_gate_targets": [
+        "Why you chose these specific endpoints and request/response shapes for [PROJECT_PURPOSE]",
+        "What happens, step by step, when a request arrives at your API with an invalid payload",
+        "Why environment variables are validated at startup instead of at first use, in your config module",
+        "Why LLM calls will live in a service module instead of inside route handlers in your project"
+      ],
+      "gate_depth": "medium",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-configured FastAPI project skeleton with config validation and CORS wired — skip the configuration walkthrough in Phase 3"
+    },
+    {
+      "phase": 3,
+      "phase_title": "LLM Integration",
+      "core_concept": "How LLM APIs work — message structure, context windows, tokens, and statelessness",
+      "ai_appropriate_tasks": [
+        "Generate boilerplate API client class",
+        "Generate error handling for rate limits and timeouts"
+      ],
+      "human_required_tasks": [
+        "Write the system prompt for [PROJECT_PURPOSE]. NOTE: This call must happen in your backend. If you are writing this in frontend code you are doing it wrong.",
+        "Design the conversation state management logic",
+        "Determine what context to include per call and why"
+      ],
+      "explanation_gate_targets": [
+        "Why the system prompt is structured the way it is for [PROJECT_PURPOSE]",
+        "What happens to conversation history between calls",
+        "How token cost is calculated and why it matters for [PROJECT_SCALE]",
+        "Why a .env file in frontend code does not protect a secret"
+      ],
+      "gate_depth": "medium",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Advanced: pre-built streaming response handler — skip manual implementation"
+    },
+    {
+      "phase": 4,
+      "phase_title": "Frontend & Conversation UI",
+      "core_concept": "Building a frontend that talks only to your backend — rendering untrusted AI and user content safely, and handling slow LLM responses gracefully",
+      "ai_appropriate_tasks": [
+        "Generate the CSS layout and styling boilerplate",
+        "Generate a fetch wrapper with error handling once the endpoint contract is decided"
+      ],
+      "human_required_tasks": [
+        "Write the rendering logic for user and AI messages. NOTE: Every piece of user or AI content must be escaped or safely inserted (textContent, not innerHTML) — this is exactly where injection happens.",
+        "Design the loading, error, and empty states for [PROJECT_PURPOSE]",
+        "Decide how the frontend tracks conversation state between messages"
+      ],
+      "explanation_gate_targets": [
+        "What specifically breaks if you render AI or user content with innerHTML without escaping, in your UI",
+        "How your frontend knows about and calls your backend — and why no key or secret appears anywhere in frontend code",
+        "What the user sees in your app while the LLM is generating a response, and how you built that"
+      ],
+      "gate_depth": "medium",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Pre-built chat interface component styled for your project — skip the message-list markup and scroll handling"
+    },
+    {
+      "phase": 5,
+      "phase_title": "Auth & User Accounts",
+      "core_concept": "Server-side authentication — Supabase Auth, JWT verification middleware, and why the API layer is the only place where auth actually counts",
+      "ai_appropriate_tasks": [
+        "Generate signup/login form markup and the client-side Supabase Auth calls",
+        "Generate the middleware boilerplate once the verification logic is decided"
+      ],
+      "human_required_tasks": [
+        "Write the auth verification middleware and attach it to every route that touches user data. NOTE: Hiding this in the UI does not protect it. This check must happen here, in the backend, on every request.",
+        "Decide which endpoints are protected and what each returns for unauthenticated (401) versus wrong-user (403 or 404) requests",
+        "Trace a JWT from login to a verified backend request in your app, and write down each step"
+      ],
+      "explanation_gate_targets": [
+        "What happens if the auth middleware is removed from one route in your backend — who can then do what",
+        "Why hiding the chat page behind a login redirect does not protect your API",
+        "How a token from your login flow gets verified in your middleware, step by step",
+        "When your API returns 401 versus 403, with a concrete example from your own endpoints"
+      ],
+      "gate_depth": "heavy",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Your explanation of the authentication architecture was thorough enough to skip the basic session setup walkthrough in Phase 6 — here's the pre-configured session handler. Plug it in and move straight to the logic layer."
+    },
+    {
+      "phase": 6,
+      "phase_title": "Persistence & Conversation History",
+      "core_concept": "Storing user data in Supabase — Row Level Security as the first line of defense, ownership policies, and parameterized access",
+      "ai_appropriate_tasks": [
+        "Generate typed query functions for your schema once tables and policies exist",
+        "Generate seed data for testing"
+      ],
+      "human_required_tasks": [
+        "Enable RLS on this table and write an ownership policy before continuing. Do not proceed until this is done.",
+        "Design the schema for conversations and messages, with a user_id ownership column on every table",
+        "Validate every user input that reaches the database and use parameterized queries — never string concatenation"
+      ],
+      "explanation_gate_targets": [
+        "What your RLS policy actually enforces, and why 'user is logged in' is not sufficient — ownership must be verified",
+        "What happens if the ownership check were removed — what anyone holding your public anon key could read or write",
+        "What breaks if input validation is removed from your message-save path",
+        "How your schema maps conversations to users, and what enforces that mapping"
+      ],
+      "gate_depth": "heavy",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Based on how you explained your database schema, you've unlocked the advanced query builder — a set of pre-written complex queries for your specific schema that would have taken manual work this phase"
+    },
+    {
+      "phase": 7,
+      "phase_title": "Pre-Deployment Security Checklist",
+      "core_concept": "Verification, not learning — confirming against your actual running app that every security constraint you built is really enforced before you ship",
+      "ai_appropriate_tasks": [
+        "Generate a search script for secret patterns (api_key, secret, sk_live, token, password) across the codebase"
+      ],
+      "human_required_tasks": [
+        "Search the entire codebase for api_key, secret, sk_live, token, password. Confirm none appear in any frontend file or any file committed to the public repo.",
+        "Open browser DevTools Network tab. Make requests in the app. Confirm no secrets appear in any request or response payload.",
+        "Confirm all external API calls with secrets are made from backend functions, not frontend code.",
+        "Open Supabase Authentication → Policies. Confirm RLS is enabled on every table. Confirm every policy checks ownership, not just login status.",
+        "Attempt to access a protected route directly via URL or curl without being logged in. Confirm it returns 401, not data.",
+        "Attempt to access another user's data by manipulating a resource ID in a request. Confirm it returns 403 or 404, not the other user's data.",
+        "Confirm every user input that reaches the database uses parameterized queries, not string concatenation.",
+        "Confirm every user input that gets rendered in the UI is sanitized or escaped before rendering.",
+        "Run the app URL with /api, /admin, /dashboard, and other common paths appended. Document what responds and confirm nothing sensitive is exposed unintentionally."
+      ],
+      "explanation_gate_targets": [
+        "Walk me through one item on this checklist. Tell me what you checked, what you found, and what you did or confirmed as a result.",
+        "Which checklist item surprised you or failed on first check in your app, and what you changed",
+        "Which single checklist item would be most damaging to skip for [PROJECT_PURPOSE], and what a stranger could do if you had skipped it"
+      ],
+      "gate_depth": "heavy",
+      "unlock_condition": "3-turn gate passed with no unresolved follow-ups",
+      "functional_unlock": "Your gate scores across this project qualify you for the system design review — a full written architectural critique of your codebase you can reference in interviews"
+    }
+  ]
+}
