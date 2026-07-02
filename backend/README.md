@@ -15,9 +15,11 @@ app/
 │   ├── errors.py    consistent JSON error shape, no internal detail leaks
 │   └── security.py  Supabase JWT verification (JWKS / ES256)
 ├── deps/auth.py   require_user dependency → 401 on missing/invalid token
-├── routers/       thin route handlers (health; archetypes — auth-required, read-only)
-├── services/      product logic (template_service.py: archetype template engine, M5)
-├── schemas/       request/response models (empty until needed)
+├── routers/       thin route handlers (health; archetypes — auth-required, read-only;
+│                  intake — auth-required five-question flow, M6)
+├── services/      product logic (template_service.py: archetype template engine, M5;
+│                  intake_service.py + project_repository.py: intake engine, M6)
+├── schemas/       request/response models (intake.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
 tests/             pytest suite

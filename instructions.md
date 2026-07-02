@@ -1,4 +1,4 @@
-# Codize Active Session Instructions — Milestone 5
+# Codize Active Session Instructions — Milestone 6
 
 Continue Codize per `CLAUDE.md`, `.claude/skills/`, and the durable context files.
 
@@ -10,12 +10,13 @@ Milestones complete:
 * M2 Supabase schema + RLS — commit `5db4744`
 * M3 Authentication foundation — commit `1075d2f`
 * M4 FastAPI core — commit `d6e55be`
+* M5 Archetype template engine — commit `53d6aa0`
 
 Known pending items:
 
 * Live adversarial prompt testing is still pending because no `ANTHROPIC_API_KEY` is available. Required before Milestone 9.
 * Live JWKS verification of a real Supabase JWT is pending backend env vars.
-* `scripts/verify_auth.py` was skipped in M4 because `SUPABASE_URL` / `SUPABASE_ANON_KEY` were absent from the session env.
+* `scripts/verify_auth.py` may be skipped if `SUPABASE_URL` / `SUPABASE_ANON_KEY` are absent.
 
 ## Read First
 
@@ -28,74 +29,114 @@ Read only these before implementation:
 * `.claude/memory/prebuild-artifact-conventions.md`
 * `.claude/memory/auth-milestone-todos.md`
 * `backend/README.md`
-* `backend/app/templates/*.json`
-* `backend/app/prompts/README.md`
+* `docs/db/schema.md`
+* `docs/auth.md`
+* `backend/app/services/template_service.py`
 
 If product behavior is unclear, consult `docs/context/codize_master_spec_v2.1.md`. Do not read `conversations.json` unless needed.
 
-## Milestone 5 Only — Archetype Template Engine
+## Milestone 6 Only — Intake Engine
 
-Goal: implement the backend engine that loads, validates, and serves the three hardcoded archetype JSON templates.
+Goal: implement the backend intake engine for Codize’s five mandatory conversational intake questions.
 
-This milestone does not call any LLMs.
+This milestone should create the backend logic and API foundation for intake. Do not build frontend UI yet.
 
-## Implement
+## Required Intake Behavior
 
-Create the simplest robust template engine inside the FastAPI backend.
+The intake flow has exactly five mandatory sequential questions.
 
-Required behavior:
+Question 1 must be exactly:
 
-* Load the three archetype JSON templates from `backend/app/templates/`.
-* Validate the template structure at startup or service initialization.
-* Expose a service layer for future milestones to retrieve templates by archetype id.
-* Preserve the rule that template structure is fixed.
-* Do not allow runtime mutation of templates.
-* Do not allow adding a fourth archetype.
-* Provide deterministic classification helper logic if appropriate, but do not call an LLM yet.
+"What problem do you want to solve, and who does solving it help?"
 
-Required service behavior:
+The five answers must capture:
 
-* `list_archetypes()` returns metadata for exactly three archetypes.
-* `get_template(archetype_id)` returns the matching template.
-* Invalid archetype ids return a controlled error.
-* Validation confirms:
+1. purpose
+2. project description / scope
+3. stack preference
+4. self-assessed AI-code understanding
+5. deadline / timeline
 
-  * exactly three templates
-  * ids are 1, 2, 3
-  * required top-level fields exist
-  * phases are sequential
-  * each phase has required fields
-  * each phase has 3–5 gate targets
-  * final phase is the Pre-Deployment Security Checklist
-  * fixed security constraints are present
-  * templates do not contain unexpected archetype ids
+Rules:
 
-API routes are allowed only if they are thin and foundation-level.
+* Questions must be answered sequentially.
+* Question 1 cannot be skipped.
+* Intake must not complete until all five answers exist.
+* Store answers in the existing Supabase-backed project model/schema design.
+* Do not add a sixth question.
+* Do not replace the purpose question with “What do you want to build?”
+* Signup should eventually go straight to question 1, but frontend work is out of scope here.
+
+## Archetype Classification
+
+After all five intake answers are complete, classify the project into exactly one of:
+
+1. AI-Powered App
+2. REST API Backend
+3. Full-Stack Web App
+
+Use the existing `resolve_archetype()` deterministic tiebreaker from the template service if appropriate.
+
+If an `ANTHROPIC_API_KEY` is available and the LLM service already exists, classification may use a temperature-0 LLM call. However, do not build a full LLM service in this milestone if that belongs later.
+
+If no Anthropic key is available, implement the clean seam for future LLM classification and use the deterministic fallback/helper for now. Document what remains unverified.
+
+Classification must never return a fourth archetype.
+
+## API Routes
+
+Create thin protected routes if appropriate.
 
 Allowed routes:
 
-* `GET /archetypes`
-* `GET /archetypes/{archetype_id}`
+* `GET /intake/questions`
+* `GET /intake/status`
+* `POST /intake/answers`
+* `POST /intake/complete`
 
-If created, these routes must:
+Adjust route names if a simpler REST shape is better, but preserve behavior.
 
-* be read-only
-* expose no secrets
-* use the service layer
-* return controlled errors for invalid ids
+Requirements:
+
+* all intake routes are auth-protected
+* route handlers stay thin
+* service layer owns intake logic
+* missing/invalid auth returns 401 through existing dependency
+* users can only access/update their own project/intake state
+* controlled errors use the existing standard error shape
+
+## Service Layer
+
+Create an intake service that handles:
+
+* question definitions
+* sequential answer validation
+* answer normalization
+* completion detection
+* archetype classification
+* project/intake state update interface
+
+Use the simplest robust structure.
+
+If real Supabase writes cannot run because env vars are unavailable, create repository/service seams and test the business rules with fakes. Clearly mark live DB writes as unverified.
 
 ## Tests
 
 Add tests for:
 
-* all three templates load
-* `list_archetypes()` returns exactly three
-* `get_template(1)`, `get_template(2)`, and `get_template(3)` work
-* invalid id returns controlled error
-* templates are immutable from caller perspective
-* template validation catches missing fields
-* API routes work if created
-* no fourth archetype can be introduced silently
+* exactly five questions
+* first question text is exact
+* questions are sequential
+* cannot complete with missing answers
+* can complete with all five answers
+* answer 1 / purpose is required
+* invalid question index/order is rejected
+* classification returns only ids 1, 2, or 3
+* LLM-core projects classify as Archetype 1
+* frontend/database projects classify as Archetype 3
+* backend/API-only projects classify as Archetype 2
+* auth required for intake routes
+* route responses contain no server-only secrets
 
 Run:
 
@@ -122,9 +163,7 @@ If env vars are unavailable, mark it unverified rather than blocking.
 
 Do not implement:
 
-* intake API routes
 * roadmap generation runtime
-* LLM calls
 * phase workspace
 * Interrogation Gate runtime
 * unlock system
@@ -132,7 +171,9 @@ Do not implement:
 * frontend UI
 * deployment
 
-Do not begin Milestone 6.
+Do not begin Milestone 7.
+
+Do not continue beyond Milestone 6.
 
 ## End Requirements
 
