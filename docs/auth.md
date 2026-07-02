@@ -31,8 +31,11 @@ reappears, that dashboard toggle is the fix.
 
 ## Backend auth enforcement design (implemented in Milestone 4)
 
-Design only — no runtime code exists yet. The rule from the spec: UI hiding is
-never security; every protected endpoint enforces auth **server-side**.
+Implemented in `backend/app/core/security.py` + `backend/app/deps/auth.py`
+(M4); tests sign locally generated ES256 tokens and stub only the JWKS fetch,
+so live verification of a real Supabase JWT is still pending backend env vars.
+The rule from the spec: UI hiding is never security; every protected endpoint
+enforces auth **server-side**.
 
 1. **Token flow.** The frontend authenticates against Supabase Auth directly
    (the one permitted frontend→external call) and holds the session JWT. Every

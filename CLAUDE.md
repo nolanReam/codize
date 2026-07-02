@@ -6,13 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Codize is an educational platform that helps students understand the projects they build with AI — it teaches real dev workflows and reasoning about your own code, using AI as a tool rather than a crutch. It is a benign educational product about architecture understanding and project reasoning. It is **not** a cybersecurity, exploit, malware, or offensive-security tool.
 
-**Current state: Milestone 3 complete** (auth foundation, on top of M2's schema+RLS and M1's pre-build artifacts). The three archetype JSON templates live in `backend/app/templates/` and the six system prompts in `backend/app/prompts/` (see its README for call parameters). The database schema (4 tables: `profiles`, `projects`, `gate_sessions`, `unlocks`) is live in Supabase project `tadkbymxkdncqahzshml` with RLS verified — see `docs/db/schema.md` and `supabase/migrations/`. Supabase Auth is verified end-to-end with real JWTs (signup trigger, password login, RLS through PostgREST) — see `docs/auth.md` for the audit and the Milestone-4 backend auth enforcement design; env contract in `.env.example`. No backend application code yet.
+**Current state: Milestone 4 complete** (FastAPI core, on top of M3's auth foundation, M2's schema+RLS and M1's pre-build artifacts). The FastAPI backend skeleton lives in `backend/app/` (see `backend/README.md`): app factory + CORS + consistent error shape (`main.py`, `core/errors.py`), centralized `Settings` with SecretStr server-only values (`core/config.py`), Supabase JWT verification via JWKS/ES256 (`core/security.py`), and the `require_user` auth dependency → 401 (`deps/auth.py`). `services/` and `schemas/` are empty until M5; only route is `GET /health` — no product routes yet. The three archetype JSON templates live in `backend/app/templates/` and the six system prompts in `backend/app/prompts/` (see its README for call parameters). The database schema (4 tables: `profiles`, `projects`, `gate_sessions`, `unlocks`) is live in Supabase project `tadkbymxkdncqahzshml` with RLS verified — see `docs/db/schema.md` and `supabase/migrations/`. Supabase Auth is verified end-to-end with real JWTs (signup trigger, password login, RLS through PostgREST) — see `docs/auth.md` for the audit and the backend auth enforcement design; env contract in `.env.example`.
 
 ## Commands
 
 - `python scripts/validate_prebuild_artifacts.py` — validates templates + prompts against the spec's invariants (run after any edit to either).
 - `scripts/verify_rls.sql` — RLS/ownership audit queries; run via Supabase MCP `execute_sql` after any schema change (sections 6–8 expect permission errors; run per-section).
 - `scripts/verify_auth.sql` + `python scripts/verify_auth.py` — end-to-end auth/RLS check over the real Auth+PostgREST APIs with real JWTs: run the SQL SETUP via MCP, run the script with `SUPABASE_URL`/`SUPABASE_ANON_KEY` set, then run the SQL CLEANUP. Run after any auth or RLS change.
+- Backend tests: from `backend/`, `.venv\Scripts\python -m pytest` (venv setup: `python -m venv .venv` then `.venv\Scripts\pip install -r requirements.txt`). Run after any backend change.
+- Backend dev server: from `backend/`, `.venv\Scripts\uvicorn app.main:app --reload`.
 
 ## Where the durable context lives
 
