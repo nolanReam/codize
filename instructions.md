@@ -1,306 +1,276 @@
-# Codize Active Session Instructions — Milestone 12
+# Codize Product Vision Reset — Context Update Only
 
-Continue Codize per `CLAUDE.md`, `.claude/skills/`, and the durable context files.
+Do not implement product code in this session.
+
+Do not build frontend screens.
+
+Do not modify backend behavior.
+
+Do not create migrations.
+
+Do not start Milestone 13.
+
+This is a context/spec reset after Milestone 12. The goal is to update Codize’s product direction before M13 frontend work begins.
 
 ## Current State
 
-Milestones complete:
+Milestones M1–M12 are complete.
 
-* M1 Repository foundation + pre-build artifacts — commit `98ad004`
-* M2 Supabase schema + RLS — commit `5db4744`
-* M3 Authentication foundation — commit `1075d2f`
-* M4 FastAPI core — commit `d6e55be`
-* M5 Archetype template engine — commit `53d6aa0`
-* M6 Intake engine — commit `0aacfae`
-* M7 Roadmap generation engine — commit `6a1c9c8`
-* M8 Phase workspace — commit `d38f642`
-* M9 Interrogation Gate — commit `9b46f7e`
-* M10 Functional unlocks — commit `4400f71`
-* M11 Reconnection system — commit `9012a52`
+Completed milestones:
 
-Known state:
+- M1 Repository foundation + pre-build artifacts — `98ad004`
+- M2 Supabase schema + RLS — `5db4744`
+- M3 Authentication foundation — `1075d2f`
+- M4 FastAPI core — `d6e55be`
+- M5 Archetype template engine — `53d6aa0`
+- M6 Intake engine — `0aacfae`
+- M7 Roadmap generation engine — `6a1c9c8`
+- M8 Phase workspace — `d38f642`
+- M9 Interrogation Gate — `9b46f7e`
+- M10 Functional unlocks — `4400f71`
+- M11 Reconnection system — `9012a52`
+- M12 Evaluation system — `44442b0`
 
-* Gemini roadmap generation is live-verified.
-* Interrogation Gate live adversarial testing is complete.
-* Live full gate PASS/FAIL flow with real Gemini and real Supabase is verified.
-* Live JWKS verification passed.
-* `verify_auth.py` passes 11/11 with the newer `sb_publishable_` key format.
-* Live PostgREST writes with the newer `sb_secret_` key are verified.
-* Functional unlocks are live-verified against real Supabase.
-* Reconnection is live-verified against real Supabase.
-* OpenRouter fallback is still live-unverified because Gemini has not failed.
-* `phase_explanation.md` is still not wired up by design.
-* Return-rate and vocabulary-growth triggers are v2 per the spec and should not be implemented unless the spec explicitly requires them in M12.
-* The M13 frontend contract for reconnection is documented: GET first on login, then acknowledge.
+## Product Direction Shift
 
-## Effort
+The product vision has been clarified.
 
-Use XHIGH effort for this milestone.
+Codize should no longer be framed mainly as:
 
-This milestone implements the backend evaluation system, which should be careful, safe, and spec-aligned.
+- roadmap generation
+- task checklist
+- understanding gate
+- generic student progress dashboard
+
+That framing is too narrow and makes Codize feel like a roadmap + quiz app.
+
+Codize should now be framed as:
+
+> An AI coding workflow trainer that helps student builders escape the 80% trap, use AI tools properly, verify what AI generated, and defend the projects they ship.
+
+This is not a random pivot.
+
+It is a correction back toward the original master spec’s thesis: Codize solves a workflow problem, not a laziness problem. Students need to learn where AI belongs in the software development process and where human judgment must remain in control.
 
 ## Read First
 
-Read only these before implementation:
+Read:
 
-* `CLAUDE.md`
-* `.claude/skills/spec-guardian/SKILL.md`
-* `.claude/skills/security-test/SKILL.md`
-* `.claude/skills/milestone-handoff/SKILL.md`
-* `.claude/memory/gate-conventions.md`
-* `.claude/memory/unlock-conventions.md`
-* `.claude/memory/reconnection-conventions.md`
-* `.claude/memory/phase-workspace-conventions.md`
-* `.claude/memory/roadmap-llm-conventions.md`
-* `.claude/memory/auth-milestone-todos.md`
-* `backend/README.md`
-* `docs/db/schema.md`
-* `backend/app/services/gate_service.py`
-* `backend/app/services/phase_service.py`
-* `backend/app/services/unlock_service.py`
-* `backend/app/services/reconnection_service.py`
-* `backend/app/services/project_repository.py`
-* `backend/app/routers/gate.py`
-* `backend/app/routers/phases.py`
-* `backend/app/routers/unlocks.py`
-* `backend/app/routers/reconnection.py`
-
-Then consult `docs/context/codize_master_spec_v2.1.md` specifically for the Evaluation system requirements.
+- `CLAUDE.md`
+- `docs/context/codize_product_vision_v3.md` if it already exists
+- `docs/context/codize_master_spec_v2.1.md`
+- `docs/context/codize_roadmap_v2.html`
+- `.claude/memory/product-vision-v3.md` if it already exists
+- `.claude/memory/` files related to roadmap, phase workspace, gate, unlocks, reconnection, and evaluation
 
 Do not read `conversations.json` unless needed.
 
-## Milestone 12 Only — Evaluation System
+## Task 1 — Create or Update Product Vision v3
 
-Goal: implement Codize’s backend evaluation system.
+Create or update:
 
-The evaluation system should help the student understand their learning progress and next best action without exposing hidden scores, hidden thresholds, evaluator internals, private prompts, or raw gate mechanics.
+`docs/context/codize_product_vision_v3.md`
 
-Do not build frontend UI yet.
+This document is the current product-direction source for Milestone 13+.
 
-## Product Rule
+If the file already exists, review it and improve it instead of duplicating it.
 
-Confirm the exact evaluation design from the spec before implementation.
+It should define Codize as:
 
-If the spec defines specific evaluation fields, states, labels, or route names, follow the spec.
+- an AI coding workflow trainer
+- not an AI coding assistant
+- not a browser IDE
+- not an AI news app
+- not just a quiz/gate platform
+- not a replacement for Claude Code, Cursor, GitHub Copilot, Replit, Codex, or ChatGPT
 
-If the spec does not require persistent evaluation snapshots, prefer a deterministic computed evaluation over adding new tables.
+## Required v3 Product Thesis
 
-Document any design decision in memory.
+Codize helps student builders stop blindly vibe coding by guiding them through a disciplined AI-assisted engineering loop:
 
-## Required Behavior
+Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
 
-The evaluation system should produce a safe, student-facing evaluation summary for the authenticated user’s current project.
+The main user pain is the 80% Trap:
 
-It should consider existing backend signals such as:
+AI can generate the first 80% of an app quickly, but the project collapses when the user adds features, hits bugs, or needs to explain architecture they never understood.
 
-* intake completion
-* roadmap generation status
-* current phase
-* phase/task progress
-* gate pass/fail history
-* safe gate-history summaries
-* earned unlocks
-* reconnection state if relevant
-* project status
+The main product payoff is the Project Defense Report:
 
-The evaluation should help answer:
+A student leaves with evidence that they planned, prompted, reviewed, verified, and explained their AI-assisted project work.
 
-1. Where am I in the roadmap?
-2. What have I completed?
-3. What is incomplete?
-4. What did my recent gate outcomes suggest in safe, non-hidden language?
-5. What should I do next?
+## MVP v0.1 Scope
 
-The evaluation system must not:
+Define the narrow MVP as:
 
-* expose raw gate scores
-* expose hidden unlock thresholds
-* expose evaluator private reasoning
-* expose prompt text
-* expose provider keys or service-role data
-* mutate the roadmap
-* advance phases
-* grant unlocks
-* update reconnection timestamps
-* change gate outcomes
+One student.
+One project.
+One phase/workflow loop.
+One Project Defense Report.
 
-## Student-Facing Evaluation Content
+MVP should include:
 
-Safe fields may include:
+1. Landing page around the 80% Trap
+2. Project Cockpit
+3. Prompt Builder
+4. Review Board
+5. Evidence Panel
+6. Verification Lab
+7. Evidence-Based Understanding Gate
+8. Project Defense Report
+9. Basic pilot analytics/survey hooks if feasible
 
-* project status
-* roadmap status
-* current phase number/title
-* completed phase count
-* total phase count
-* current phase task completion summary
-* incomplete current-phase tasks
-* recent gate outcome label, without raw score
-* earned unlock summaries
-* recommended next action
-* readiness state such as `not_started`, `intake_needed`, `roadmap_needed`, `in_progress`, `gate_ready`, `cooldown`, or `complete` if supported by the spec
+MVP should not include:
 
-Do not include:
+- browser IDE
+- full GitHub OAuth
+- AI news digest
+- community/social features
+- tool marketplace
+- random XP/streak gamification
+- elementary/Scratch version
+- full automated verification of arbitrary projects
+- AI coding agent
+- hosted coding runtime
 
-* numeric hidden gate score
-* hidden unlock formula
-* “score >= 7”
-* evaluator private rubric text
-* full internal gate transcript unless the spec explicitly requires it
-* internal prompt names or prompt bodies
-* service-role data
+Manual evidence is acceptable for v0.1:
 
-## LLM Use
+- repo URL
+- commit hash
+- changed files
+- pasted terminal output
+- screenshot link/notes
+- what AI generated
+- what the user accepted/rejected/edited
 
-Do not add a new LLM dependency unless the spec explicitly requires it.
+## Task 2 — Create or Update Claude Memory
 
-Prefer deterministic evaluation derived from existing stored state.
+Create or update:
 
-If the spec requires LLM-generated evaluation language:
+`.claude/memory/product-vision-v3.md`
 
-* use the provider-agnostic LLM service only
-* Gemini primary
-* OpenRouter fallback
-* stub for tests/no-key mode
-* validate output so it cannot reveal hidden scores, thresholds, prompts, or private evaluator reasoning
-* mark live LLM evaluation unverified if no live provider call is made
+This should be a concise durable reminder, not the full product spec.
 
-Do not require Anthropic.
+It should record:
 
-Do not add Anthropic env vars.
+- the vision shifted before M13
+- old roadmap + checklist + gate framing is incomplete
+- current thesis is AI Workflow Trainer / Project Defense Workflow
+- the Codize Build Loop is Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
+- M13 should become AI Workflow Workspace MVP
+- browser IDE, full GitHub OAuth, AI news, community, and tool marketplace are out of scope for v0.1
+- `docs/context/codize_product_vision_v3.md` is the current product-direction source
 
-## API Routes
+## Task 3 — Update Context Authority
 
-Create thin protected routes if appropriate.
+Create or update:
 
-Allowed routes:
+`docs/context/context_authority.md`
 
-* `GET /evaluation`
-* `GET /evaluation/summary`
+This file should clearly define source authority.
 
-Use one route if that is simpler.
+Use this hierarchy:
 
-Adjust route names only if the spec or existing backend style clearly suggests a better shape.
+1. `instructions.md`
+   - Controls the active Claude Code task/process only.
+   - Does not permanently redefine product vision unless it explicitly updates context docs.
 
-Requirements:
+2. `docs/context/codize_product_vision_v3.md`
+   - Controls current product positioning, UX direction, MVP scope, and M13+ frontend direction.
 
-* routes are auth-protected
-* route handlers stay thin
-* service layer owns evaluation logic
-* user can only access their own evaluation state
-* controlled errors use the existing standard error shape
-* responses leak no server-only secrets
-* responses do not expose hidden scores or thresholds
+3. `docs/context/codize_master_spec_v2.1.md`
+   - Controls backend invariants, core architecture, intake, archetypes, security constraints, RLS/auth requirements, and gate mechanics unless explicitly superseded by v3.
 
-## Service Layer
+4. `CLAUDE.md`, `.claude/skills/`, and `.claude/memory/`
+   - Control durable implementation conventions and operational memory.
 
-Create an evaluation service that handles:
+5. `docs/context/codize_roadmap_v2.html`
+   - Legacy build/learning roadmap.
+   - Useful historical context.
+   - Not current product direction.
+   - Do not use it to define M13 unless explicitly instructed.
 
-* loading the authenticated user’s current project
-* determining project/evaluation readiness state
-* reading phase/task progress safely
-* reading safe gate outcome summaries
-* reading unlock views
-* producing recommended next action
-* preventing cross-user access
-* producing safe client-facing response models
+6. `docs/context/conversations.json`
+   - Historical product-debate archive only.
+   - Not authoritative.
+   - Do not read unless explicitly needed.
 
-Use existing service/repository seams where appropriate.
+## What “Legacy” Means
 
-Avoid duplicating phase/unlock/reconnection logic if public safe view helpers already exist.
+Do not delete legacy files.
 
-## Persistence Requirements
+Do not rename legacy files unless necessary.
 
-Prefer no new migration.
+Marking a file as legacy means:
 
-If the spec requires persistent evaluation records, add the smallest safe migration possible.
+- future Claude sessions should know it is old context
+- it can still be referenced for history
+- it must not override the current v3 product direction
+- it should not drive M13 frontend decisions
 
-If adding persistence:
+Do not edit `codize_roadmap_v2.html` heavily.
 
-* RLS must remain enabled
-* ownership must be enforced
-* hidden scores and thresholds must not be client-readable
-* service-role writes must still filter by `user_id`
+If adding a note is safe, add only a small comment near the top saying it is legacy. If that risks breaking the HTML, do not edit the HTML file; rely on `context_authority.md`, `CLAUDE.md`, and memory instead.
 
-If evaluation is computed on read, document that decision in memory.
+## Task 4 — Update CLAUDE.md
 
-## Tests
+Update `CLAUDE.md` so future sessions know:
 
-Add tests for:
+- Codize v3 product direction is AI Workflow Trainer / Project Defense Workflow.
+- The old “roadmap + gate” framing is incomplete.
+- `docs/context/codize_product_vision_v3.md` is the current product-direction source for M13+.
+- `docs/context/codize_master_spec_v2.1.md` still controls backend/security/gate invariants.
+- `docs/context/codize_roadmap_v2.html` is legacy build/learning context.
+- `conversations.json` is historical archive only.
+- M13 must not be started from the old three-screen frontend plan.
+- M13 should implement the AI Workflow Workspace MVP.
+- Browser IDE, AI news, full GitHub OAuth, community, and tool marketplace are out of scope for v0.1.
 
-* evaluation returns correct state when user has no project
-* evaluation returns intake-needed state before intake completion
-* evaluation returns roadmap-needed state before roadmap generation
-* evaluation returns active in-progress state after roadmap generation
-* evaluation includes current phase number/title
-* evaluation includes task completion summary
-* evaluation includes incomplete current-phase tasks
-* evaluation includes safe earned unlock summaries
-* evaluation includes safe recent gate outcome label/summary
-* evaluation recommends next action before gate
-* evaluation recommends next action during cooldown
-* evaluation recommends next action after gate pass
-* evaluation handles completed/final phase if applicable
-* evaluation does not expose raw gate scores
-* evaluation does not expose hidden thresholds
-* evaluation does not expose internal prompts
-* evaluation does not expose provider or service-role secrets
-* evaluation does not mutate roadmap, task progress, unlocks, gates, or reconnection timestamps
-* user cannot access another user’s evaluation
-* auth required for evaluation routes
-* responses contain no server-only secrets
+## M13 Direction To Record
 
-Run:
+Milestone 13 should be renamed/reframed from generic frontend integration to:
 
-```bash id="5hmv3p"
-cd backend
-pytest
-```
+> AI Workflow Workspace MVP
 
-Also run:
+M13 should not simply create old screens for:
 
-```bash id="8fpu6o"
-python scripts/validate_prebuild_artifacts.py
-```
+- intake
+- roadmap
+- phase checklist
+- gate modal
 
-Run auth verification:
+M13 should create a frontend experience around:
 
-```bash id="r8byw4"
-python scripts/verify_auth.py
-```
+- Landing page
+- Project Cockpit
+- Prompt Builder
+- Review Board
+- Evidence Panel
+- Verification Lab
+- Evidence-Based Gate
+- Project Defense Report / Evaluation Summary
 
-If Supabase env vars are unavailable, mark live verification unverified rather than blocking.
+Existing backend routes may still be used, but the UX language and flow should match the v3 product direction.
 
-If live Supabase is configured, run a minimal live smoke test for evaluation summary.
+## Do Not
 
-## Out of Scope
-
-Do not implement:
-
-* frontend UI
-* deployment
-* return-rate unlock triggers
-* vocabulary-growth unlock triggers
-* phase explanation generation
-* new roadmap generation behavior
-* new gate scoring behavior
-* new unlock rules unless the spec explicitly requires them for M12
-
-Do not begin Milestone 13.
-
-Do not continue beyond Milestone 12.
+Do not implement frontend code.
+Do not modify backend behavior.
+Do not create migrations.
+Do not start M13.
+Do not delete old context files.
+Do not rewrite the entire master spec.
+Do not overbuild the product vision into a huge platform.
+Do not add AI news, browser IDE, GitHub OAuth, community, or tool marketplace to the MVP.
 
 ## End Requirements
 
 At the end:
 
-* run backend tests
-* run prebuild validator
-* run auth verification if env vars exist
-* run secret scan
-* run live Supabase smoke test if env vars exist
-* commit changes
-* update `CLAUDE.md` with new commands/routes if relevant
-* update `.claude/memory/` with durable evaluation lessons
-* output `MILESTONE COMPLETE`
-* tell the user to run `/compact`
+- list files created/updated
+- explain the new authority hierarchy
+- explain what is now legacy
+- explain how M13 changes
+- run a quick secret scan if files were changed
+- commit changes
+- output the git commit hash
+- stop
