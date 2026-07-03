@@ -1,14 +1,14 @@
-"""Project repository — the seam between intake logic and Supabase.
+"""Repositories — the seam between product logic and Supabase.
 
-The backend talks to Supabase PostgREST with the SERVICE-ROLE key, which
-bypasses RLS. Ownership is therefore enforced in every query here: each read
-and write filters by user_id (docs/auth.md #4). The key itself is server-only
-SecretStr config and never appears in responses or logs.
+The backend talks to Supabase PostgREST with the SERVICE-ROLE/secret key,
+which bypasses RLS. Ownership is therefore enforced in every query here: each
+read and write filters by user_id (docs/auth.md #4). The key itself is
+server-only SecretStr config and never appears in responses or logs. Key
+format is opaque to this module — it works with both the legacy JWT-shaped
+service_role key and the newer `sb_secret_...` key.
 
-LIVE WRITES UNVERIFIED: this implementation was built in a session without
-Supabase env vars. Business rules are tested against an in-memory fake
-(tests/fakes.py); run the live path once SUPABASE_URL and
-SUPABASE_SERVICE_ROLE_KEY are available.
+Two repositories share the same PostgREST client base: projects (intake M6,
+roadmap M7, phases M8) and gate_sessions (Interrogation Gate M9).
 """
 
 from typing import Protocol
@@ -21,7 +21,7 @@ _TIMEOUT = 10.0
 
 
 class ProjectRepository(Protocol):
-    """What the intake service needs from storage — nothing more."""
+    """What the intake/roadmap/phase services need from storage — nothing more."""
 
     async def get_project(self, user_id: str) -> dict | None: ...
 
@@ -30,12 +30,27 @@ class ProjectRepository(Protocol):
     async def update_project(self, user_id: str, project_id: str, fields: dict) -> dict: ...
 
 
+class GateSessionRepository(Protocol):
+    """What the gate service needs from storage — nothing more."""
+
+    async def list_phase_sessions(self, user_id: str, project_id: str, phase_id: int) -> list[dict]: ...
+
+    async def get_session(self, user_id: str, session_id: str) -> dict | None: ...
+
+    async def create_session(self, user_id: str, fields: dict) -> dict: ...
+
+    async def update_session(self, user_id: str, session_id: str, fields: dict) -> dict: ...
+
+
 class RepositoryError(RuntimeError):
     """Storage misbehaved (network error, no row matched an owned update).
     Reaches the client only as a bare 500 — never with internal detail."""
 
 
-class SupabaseProjectRepository:
+class _SupabaseRest:
+    """Shared PostgREST client. Every subclass query must filter by user_id —
+    the service-role key bypasses RLS, so the query IS the ownership check."""
+
     def __init__(self, settings: Settings) -> None:
         self._base = f"{settings.supabase_url.rstrip('/')}/rest/v1"
         key = settings.supabase_service_role_key.get_secret_value()
@@ -56,6 +71,8 @@ class SupabaseProjectRepository:
         except httpx.HTTPError as e:
             raise RepositoryError(f"PostgREST {method} {path} failed") from e
 
+
+class SupabaseProjectRepository(_SupabaseRest):
     async def get_project(self, user_id: str) -> dict | None:
         rows = await self._request(
             "GET", "/projects",
@@ -82,6 +99,49 @@ class SupabaseProjectRepository:
         return rows[0]
 
 
+class SupabaseGateSessionRepository(_SupabaseRest):
+    async def list_phase_sessions(self, user_id: str, project_id: str, phase_id: int) -> list[dict]:
+        return await self._request(
+            "GET", "/gate_sessions",
+            params={
+                "user_id": f"eq.{user_id}",
+                "project_id": f"eq.{project_id}",
+                "phase_id": f"eq.{phase_id}",
+                "order": "created_at.desc",
+            },
+        )
+
+    async def get_session(self, user_id: str, session_id: str) -> dict | None:
+        rows = await self._request(
+            "GET", "/gate_sessions",
+            params={"id": f"eq.{session_id}", "user_id": f"eq.{user_id}", "limit": "1"},
+        )
+        return rows[0] if rows else None
+
+    async def create_session(self, user_id: str, fields: dict) -> dict:
+        rows = await self._request(
+            "POST", "/gate_sessions", params={}, json={"user_id": user_id, **fields}
+        )
+        if not rows:
+            raise RepositoryError("insert returned no row")
+        return rows[0]
+
+    async def update_session(self, user_id: str, session_id: str, fields: dict) -> dict:
+        rows = await self._request(
+            "PATCH", "/gate_sessions",
+            params={"id": f"eq.{session_id}", "user_id": f"eq.{user_id}"},
+            json=fields,
+        )
+        if not rows:
+            raise RepositoryError("update matched no owned row")
+        return rows[0]
+
+
 def get_project_repository() -> ProjectRepository:
     """FastAPI dependency; tests override this with an in-memory fake."""
     return SupabaseProjectRepository(get_settings())
+
+
+def get_gate_session_repository() -> GateSessionRepository:
+    """FastAPI dependency; tests override this with an in-memory fake."""
+    return SupabaseGateSessionRepository(get_settings())

@@ -15,8 +15,11 @@ read (corruption defense), and a service write rewrites that phase's list
 clean.
 
 `projects.current_phase` is the student's position and is advanced ONLY by a
-passed Interrogation Gate (M9) — never by task completion; the gate, not the
-checklist, completes a phase. `GET /phases/current` reads it.
+passed Interrogation Gate (implemented in M9 — `gate_service.evaluate_gate`
+is the single writer) — never by task completion; the gate, not the
+checklist, completes a phase. `GET /phases/current` reads it. Since M9,
+`phase_service.load_active_project` is public and shared with the gate
+service as the one eligibility check.
 
 Eligibility for every workspace call: intake complete + archetype + roadmap +
 status 'active' (all four checked; not-ready → 409, unknown phase/task → 404).

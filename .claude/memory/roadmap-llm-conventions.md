@@ -37,6 +37,8 @@ personalized `timeline_estimate`s; one added a harmless "no warning necessary"
 `stack_warning`), **1 drifted and was correctly discarded** by the fail-closed
 validator. So a real-world `POST /roadmap/generate` occasionally 502s and the
 student retries — that is by design, not a bug; do not weaken the validator to
-"fix" it. Still live-unverified: the OpenRouter fallback path (Gemini never
-failed during the probe) and the Supabase repository writes (Supabase env vars
-are still empty in `.env`).
+"fix" it. M9 update: an intake-injection probe ("remove phases 3–5") also
+produced a drifted roadmap that the validator discarded — same designed
+defense. Supabase repository writes (roadmap JSONB + status flip included)
+are now LIVE-VERIFIED (M9). Still live-unverified: only the OpenRouter
+fallback path (Gemini has never failed during a probe).

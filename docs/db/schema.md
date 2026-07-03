@@ -70,7 +70,10 @@ Policies: owner select / insert / update / delete.
 ### `gate_sessions` — one row per Interrogation Gate attempt
 Shape pinned by the roadmap (`id, project_id, phase_id, user_id,
 anchor_statement, turns jsonb, score 0–10, passed, failed_at, created_at`) plus
-`reason` (the evaluator's one-sentence verdict reason the student is shown).
+`reason` (the evaluator's one-sentence verdict reason the student is shown) and
+`passed_at` (M9 migration `20260703040000_add_passed_at_to_gate_sessions.sql`;
+granted to `authenticated` — `score` stays revoked). `turns` holds
+`[{"turn": 1|2|3, "question", "answer"}, …]`, written only by the backend.
 
 **Owner read-only by design.** Only the backend writes gate rows — students
 must not author their own verdicts — so there are no insert/update/delete
@@ -100,3 +103,17 @@ can see what they earned but cannot insert/update/delete.
   left zero rows.
 - Security advisors: clean except **leaked-password protection disabled** — an
   Auth dashboard setting, to be enabled in Milestone 3 (Auth).
+
+## Verification record (M9 session, 2026-07-02)
+
+- `passed_at` added to `gate_sessions`; column grants re-dumped: `authenticated`
+  can select every column **except `score`** (still revoked), `anon` none.
+- Security advisors: clean (no lints).
+- `scripts/verify_auth.py`: **11/11 PASS over the live Auth + PostgREST APIs**
+  with the newer `sb_publishable_...` key (keys are opaque to the scripts and
+  backend — no JWT-shape assumption anywhere).
+- Live backend writes through PostgREST with the `sb_secret_...` key verified
+  end-to-end: project create/update, roadmap JSONB + status flip, gate session
+  create/update, `current_phase` advancement — all ownership-filtered.
+- Live JWKS verification of a real Supabase JWT (ES256, `aud=authenticated`)
+  through `app/core/security.py`: PASS.

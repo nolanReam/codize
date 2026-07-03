@@ -18,13 +18,17 @@ app/
 ├── routers/       thin route handlers (health; archetypes — auth-required, read-only;
 │                  intake — auth-required five-question flow, M6;
 │                  roadmap — auth-required generation + read, M7;
-│                  phases — auth-required phase workspace, M8)
+│                  phases — auth-required phase workspace, M8;
+│                  gate — auth-required Interrogation Gate, M9)
 ├── services/      product logic (template_service.py: archetype template engine, M5;
-│                  intake_service.py + project_repository.py: intake engine, M6;
+│                  intake_service.py + project_repository.py: intake engine, M6
+│                  — project_repository.py also holds the gate_sessions
+│                  repository since M9;
 │                  llm_service.py + roadmap_service.py: provider-agnostic LLM
 │                  layer and roadmap generation with fail-closed validation, M7;
-│                  phase_service.py: phase workspace over the stored roadmap, M8)
-├── schemas/       request/response models (intake.py, phases.py)
+│                  phase_service.py: phase workspace over the stored roadmap, M8;
+│                  gate_service.py: 3-turn Interrogation Gate + evaluator, M9)
+├── schemas/       request/response models (intake.py, phases.py, gate.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
 tests/             pytest suite
@@ -69,6 +73,30 @@ structure. `current_phase` is advanced by the Interrogation Gate (M9), never
 by ticking tasks. Routes: `GET /phases`, `GET /phases/current`,
 `GET /phases/{n}`, `PATCH /phases/{n}/tasks/{task_id}` (body
 `{"completed": bool}`); workspace not ready → 409, unknown phase/task → 404.
+
+## Interrogation Gate (M9)
+
+`services/gate_service.py` runs the spec's 3-turn gate for the student's
+current phase. Flow: `POST /gate/start` (eligibility: active project + roadmap
++ current phase; 30-minute cooldown after a failed attempt, derived from
+`gate_sessions.failed_at`) → `POST /gate/{id}/turn1` (body
+`{"anchor_statement"}`; a deterministic server check plus model re-validation
+reject anchors with no concrete implementation element — the gate never starts
+without an anchor) → `POST /gate/{id}/turn2` and `/turn3` (body `{"answer"}`;
+each stores the previous answer and returns the next question in one write, so
+LLM failures are retryable with nothing lost) → `POST /gate/{id}/evaluate`
+(separate temperature-0 call; strict fail-closed JSON parse). Turns run at
+temperature 0.3, prompts from `app/prompts/gate_turn_*.md` /
+`gate_evaluation.md`. On PASS: `passed_at` set, `projects.current_phase`
+advances (never past the final phase), `gate_history_summary` appended. On
+FAIL: `failed_at` set, cooldown starts, no advancement. `GET /gate/current`
+reports the current phase's gate state (not started / in progress with
+transcript / cooldown with remaining seconds / passed). The evaluator's 0–10
+quality score is stored for M10's hidden unlock thresholds and never appears
+in any response; the DB additionally revokes the column from client roles.
+Errors: not ready / in progress / already passed / out of order / cooldown →
+409 (cooldown adds Retry-After), unknown session → 404, invalid anchor → 422,
+LLM failure or malformed verdict → 502 with nothing stored.
 
 ## Tests
 

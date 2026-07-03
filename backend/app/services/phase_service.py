@@ -39,7 +39,7 @@ class TaskNotFoundError(PhaseWorkspaceError):
     """Task id does not resolve to a task in this phase."""
 
 
-async def _load_active_project(repo: ProjectRepository, user_id: str) -> dict:
+async def load_active_project(repo: ProjectRepository, user_id: str) -> dict:
     project = await repo.get_project(user_id)
     if (
         project is None
@@ -121,7 +121,7 @@ def _phase_summary(project: dict, phase: dict) -> dict:
 
 
 async def list_phases(repo: ProjectRepository, user_id: str) -> dict:
-    project = await _load_active_project(repo, user_id)
+    project = await load_active_project(repo, user_id)
     return {
         "current_phase": project["current_phase"],
         "phases": [_phase_summary(project, p) for p in project["roadmap"]["phases"]],
@@ -129,19 +129,19 @@ async def list_phases(repo: ProjectRepository, user_id: str) -> dict:
 
 
 async def get_phase(repo: ProjectRepository, user_id: str, phase_number: int) -> dict:
-    project = await _load_active_project(repo, user_id)
+    project = await load_active_project(repo, user_id)
     return _phase_view(project, _find_phase(project, phase_number))
 
 
 async def get_current_phase(repo: ProjectRepository, user_id: str) -> dict:
-    project = await _load_active_project(repo, user_id)
+    project = await load_active_project(repo, user_id)
     return _phase_view(project, _find_phase(project, project["current_phase"]))
 
 
 async def set_task_completion(
     repo: ProjectRepository, user_id: str, phase_number: int, task_id: str, completed: bool
 ) -> dict:
-    project = await _load_active_project(repo, user_id)
+    project = await load_active_project(repo, user_id)
     phase = _find_phase(project, phase_number)
     if task_id not in _valid_task_ids(phase):
         raise TaskNotFoundError(f"Task '{task_id}' does not exist in phase {phase_number}.")

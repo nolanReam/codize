@@ -10,9 +10,9 @@ Keys are server-only SecretStr config; they travel only in outbound request
 headers and never appear in errors or responses. Provider failures surface as
 LLMError — the caller maps that to a generic client message.
 
-LIVE PROVIDERS UNVERIFIED: built in a session without GEMINI_API_KEY or
-OPENROUTER_API_KEY. Both providers are unit-tested against mocked transports;
-run one real generation once a key is available.
+Live verification: Gemini verified with real calls (M8 roadmap generation;
+M9 gate turns, evaluator, and adversarial prompt runs). The OpenRouter
+fallback is still live-unverified — Gemini has never failed during a probe.
 """
 
 import json
