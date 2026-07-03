@@ -25,6 +25,7 @@ Read these before making product or architecture decisions:
 
 - **`docs/context/context_authority.md`** — the source-authority hierarchy: which document wins on conflicts. Read this first when sources disagree.
 - **`docs/context/codize_product_vision_v3.md`** — the **current product-direction source** (positioning, UX direction, MVP scope, M13+ frontend direction). Wins on UX/positioning conflicts.
+- **`docs/context/m13_ai_workflow_workspace_plan.md`** — the M13 implementation plan (from the M13A planning session): per-surface analysis, route map, and the decided split — **M13B** backend mini-milestone (`workflow_artifacts` JSONB column on `projects` + `GET/PUT /workflow` routes, `task_progress` precedent) before **M13C** frontend.
 - **`docs/context/codize_master_spec_v2.1.md`** — the authoritative product specification (Master Spec, content v1.2) for **backend invariants, intake, archetypes, security, RLS/auth, and gate mechanics**. Wins on backend/security/gate-safety conflicts. Note: it is a Markdown file despite some skill references to a `.pdf`.
 - **`docs/context/codize_roadmap_v2.html`** — **LEGACY** build/learning roadmap. Historical context for technical decisions (async FastAPI, service-layer structure, gate temperatures, RLS policy shape); not current product direction — do not use it to define M13.
 - **`docs/context/conversations.json`** — **ARCHIVE**: historical product-debate record only, not authoritative (large, ~1.4MB; grep it, don't read whole).

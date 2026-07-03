@@ -96,11 +96,21 @@ analytics have NO backend routes or tables as of M12. The existing API
 surface is exactly intake/archetypes/roadmap/phases/gate/unlocks/
 reconnection/evaluation (see [[gate-conventions]],
 [[phase-workspace-conventions]], [[unlock-conventions]],
-[[reconnection-conventions]], [[evaluation-conventions]]). Decide per
-surface: client-side for v0.1, defer, or a small new backend milestone —
-never assume backend support exists. Existing safety invariants (hidden
-scores, thresholds, prompt secrecy, RLS, gate mechanics) are unchanged by
-this vision reset.
+[[reconnection-conventions]], [[evaluation-conventions]]). Existing safety
+invariants (hidden scores, thresholds, prompt secrecy, RLS, gate mechanics)
+are unchanged by this vision reset.
+
+RESOLVED by the M13A planning session (2026-07-03,
+`docs/context/m13_ai_workflow_workspace_plan.md` — the authoritative M13
+plan): M13 splits into **M13B** (backend mini-milestone: `workflow_artifacts`
+JSONB column on `projects` following the `task_progress` precedent, plus
+`GET /workflow/{phase}` + `PUT /workflow/{phase}/{section}` — no LLM, no new
+table, no new RLS) and **M13C** (Next.js workspace frontend). Prompt Builder
+generation is deterministic client-side (no LLM); the Defense Report is
+assembled client-side from existing GETs + the workflow routes (no report
+endpoint); the gate stays the M9 gate as-is (evidence-aware prompts
+deferred, spec-guardian-gated); pilot analytics = operator SQL + external
+survey link, no product analytics.
 
 ## MVP Boundaries
 
