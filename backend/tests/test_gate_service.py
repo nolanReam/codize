@@ -35,6 +35,7 @@ from app.services.llm_service import LLMError, LLMService, StubProvider
 from tests.fakes import (
     InMemoryGateSessionRepository,
     InMemoryProjectRepository,
+    InMemoryUnlockRepository,
     ScriptedLLM,
 )
 
@@ -75,7 +76,7 @@ def make_repos(user=USER):
     return repo, gates, project
 
 
-def run_full_gate(repo, gates, user=USER, verdict=PASS_VERDICT):
+def run_full_gate(repo, gates, user=USER, verdict=PASS_VERDICT, unlocks=None):
     """Drive one complete gate: anchor → q1/a1 → q2/a2 → q3/a3 → evaluation."""
     started = run(start_gate(repo, gates, user))
     sid = started["gate_session_id"]
@@ -84,7 +85,7 @@ def run_full_gate(repo, gates, user=USER, verdict=PASS_VERDICT):
     run(submit_anchor(repo, gates, llm, user, sid, ANCHOR))
     run(generate_followup(repo, gates, llm, user, sid, 2, "Because ownership lives on the row."))
     run(generate_followup(repo, gates, llm, user, sid, 3, "WITH CHECK still blocks writes."))
-    result = run(evaluate_gate(repo, gates, llm, user, sid,
+    result = run(evaluate_gate(repo, gates, unlocks or InMemoryUnlockRepository(), llm, user, sid,
                                "My matches table would need a join table; create_match() changes."))
     return sid, result, llm
 
@@ -133,7 +134,7 @@ def test_turns_refused_before_anchor():
         with pytest.raises(GateOutOfOrderError):
             run(generate_followup(repo, gates, llm, USER, sid, turn, "answer"))
     with pytest.raises(GateOutOfOrderError):
-        run(evaluate_gate(repo, gates, llm, USER, sid, "answer"))
+        run(evaluate_gate(repo, gates, InMemoryUnlockRepository(), llm, USER, sid, "answer"))
     assert llm.calls == []  # no LLM call happens before the anchor exists
 
 
@@ -220,7 +221,7 @@ def test_out_of_order_turns_are_refused():
     with pytest.raises(GateOutOfOrderError):  # anchor resubmission
         run(submit_anchor(repo, gates, llm, USER, sid, ANCHOR))
     with pytest.raises(GateOutOfOrderError):  # evaluate before turn 3
-        run(evaluate_gate(repo, gates, llm, USER, sid, "answer"))
+        run(evaluate_gate(repo, gates, InMemoryUnlockRepository(), llm, USER, sid, "answer"))
     run(generate_followup(repo, gates, llm, USER, sid, 2, "answer"))
     with pytest.raises(GateOutOfOrderError):  # turn2 twice
         run(generate_followup(repo, gates, llm, USER, sid, 2, "answer"))
@@ -328,7 +329,7 @@ def test_malformed_evaluator_output_is_rejected_and_stores_nothing():
     run(generate_followup(repo, gates, llm, USER, sid, 2, "a1"))
     run(generate_followup(repo, gates, llm, USER, sid, 3, "a2"))
     with pytest.raises(GateGenerationError):
-        run(evaluate_gate(repo, gates, llm, USER, sid, "a3"))
+        run(evaluate_gate(repo, gates, InMemoryUnlockRepository(), llm, USER, sid, "a3"))
     session = run(gates.get_session(USER, sid))
     assert session["passed"] is None and session["score"] is None
     assert session["turns"][2]["answer"] is None  # retryable
@@ -369,7 +370,7 @@ def test_wrong_user_cannot_access_anothers_gate_session():
     with pytest.raises(GateSessionNotFoundError):
         run(generate_followup(repo, gates, llm, OTHER_USER, sid, 2, "a"))
     with pytest.raises(GateSessionNotFoundError):
-        run(evaluate_gate(repo, gates, llm, OTHER_USER, sid, "a"))
+        run(evaluate_gate(repo, gates, InMemoryUnlockRepository(), llm, OTHER_USER, sid, "a"))
     assert llm.calls == []
 
 
@@ -395,7 +396,7 @@ def test_get_current_gate_states_never_include_score():
     llm.responses.extend(["Q2?", "Q3?", FAIL_VERDICT])
     run(generate_followup(repo, gates, llm, USER, sid, 2, "a1"))
     run(generate_followup(repo, gates, llm, USER, sid, 3, "a2"))
-    run(evaluate_gate(repo, gates, llm, USER, sid, "a3"))
+    run(evaluate_gate(repo, gates, InMemoryUnlockRepository(), llm, USER, sid, "a3"))
     view = run(get_current_gate(repo, gates, USER))
     assert view["state"] == "cooldown"
     assert 0 < view["cooldown_seconds_remaining"] <= 1800

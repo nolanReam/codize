@@ -22,10 +22,12 @@ from app.services.llm_service import get_llm_service
 from app.services.project_repository import (
     get_gate_session_repository,
     get_project_repository,
+    get_unlock_repository,
 )
 from tests.fakes import (
     InMemoryGateSessionRepository,
     InMemoryProjectRepository,
+    InMemoryUnlockRepository,
     ScriptedLLM,
 )
 
@@ -74,8 +76,10 @@ def client(monkeypatch, gate_llm):
     # one repo instance per test — capture them
     project_repo = InMemoryProjectRepository()
     gate_repo = InMemoryGateSessionRepository()
+    unlock_repo = InMemoryUnlockRepository()
     app.dependency_overrides[get_project_repository] = lambda: project_repo
     app.dependency_overrides[get_gate_session_repository] = lambda: gate_repo
+    app.dependency_overrides[get_unlock_repository] = lambda: unlock_repo
     test_client = TestClient(app)
     test_client.gate_llm = gate_llm
     test_client.app_ref = app

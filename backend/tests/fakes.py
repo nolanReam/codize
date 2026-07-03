@@ -6,6 +6,7 @@ import itertools
 import uuid
 
 from app.services.llm_service import LLMError
+from app.services.project_repository import RepositoryError
 
 
 class InMemoryProjectRepository:
@@ -65,6 +66,16 @@ class InMemoryGateSessionRepository:
         rows.sort(key=lambda r: r["created_at"], reverse=True)
         return copy.deepcopy(rows)
 
+    async def list_passed_sessions(self, user_id: str, project_id: str) -> list[dict]:
+        rows = [
+            r for r in self._rows
+            if r["user_id"] == user_id
+            and r["project_id"] == project_id
+            and r["passed"] is True
+        ]
+        rows.sort(key=lambda r: r["phase_id"])
+        return copy.deepcopy(rows)
+
     async def get_session(self, user_id: str, session_id: str) -> dict | None:
         for row in self._rows:
             if row["id"] == session_id and row["user_id"] == user_id:
@@ -96,6 +107,52 @@ class InMemoryGateSessionRepository:
                 row.update(fields)
                 return copy.deepcopy(row)
         raise RuntimeError("update matched no owned row")
+
+
+class InMemoryUnlockRepository:
+    """Mirrors the unlocks table, including the unique (project_id, unlock_key)
+    constraint with PostgREST's ignore-duplicates behavior (returns None)."""
+
+    def __init__(self) -> None:
+        self._rows: list[dict] = []
+        self._seq = itertools.count()
+
+    async def list_unlocks(self, user_id: str, project_id: str) -> list[dict]:
+        rows = [
+            r for r in self._rows
+            if r["user_id"] == user_id and r["project_id"] == project_id
+        ]
+        rows.sort(key=lambda r: r["phase_number"])
+        return copy.deepcopy(rows)
+
+    async def create_unlock(self, user_id: str, fields: dict) -> dict | None:
+        row = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "project_id": None,
+            "phase_number": None,
+            "unlock_key": None,
+            "granted_at": f"2026-07-03T00:00:{next(self._seq):02d}+00:00",
+        }
+        row.update(fields)
+        for existing in self._rows:
+            if (
+                existing["project_id"] == row["project_id"]
+                and existing["unlock_key"] == row["unlock_key"]
+            ):
+                return None
+        self._rows.append(row)
+        return copy.deepcopy(row)
+
+
+class RaisingUnlockRepository:
+    """Every call fails — verifies unlock storage errors never break a PASS."""
+
+    async def list_unlocks(self, user_id: str, project_id: str) -> list[dict]:
+        raise RepositoryError("unlock storage unavailable")
+
+    async def create_unlock(self, user_id: str, fields: dict) -> dict | None:
+        raise RepositoryError("unlock storage unavailable")
 
 
 class ScriptedLLM:

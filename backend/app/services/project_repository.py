@@ -7,8 +7,9 @@ server-only SecretStr config and never appears in responses or logs. Key
 format is opaque to this module — it works with both the legacy JWT-shaped
 service_role key and the newer `sb_secret_...` key.
 
-Two repositories share the same PostgREST client base: projects (intake M6,
-roadmap M7, phases M8) and gate_sessions (Interrogation Gate M9).
+Three repositories share the same PostgREST client base: projects (intake M6,
+roadmap M7, phases M8), gate_sessions (Interrogation Gate M9), and unlocks
+(functional unlocks M10).
 """
 
 from typing import Protocol
@@ -35,11 +36,21 @@ class GateSessionRepository(Protocol):
 
     async def list_phase_sessions(self, user_id: str, project_id: str, phase_id: int) -> list[dict]: ...
 
+    async def list_passed_sessions(self, user_id: str, project_id: str) -> list[dict]: ...
+
     async def get_session(self, user_id: str, session_id: str) -> dict | None: ...
 
     async def create_session(self, user_id: str, fields: dict) -> dict: ...
 
     async def update_session(self, user_id: str, session_id: str, fields: dict) -> dict: ...
+
+
+class UnlockRepository(Protocol):
+    """What the unlock service needs from storage — nothing more."""
+
+    async def list_unlocks(self, user_id: str, project_id: str) -> list[dict]: ...
+
+    async def create_unlock(self, user_id: str, fields: dict) -> dict | None: ...
 
 
 class RepositoryError(RuntimeError):
@@ -60,11 +71,15 @@ class _SupabaseRest:
             "Prefer": "return=representation",
         }
 
-    async def _request(self, method: str, path: str, *, params: dict, json: dict | None = None) -> list[dict]:
+    async def _request(
+        self, method: str, path: str, *,
+        params: dict, json: dict | None = None, headers: dict | None = None,
+    ) -> list[dict]:
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
                 resp = await client.request(
-                    method, f"{self._base}{path}", params=params, json=json, headers=self._headers
+                    method, f"{self._base}{path}", params=params, json=json,
+                    headers={**self._headers, **(headers or {})},
                 )
                 resp.raise_for_status()
                 return resp.json()
@@ -111,6 +126,17 @@ class SupabaseGateSessionRepository(_SupabaseRest):
             },
         )
 
+    async def list_passed_sessions(self, user_id: str, project_id: str) -> list[dict]:
+        return await self._request(
+            "GET", "/gate_sessions",
+            params={
+                "user_id": f"eq.{user_id}",
+                "project_id": f"eq.{project_id}",
+                "passed": "eq.true",
+                "order": "phase_id.asc",
+            },
+        )
+
     async def get_session(self, user_id: str, session_id: str) -> dict | None:
         rows = await self._request(
             "GET", "/gate_sessions",
@@ -137,6 +163,29 @@ class SupabaseGateSessionRepository(_SupabaseRest):
         return rows[0]
 
 
+class SupabaseUnlockRepository(_SupabaseRest):
+    async def list_unlocks(self, user_id: str, project_id: str) -> list[dict]:
+        return await self._request(
+            "GET", "/unlocks",
+            params={
+                "user_id": f"eq.{user_id}",
+                "project_id": f"eq.{project_id}",
+                "order": "phase_number.asc",
+            },
+        )
+
+    async def create_unlock(self, user_id: str, fields: dict) -> dict | None:
+        # The unique (project_id, unlock_key) constraint makes grants idempotent
+        # at the DB: a duplicate insert is ignored and returns no row.
+        rows = await self._request(
+            "POST", "/unlocks",
+            params={"on_conflict": "project_id,unlock_key"},
+            json={"user_id": user_id, **fields},
+            headers={"Prefer": "return=representation,resolution=ignore-duplicates"},
+        )
+        return rows[0] if rows else None
+
+
 def get_project_repository() -> ProjectRepository:
     """FastAPI dependency; tests override this with an in-memory fake."""
     return SupabaseProjectRepository(get_settings())
@@ -145,3 +194,8 @@ def get_project_repository() -> ProjectRepository:
 def get_gate_session_repository() -> GateSessionRepository:
     """FastAPI dependency; tests override this with an in-memory fake."""
     return SupabaseGateSessionRepository(get_settings())
+
+
+def get_unlock_repository() -> UnlockRepository:
+    """FastAPI dependency; tests override this with an in-memory fake."""
+    return SupabaseUnlockRepository(get_settings())

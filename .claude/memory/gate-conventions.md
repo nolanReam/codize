@@ -25,7 +25,11 @@ re-runs the evaluation. Cooldown is derived from `gate_sessions.failed_at`
 (migration `20260703040000`) and granted to authenticated; `score` stays
 revoked and never appears in any response body — `gate_history_summary` (on
 the client-readable projects table) therefore records attempt counts only,
-never scores, so hidden M10 unlock thresholds stay unobservable.
+never scores, so the hidden unlock thresholds stay unobservable. Since M10,
+`evaluate_gate` takes an `UnlockRepository` and on PASS calls
+`unlock_service.evaluate_unlocks` (RepositoryError swallowed + logged — see
+[[unlock-conventions]] via .claude/memory/unlock-conventions.md); the PASS
+response gains a `new_unlocks` list.
 
 `current_phase` advances ONLY here, on PASS, by +1, never past the final
 phase (a final-phase pass keeps `current_phase` and `GET /gate/current`

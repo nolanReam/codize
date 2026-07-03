@@ -29,19 +29,28 @@ so an LLM failure (502) leaves the session in its previous state and the call
 can simply be retried. The evaluator's parse is strict and fail-closed: a
 malformed verdict stores nothing.
 
-The `score` column is written here but never returned to the client — unlock
-thresholds (M10) must stay unobservable (schema revokes the column from
-client roles; this module keeps it out of every response body).
+The `score` column is written here but never returned to the client — it
+feeds the hidden unlock thresholds consumed server-side by unlock_service
+(M10), which runs after every PASS (schema revokes the column from client
+roles; this module keeps it out of every response body).
 """
 
 import json
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from app.services import llm_service, phase_service
+from app.services import llm_service, phase_service, unlock_service
 from app.services.llm_service import LLMService
-from app.services.project_repository import GateSessionRepository, ProjectRepository
+from app.services.project_repository import (
+    GateSessionRepository,
+    ProjectRepository,
+    RepositoryError,
+    UnlockRepository,
+)
+
+logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -417,6 +426,7 @@ def _summary_line(phase: dict, attempt_count: int) -> str:
 async def evaluate_gate(
     project_repo: ProjectRepository,
     gate_repo: GateSessionRepository,
+    unlock_repo: UnlockRepository,
     llm: LLMService,
     user_id: str,
     session_id: str,
@@ -458,6 +468,17 @@ async def evaluate_gate(
             project_fields["current_phase"] = phase["phase"] + 1
         project = await project_repo.update_project(user_id, project["id"], project_fields)
         result["current_phase"] = project["current_phase"]
+        # Functional unlocks (M10) are evaluated only on PASS. The pass is
+        # already stored, so an unlock storage error must not fail the verdict
+        # response — evaluation recomputes from full history on every PASS,
+        # so a missed grant self-heals at the next one.
+        try:
+            result["new_unlocks"] = await unlock_service.evaluate_unlocks(
+                gate_repo, unlock_repo, user_id, project
+            )
+        except RepositoryError:
+            logger.warning("unlock evaluation failed after gate pass", exc_info=True)
+            result["new_unlocks"] = []
     else:
         result["current_phase"] = phase["phase"]
         result["cooldown_seconds"] = int(COOLDOWN.total_seconds())

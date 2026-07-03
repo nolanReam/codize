@@ -117,3 +117,17 @@ can see what they earned but cannot insert/update/delete.
   create/update, `current_phase` advancement — all ownership-filtered.
 - Live JWKS verification of a real Supabase JWT (ES256, `aud=authenticated`)
   through `app/core/security.py`: PASS.
+
+## Verification record (M10 session, 2026-07-03)
+
+No schema change — the M2 `unlocks` table carried M10 as designed. Live smoke
+test (10/10) with the verify_auth.sql test users: unlock granted through
+`unlock_service.evaluate_unlocks` after two consecutive qualifying passed
+gates (scores 8, 7); re-evaluation idempotent; a duplicate insert ignored by
+the unique `(project_id, unlock_key)` constraint via PostgREST
+`resolution=ignore-duplicates` (returns no row); ownership filtering verified
+at the repo layer; RLS verified through the client path (user A reads own
+unlock with a real JWT + anon key, user B sees zero rows, and the row exposes
+no score field). `scripts/verify_auth.py` re-run: 11/11 PASS (includes the
+unlock-forgery 42501 check). Security advisors: clean. Test users deleted;
+cascade left zero rows in all four tables.

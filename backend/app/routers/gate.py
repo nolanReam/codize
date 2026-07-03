@@ -19,8 +19,10 @@ from app.services.llm_service import LLMService, get_llm_service
 from app.services.project_repository import (
     GateSessionRepository,
     ProjectRepository,
+    UnlockRepository,
     get_gate_session_repository,
     get_project_repository,
+    get_unlock_repository,
 )
 
 router = APIRouter(prefix="/gate")
@@ -125,11 +127,13 @@ async def evaluate_gate(
     user: CurrentUser = Depends(require_user),
     project_repo: ProjectRepository = Depends(get_project_repository),
     gate_repo: GateSessionRepository = Depends(get_gate_session_repository),
+    unlock_repo: UnlockRepository = Depends(get_unlock_repository),
     llm: LLMService = Depends(get_llm_service),
 ) -> dict:
     try:
         return await gate_service.evaluate_gate(
-            project_repo, gate_repo, llm, user.user_id, gate_session_id, body.answer
+            project_repo, gate_repo, unlock_repo, llm, user.user_id,
+            gate_session_id, body.answer,
         )
     except gate_service.GateError as exc:
         raise _http_error(exc)

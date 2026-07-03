@@ -1,8 +1,8 @@
 # Codize backend (FastAPI)
 
 Async FastAPI service. Architecture rule: **Frontend → this backend → external
-services (Supabase, Anthropic)** — the frontend never calls external services
-directly except Supabase Auth. Route handlers stay thin; product logic lives in
+services (Supabase, LLM providers)** — the frontend never calls external
+services directly except Supabase Auth. Route handlers stay thin; product logic lives in
 `app/services/` (from Milestone 5 on).
 
 ## Layout
@@ -19,7 +19,8 @@ app/
 │                  intake — auth-required five-question flow, M6;
 │                  roadmap — auth-required generation + read, M7;
 │                  phases — auth-required phase workspace, M8;
-│                  gate — auth-required Interrogation Gate, M9)
+│                  gate — auth-required Interrogation Gate, M9;
+│                  unlocks — auth-required earned-unlock listing, M10)
 ├── services/      product logic (template_service.py: archetype template engine, M5;
 │                  intake_service.py + project_repository.py: intake engine, M6
 │                  — project_repository.py also holds the gate_sessions
@@ -27,7 +28,8 @@ app/
 │                  llm_service.py + roadmap_service.py: provider-agnostic LLM
 │                  layer and roadmap generation with fail-closed validation, M7;
 │                  phase_service.py: phase workspace over the stored roadmap, M8;
-│                  gate_service.py: 3-turn Interrogation Gate + evaluator, M9)
+│                  gate_service.py: 3-turn Interrogation Gate + evaluator, M9;
+│                  unlock_service.py: hidden-threshold functional unlocks, M10)
 ├── schemas/       request/response models (intake.py, phases.py, gate.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
@@ -92,11 +94,31 @@ advances (never past the final phase), `gate_history_summary` appended. On
 FAIL: `failed_at` set, cooldown starts, no advancement. `GET /gate/current`
 reports the current phase's gate state (not started / in progress with
 transcript / cooldown with remaining seconds / passed). The evaluator's 0–10
-quality score is stored for M10's hidden unlock thresholds and never appears
-in any response; the DB additionally revokes the column from client roles.
+quality score is stored for the hidden unlock thresholds (consumed server-side
+by M10's unlock service) and never appears in any response; the DB
+additionally revokes the column from client roles.
 Errors: not ready / in progress / already passed / out of order / cooldown →
 409 (cooldown adds Retry-After), unknown session → 404, invalid anchor → 422,
 LLM failure or malformed verdict → 502 with nothing stored.
+
+## Functional unlocks (M10)
+
+`services/unlock_service.py` implements the spec's variable-reward mechanic:
+after every gate PASS (never a FAIL), the gate flow calls the unlock
+evaluation, which recomputes earned unlocks from the project's passed-gate
+history — the hidden rule is a quality score at the qualifying threshold on
+two consecutive phases' passed gates (spec: ≥7; only the passing attempt's
+score counts). Qualifying at phase N grants roadmap phase N's
+`functional_unlock` reward (template content that skips configuration work or
+provides a pre-built component). Grants are idempotent (recompute + the DB's
+unique `(project_id, unlock_key)` with PostgREST ignore-duplicates) and
+self-healing — an unlock storage error never fails the PASS response; the
+next PASS backfills. Unlocks never mutate the roadmap and never advance
+phases. Routes: `GET /unlocks` lists what the user earned on their current
+project (safe fields only: id, unlock_key, phase, description, unlocked_at,
+project_id); a PASS's `new_unlocks` appears in the evaluate response. The
+threshold, the rule, and raw scores are server-only and appear in no response
+(the `unlocks` table itself is owner read-only with client writes revoked).
 
 ## Tests
 
