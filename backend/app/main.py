@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
-from app.routers import archetypes, health, intake, roadmap
+from app.routers import archetypes, health, intake, phases, roadmap
 from app.services import template_service
 
 
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(archetypes.router)
     app.include_router(intake.router)
     app.include_router(roadmap.router)
+    app.include_router(phases.router)
     return app
 
 

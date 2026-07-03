@@ -1,4 +1,4 @@
-# Codize Active Session Instructions — Milestone 7
+# Codize Active Session Instructions — Milestone 8
 
 Continue Codize per `CLAUDE.md`, `.claude/skills/`, and the durable context files.
 
@@ -12,13 +12,15 @@ Milestones complete:
 * M4 FastAPI core — commit `d6e55be`
 * M5 Archetype template engine — commit `53d6aa0`
 * M6 Intake engine — commit `0aacfae`
+* M7 Roadmap generation engine — commit `6a1c9c8`
 
 Known pending items:
 
-* Live PostgREST reads/writes are unverified because backend env vars have not been available.
+* Live Gemini/OpenRouter calls were unverified in M7 because no live LLM provider key was available in that session.
+* Live adversarial prompt testing is still pending until at least one live LLM provider is configured. Gemini or OpenRouter may satisfy this. Required before Milestone 9.
+* Live PostgREST reads/writes remain unverified because backend Supabase env vars have not been available.
 * Live JWKS verification of a real Supabase JWT is pending env vars.
-* Live adversarial prompt testing is still pending until at least one live LLM provider is configured. Gemini or OpenRouter may satisfy this. Anthropic is intentionally not required for this project.
-* M6 decision: completing intake sets `intake_completed_at` and `archetype_id` but leaves `projects.status = 'intake'`. M7 should flip status to `active` after roadmap generation succeeds.
+* M7 closed the M6 status decision: intake completion leaves status `intake`; successful roadmap generation stores a valid roadmap and flips status to `active` in the same write.
 
 ## Read First
 
@@ -28,138 +30,69 @@ Read only these before implementation:
 * `.claude/skills/spec-guardian/SKILL.md`
 * `.claude/skills/security-test/SKILL.md`
 * `.claude/skills/milestone-handoff/SKILL.md`
-* `.claude/memory/prebuild-artifact-conventions.md`
 * `.claude/memory/intake-engine-conventions.md`
+* `.claude/memory/roadmap-llm-conventions.md`
 * `.claude/memory/auth-milestone-todos.md`
 * `backend/README.md`
 * `backend/app/services/template_service.py`
 * `backend/app/services/intake_service.py`
+* `backend/app/services/roadmap_service.py`
 * `backend/app/services/project_repository.py`
-* `backend/app/prompts/roadmap_generation.md`
+* `backend/app/prompts/phase_explanation.md`
 * `backend/app/prompts/README.md`
 
 If product behavior is unclear, consult `docs/context/codize_master_spec_v2.1.md`. Do not read `conversations.json` unless needed.
 
-## Milestone 7 Only — Roadmap Generation
+## Milestone 8 Only — Phase Workspace
 
-Goal: implement the backend roadmap generation engine.
+Goal: implement the backend phase workspace foundation.
 
-Roadmap generation must use the selected archetype’s hardcoded JSON template as the structural source of truth.
+The phase workspace should let an authenticated user view the current roadmap phase, see its personalized content/tasks/resources/gate targets, mark phase tasks complete, and persist phase progress.
 
-The LLM may personalize language and examples, but it must never:
-
-* add phases
-* remove phases
-* reorder phases
-* change task classifications
-* alter gate targets
-* alter gate depth
-* alter unlock conditions
-* alter functional unlock rewards
-* add a fourth archetype
+Do not build frontend UI yet.
 
 ## Required Behavior
 
-After intake is complete and an `archetype_id` exists, roadmap generation should:
+The phase workspace must use the stored roadmap as the source of truth.
 
-1. Load the matching archetype template.
-2. Inject the full template and the student’s intake answers into the roadmap generation prompt.
-3. Generate or prepare a personalized roadmap.
-4. Preserve the template structure exactly.
-5. Store the generated roadmap on the project record.
-6. Flip `projects.status` from `intake` to `active` only after roadmap generation succeeds.
-7. Return the generated roadmap to the caller.
+A project is eligible for phase workspace only if:
 
-## LLM Handling
+* intake is complete
+* archetype_id exists
+* roadmap exists
+* project status is `active`
 
-Build a provider-agnostic LLM service.
+The workspace should support:
 
-Provider order for development:
+1. Listing roadmap phases.
+2. Reading one phase by phase number.
+3. Reading the current phase.
+4. Reading task completion state for the current user/project.
+5. Marking individual tasks complete/incomplete.
+6. Persisting phase progress on the project record or existing schema structure.
+7. Preventing access to another user’s project.
+8. Returning controlled errors for missing roadmap, invalid phase number, or inactive project.
 
-1. Gemini primary
-2. OpenRouter fallback
-3. Stub provider for tests/no-key mode
+Use the simplest robust persistence strategy supported by the existing schema.
+
+Do not create new tables unless absolutely necessary. Prefer existing JSONB/progress fields if they already exist and are appropriate.
+
+## Phase Explanation
+
+The prompt file `backend/app/prompts/phase_explanation.md` exists, but this milestone should not overbuild LLM behavior.
+
+If the roadmap already contains personalized phase content, use it.
+
+If a phase explanation generation seam is needed:
+
+* call the generic LLM service only through the provider-agnostic layer
+* use Gemini primary, OpenRouter fallback, stub for tests/no-key mode
+* use the correct temperature from `backend/app/prompts/README.md`
+* validate that returned explanation does not alter phase structure
+
+If no live provider key is configured, use deterministic stub behavior in tests and mark live explanation generation as unverified.
 
 Do not require Anthropic.
-
-Do not add `ANTHROPIC_API_KEY` to `.env.example` unless the user explicitly decides to support Anthropic later.
-
-Use these environment variables:
-
-* `LLM_PROVIDER`
-* `GEMINI_API_KEY`
-* `GEMINI_MODEL`
-* `OPENROUTER_API_KEY`
-* `OPENROUTER_MODEL`
-
-Default development config:
-
-* `LLM_PROVIDER=gemini`
-* `GEMINI_MODEL=gemini-2.5-flash-lite`
-* `OPENROUTER_MODEL=cohere/north-mini-code:free`
-
-Roadmap generation must call the generic LLM service, not provider-specific code directly.
-
-If Gemini is configured:
-
-* use Gemini for live roadmap generation
-* use the correct temperature from `backend/app/prompts/README.md`
-* validate the returned roadmap against the source template
-* fail closed if structure drifts
-
-If Gemini fails due to rate limit, provider error, or unavailable model, and OpenRouter is configured:
-
-* fall back to OpenRouter
-* use `OPENROUTER_MODEL`
-* validate the returned roadmap against the source template
-* fail closed if structure drifts
-
-If no live provider key is configured:
-
-* implement the provider interface
-* use a deterministic stub provider for tests and local no-key mode
-* mark live LLM generation as unverified
-* do not block the milestone
-
-The stub provider must be deterministic and used only for tests/local no-key mode.
-
-Regardless of provider, validate the returned roadmap against the source archetype template and fail closed if structure drifts.
-
-Do not ask the user to paste secrets into chat.
-
-## Service Layer
-
-Create or update services so that roadmap generation logic lives outside route handlers.
-
-Likely service responsibilities:
-
-* load roadmap generation prompt
-* prepare prompt inputs
-* call generic LLM service
-* call Gemini provider when configured
-* call OpenRouter provider as fallback when configured
-* use stub provider for tests/no-key mode
-* validate generated roadmap against source template
-* persist roadmap JSONB
-* update project status to `active`
-
-Use the simplest robust design.
-
-## Environment Documentation
-
-Update `.env.example` and backend docs if needed.
-
-Document variables without values:
-
-* `LLM_PROVIDER`
-* `GEMINI_API_KEY`
-* `GEMINI_MODEL`
-* `OPENROUTER_API_KEY`
-* `OPENROUTER_MODEL`
-
-Do not document Anthropic variables unless the user explicitly decides to support Anthropic later.
-
-Never commit real secrets.
 
 ## API Routes
 
@@ -167,56 +100,54 @@ Create thin protected routes if appropriate.
 
 Allowed routes:
 
-* `POST /roadmap/generate`
-* `GET /roadmap`
+* `GET /phases`
+* `GET /phases/current`
+* `GET /phases/{phase_number}`
+* `PATCH /phases/{phase_number}/tasks/{task_id}`
 
 Adjust route names only if a simpler consistent REST shape is better.
 
 Requirements:
 
 * routes are auth-protected
-* users can only generate/read their own roadmap
 * route handlers stay thin
-* service layer owns roadmap logic
-* controlled errors use the existing standard error shape
+* service layer owns phase workspace logic
+* user can access only their own project state
+* invalid phase numbers return controlled errors
+* responses use the existing standard error shape
 * responses leak no server-only secrets
 
-## Roadmap Structure Validation
+## Service Layer
 
-Add validation that catches:
+Create a phase workspace service that handles:
 
-* missing phases
-* extra phases
-* reordered phases
-* changed phase numbers
-* changed gate targets
-* changed gate depth
-* changed unlock conditions
-* changed functional unlocks
-* changed AI/human task labels
-* added fourth archetype or wrong archetype id
+* loading the user’s active project
+* reading stored roadmap JSON
+* validating phase numbers
+* returning phase workspace data
+* updating task completion state
+* preserving roadmap structure
+* preventing phase progress corruption
+* preparing future Interrogation Gate integration
 
-The validator should compare generated roadmap output against the original template.
+Use the simplest robust design.
 
 ## Tests
 
 Add tests for:
 
-* cannot generate roadmap before intake completion
-* cannot generate roadmap without archetype id
-* loads correct template for archetype id
-* generated roadmap preserves phase count/order
-* generated roadmap preserves fixed gate targets
-* generated roadmap preserves AI/human task classifications
-* generated roadmap preserves unlock conditions
-* generated roadmap preserves final security checklist phase
-* successful generation stores roadmap and flips status to `active`
-* generation failure does not flip status to `active`
-* Gemini provider path can be unit-tested without real API calls
-* OpenRouter fallback path can be unit-tested without real API calls
-* stub provider is deterministic
-* user cannot read or generate another user’s roadmap
-* auth required for roadmap routes
+* cannot access phases before roadmap exists
+* cannot access phases if project is not active
+* can list phases from stored roadmap
+* can read current phase
+* can read phase by valid phase number
+* invalid phase number returns controlled error
+* task completion can be marked true
+* task completion can be marked false
+* task completion persists
+* task updates do not mutate fixed roadmap structure
+* user cannot access or mutate another user’s phase state
+* auth required for phase routes
 * responses contain no server-only secrets
 
 Run:
@@ -240,11 +171,12 @@ python scripts/verify_auth.py
 
 If env vars are unavailable, mark it unverified rather than blocking.
 
+If Gemini/OpenRouter env vars are available, run one live roadmap or phase-explanation smoke test if the service supports it. If unavailable, mark live LLM behavior unverified.
+
 ## Out of Scope
 
 Do not implement:
 
-* phase workspace
 * Interrogation Gate runtime
 * gate evaluation runtime
 * unlock system
@@ -252,9 +184,9 @@ Do not implement:
 * frontend UI
 * deployment
 
-Do not begin Milestone 8.
+Do not begin Milestone 9.
 
-Do not continue beyond Milestone 7.
+Do not continue beyond Milestone 8.
 
 ## End Requirements
 
@@ -265,6 +197,6 @@ At the end:
 * run secret scan
 * commit changes
 * update `CLAUDE.md` with new commands/routes if relevant
-* update `.claude/memory/` with durable roadmap/LLM lessons
+* update `.claude/memory/` with durable phase-workspace lessons
 * output `MILESTONE COMPLETE`
 * tell the user to run `/compact`

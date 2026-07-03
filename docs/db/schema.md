@@ -26,6 +26,8 @@ trigger and `ensure_rls` event trigger.
     archetypes; a join table would model flexibility the spec forbids).
   - **Phase progress** — `projects.current_phase` plus passed `gate_sessions`
     rows; phases themselves are fixed by the hardcoded archetype templates.
+    Task checkboxes (M8) are `projects.task_progress` jsonb — kept outside the
+    `roadmap` jsonb so ticking tasks can never mutate the fixed structure.
   - **Reconnection tracking** — `profiles.last_login_at` (modal fires on login
     when delta > 72h; shows `projects.intake_purpose` verbatim).
   - **Session/logging metadata** — not required by the spec MVP; add only when
@@ -58,7 +60,8 @@ from `auth.users`).
 | `archetype_id` | smallint ∈ {1,2,3} | temp-0 classification result |
 | `stack_warning` | text | roadmap prompt's >30% language-gap warning |
 | `roadmap` | jsonb | personalized roadmap (template structure, LLM wording) |
-| `current_phase` | smallint 1–7 | |
+| `current_phase` | smallint 1–7 | advanced by gate passes (M9), never by task completion |
+| `task_progress` | jsonb, default `{}` | M8 phase workspace: `{"<phase>": ["ai-1", "human-2", …]}` — completed task ids per phase, backend-written only |
 | `gate_history_summary` | text | summarized transcripts; calibrates future gates |
 | `status` | 'intake' \| 'active' \| 'completed' | |
 

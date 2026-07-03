@@ -31,6 +31,7 @@ class InMemoryProjectRepository:
             "stack_warning": None,
             "roadmap": None,
             "current_phase": 1,
+            "task_progress": {},
             "gate_history_summary": None,
             "status": "intake",
             "created_at": next(self._seq),

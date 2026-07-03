@@ -17,12 +17,14 @@ app/
 ├── deps/auth.py   require_user dependency → 401 on missing/invalid token
 ├── routers/       thin route handlers (health; archetypes — auth-required, read-only;
 │                  intake — auth-required five-question flow, M6;
-│                  roadmap — auth-required generation + read, M7)
+│                  roadmap — auth-required generation + read, M7;
+│                  phases — auth-required phase workspace, M8)
 ├── services/      product logic (template_service.py: archetype template engine, M5;
 │                  intake_service.py + project_repository.py: intake engine, M6;
 │                  llm_service.py + roadmap_service.py: provider-agnostic LLM
-│                  layer and roadmap generation with fail-closed validation, M7)
-├── schemas/       request/response models (intake.py)
+│                  layer and roadmap generation with fail-closed validation, M7;
+│                  phase_service.py: phase workspace over the stored roadmap, M8)
+├── schemas/       request/response models (intake.py, phases.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
 tests/             pytest suite
@@ -53,6 +55,20 @@ failing live provider). `LLM_PROVIDER` names the primary. Anthropic is
 intentionally not supported. Whatever the provider, a generated roadmap is
 validated against the source archetype template and discarded on any
 structural drift.
+
+## Phase workspace (M8)
+
+`services/phase_service.py` serves phases straight from the stored roadmap
+JSONB (the personalized content generated in M7) — no LLM call; the
+`phase_explanation.md` prose call is deliberately not wired up yet. Eligibility
+is intake complete + archetype + roadmap + status `active`. Task completion is
+tracked per phase in the separate `projects.task_progress` column as
+`{"<phase>": ["ai-1", "human-2", …]}` (1-based index into the phase's task
+lists), so marking tasks complete can never mutate the fixed roadmap
+structure. `current_phase` is advanced by the Interrogation Gate (M9), never
+by ticking tasks. Routes: `GET /phases`, `GET /phases/current`,
+`GET /phases/{n}`, `PATCH /phases/{n}/tasks/{task_id}` (body
+`{"completed": bool}`); workspace not ready → 409, unknown phase/task → 404.
 
 ## Tests
 

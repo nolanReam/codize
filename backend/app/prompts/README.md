@@ -26,4 +26,4 @@ The six system prompts required by the master spec ("System Prompt Architecture 
 
 ## Adversarial testing status
 
-Static adversarial analysis: see `docs/prebuild/adversarial_tests.md`. Live model runs against these prompts are **pending an Anthropic API key** and must be completed before the Interrogation Gate milestone.
+Static adversarial analysis: see `docs/prebuild/adversarial_tests.md`. Live model runs against these prompts go through `llm_service` (Gemini primary / OpenRouter fallback — Anthropic is intentionally not supported) and must be completed before the Interrogation Gate milestone.

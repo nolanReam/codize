@@ -29,7 +29,14 @@ without a stored valid roadmap. Roadmap generation temperature is 0.7, fixed
 by `backend/app/prompts/README.md` — the constant lives in
 `roadmap_service.ROADMAP_TEMPERATURE`.
 
-Unverified as of 2026-07-02: live Gemini/OpenRouter calls (no keys in the M7
-session — both providers unit-tested against `httpx.MockTransport` only). In
-the first session with a real key, run one real `POST /roadmap/generate` and
-confirm the returned roadmap passes validation.
+LIVE VERIFICATION (M8 session, 2026-07-02): `GEMINI_API_KEY` and
+`OPENROUTER_API_KEY` now exist in the repo-root `.env` (gitignored — confirmed
+via `git check-ignore`). Four real Gemini (`gemini-2.5-flash-lite`) roadmap
+generations at temp 0.7 against archetype 2: **3 validated clean** (sensible
+personalized `timeline_estimate`s; one added a harmless "no warning necessary"
+`stack_warning`), **1 drifted and was correctly discarded** by the fail-closed
+validator. So a real-world `POST /roadmap/generate` occasionally 502s and the
+student retries — that is by design, not a bug; do not weaken the validator to
+"fix" it. Still live-unverified: the OpenRouter fallback path (Gemini never
+failed during the probe) and the Supabase repository writes (Supabase env vars
+are still empty in `.env`).
