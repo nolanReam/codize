@@ -7,9 +7,9 @@ server-only SecretStr config and never appears in responses or logs. Key
 format is opaque to this module — it works with both the legacy JWT-shaped
 service_role key and the newer `sb_secret_...` key.
 
-Three repositories share the same PostgREST client base: projects (intake M6,
-roadmap M7, phases M8), gate_sessions (Interrogation Gate M9), and unlocks
-(functional unlocks M10).
+Four repositories share the same PostgREST client base: projects (intake M6,
+roadmap M7, phases M8), gate_sessions (Interrogation Gate M9), unlocks
+(functional unlocks M10), and profiles (reconnection M11).
 """
 
 from typing import Protocol
@@ -51,6 +51,14 @@ class UnlockRepository(Protocol):
     async def list_unlocks(self, user_id: str, project_id: str) -> list[dict]: ...
 
     async def create_unlock(self, user_id: str, fields: dict) -> dict | None: ...
+
+
+class ProfileRepository(Protocol):
+    """What the reconnection service needs from storage — nothing more."""
+
+    async def get_profile(self, user_id: str) -> dict | None: ...
+
+    async def set_last_login(self, user_id: str, last_login_at: str) -> dict: ...
 
 
 class RepositoryError(RuntimeError):
@@ -186,6 +194,27 @@ class SupabaseUnlockRepository(_SupabaseRest):
         return rows[0] if rows else None
 
 
+class SupabaseProfileRepository(_SupabaseRest):
+    async def get_profile(self, user_id: str) -> dict | None:
+        rows = await self._request(
+            "GET", "/profiles", params={"user_id": f"eq.{user_id}", "limit": "1"}
+        )
+        return rows[0] if rows else None
+
+    async def set_last_login(self, user_id: str, last_login_at: str) -> dict:
+        # Upsert on the profiles PK: the signup trigger normally guarantees the
+        # row exists, but merge-duplicates makes acknowledge safe either way.
+        rows = await self._request(
+            "POST", "/profiles",
+            params={"on_conflict": "user_id"},
+            json={"user_id": user_id, "last_login_at": last_login_at},
+            headers={"Prefer": "return=representation,resolution=merge-duplicates"},
+        )
+        if not rows:
+            raise RepositoryError("profile upsert returned no row")
+        return rows[0]
+
+
 def get_project_repository() -> ProjectRepository:
     """FastAPI dependency; tests override this with an in-memory fake."""
     return SupabaseProjectRepository(get_settings())
@@ -199,3 +228,8 @@ def get_gate_session_repository() -> GateSessionRepository:
 def get_unlock_repository() -> UnlockRepository:
     """FastAPI dependency; tests override this with an in-memory fake."""
     return SupabaseUnlockRepository(get_settings())
+
+
+def get_profile_repository() -> ProfileRepository:
+    """FastAPI dependency; tests override this with an in-memory fake."""
+    return SupabaseProfileRepository(get_settings())

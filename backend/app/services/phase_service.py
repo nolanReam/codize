@@ -133,9 +133,15 @@ async def get_phase(repo: ProjectRepository, user_id: str, phase_number: int) ->
     return _phase_view(project, _find_phase(project, phase_number))
 
 
+def current_phase_view(project: dict) -> dict:
+    """Full view of an already-loaded active project's current phase — shared
+    with the reconnection service (M11), which loads the project once itself."""
+    return _phase_view(project, _find_phase(project, project["current_phase"]))
+
+
 async def get_current_phase(repo: ProjectRepository, user_id: str) -> dict:
     project = await load_active_project(repo, user_id)
-    return _phase_view(project, _find_phase(project, project["current_phase"]))
+    return current_phase_view(project)
 
 
 async def set_task_completion(

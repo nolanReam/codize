@@ -155,6 +155,33 @@ class RaisingUnlockRepository:
         raise RepositoryError("unlock storage unavailable")
 
 
+class InMemoryProfileRepository:
+    """Mirrors the profiles table (PK user_id; live rows are auto-created by
+    the signup trigger with last_login_at defaulting to now)."""
+
+    def __init__(self) -> None:
+        self._rows: dict[str, dict] = {}
+
+    def seed(self, user_id: str, last_login_at: str) -> None:
+        """Test helper: what the signup trigger (or an earlier acknowledge)
+        would have left behind."""
+        self._rows[user_id] = {
+            "user_id": user_id,
+            "display_name": None,
+            "last_login_at": last_login_at,
+        }
+
+    async def get_profile(self, user_id: str) -> dict | None:
+        row = self._rows.get(user_id)
+        return copy.deepcopy(row) if row else None
+
+    async def set_last_login(self, user_id: str, last_login_at: str) -> dict:
+        if user_id not in self._rows:
+            self.seed(user_id, last_login_at)
+        self._rows[user_id]["last_login_at"] = last_login_at
+        return copy.deepcopy(self._rows[user_id])
+
+
 class ScriptedLLM:
     """Returns queued responses in order; an Exception in the queue is raised.
     Records (prompt, temperature) for assertions."""

@@ -100,6 +100,15 @@ async def evaluate_unlocks(
     return granted
 
 
+async def unlock_views(
+    unlock_repo: UnlockRepository, user_id: str, project: dict
+) -> list[dict]:
+    """Client-safe views of every unlock earned on an already-loaded project —
+    shared with the reconnection service (M11)."""
+    rows = await unlock_repo.list_unlocks(user_id, project["id"])
+    return [_view(r, project) for r in rows]
+
+
 async def list_unlocks(
     project_repo: ProjectRepository, unlock_repo: UnlockRepository, user_id: str
 ) -> dict:
@@ -108,5 +117,4 @@ async def list_unlocks(
     project = await project_repo.get_project(user_id)
     if project is None:
         return {"unlocks": []}
-    rows = await unlock_repo.list_unlocks(user_id, project["id"])
-    return {"unlocks": [_view(r, project) for r in rows]}
+    return {"unlocks": await unlock_views(unlock_repo, user_id, project)}

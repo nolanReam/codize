@@ -29,7 +29,11 @@ trigger and `ensure_rls` event trigger.
     Task checkboxes (M8) are `projects.task_progress` jsonb — kept outside the
     `roadmap` jsonb so ticking tasks can never mutate the fixed structure.
   - **Reconnection tracking** — `profiles.last_login_at` (modal fires on login
-    when delta > 72h; shows `projects.intake_purpose` verbatim).
+    when delta ≥ 72h; shows `projects.intake_purpose` verbatim). Semantics
+    pinned in M11: the column means "last acknowledged presence" — set at
+    signup by its `default now()`, thereafter written only by
+    `POST /reconnection/acknowledge` (never by `GET /reconnection`, which is a
+    pure read). No schema change was needed.
   - **Session/logging metadata** — not required by the spec MVP; add only when
     a milestone needs it.
 
@@ -131,3 +135,17 @@ unlock with a real JWT + anon key, user B sees zero rows, and the row exposes
 no score field). `scripts/verify_auth.py` re-run: 11/11 PASS (includes the
 unlock-forgery 42501 check). Security advisors: clean. Test users deleted;
 cascade left zero rows in all four tables.
+
+## Verification record (M11 session, 2026-07-03)
+
+No schema change — `profiles.last_login_at` (M2) carried M11 as designed. Live
+smoke test (12/12) with the verify_auth.sql test users: signup-trigger profile
+readable with a fresh timestamp → `recently_active`; backdated 100h without a
+roadmap → controlled `workspace_not_ready`; with an active project →
+`reconnection` with the safe summary (verbatim purpose, phase context,
+incomplete tasks, gate-history line, unlock view; JSON contains no
+score/threshold strings); double acknowledge idempotent and clears the state;
+user B's state independent of A's; RLS client path with real JWTs + anon key
+(each user reads exactly their own `profiles` row). `scripts/verify_auth.py`
+re-run: 11/11 PASS. Security advisors: clean. Test users deleted; cascade left
+zero rows in all four tables.

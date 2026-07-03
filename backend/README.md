@@ -20,7 +20,8 @@ app/
 │                  roadmap — auth-required generation + read, M7;
 │                  phases — auth-required phase workspace, M8;
 │                  gate — auth-required Interrogation Gate, M9;
-│                  unlocks — auth-required earned-unlock listing, M10)
+│                  unlocks — auth-required earned-unlock listing, M10;
+│                  reconnection — auth-required 72h reconnection state, M11)
 ├── services/      product logic (template_service.py: archetype template engine, M5;
 │                  intake_service.py + project_repository.py: intake engine, M6
 │                  — project_repository.py also holds the gate_sessions
@@ -29,7 +30,8 @@ app/
 │                  layer and roadmap generation with fail-closed validation, M7;
 │                  phase_service.py: phase workspace over the stored roadmap, M8;
 │                  gate_service.py: 3-turn Interrogation Gate + evaluator, M9;
-│                  unlock_service.py: hidden-threshold functional unlocks, M10)
+│                  unlock_service.py: hidden-threshold functional unlocks, M10;
+│                  reconnection_service.py: Yeager reconnection engine, M11)
 ├── schemas/       request/response models (intake.py, phases.py, gate.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
@@ -119,6 +121,27 @@ project (safe fields only: id, unlock_key, phase, description, unlocked_at,
 project_id); a PASS's `new_unlocks` appears in the evaluate response. The
 threshold, the rule, and raw scores are server-only and appear in no response
 (the `unlocks` table itself is owner read-only with client writes revoked).
+
+## Reconnection (M11)
+
+`services/reconnection_service.py` implements the spec's Yeager reconnection
+mechanic server-side (the modal itself is frontend work, M13). Timestamp
+semantics: `profiles.last_login_at` means "last acknowledged presence" — it is
+initialized by the signup trigger's `default now()` (so a brand-new user never
+sees the modal) and thereafter written ONLY by
+`POST /reconnection/acknowledge`. `GET /reconnection` is a pure read that
+returns one of four controlled states: `new_user` (no profile/timestamp),
+`recently_active` (away < 72h), `workspace_not_ready` (away 72h+ but no
+active project/roadmap yet), or `reconnection` (away 72h+) with a safe,
+deterministic summary — the verbatim intake purpose (spec requirement),
+current phase number/title/concept reminder, the incomplete current-phase
+tasks, the newest gate-history line (attempt counts only — never scores),
+earned unlock views, and a recommended next action. No LLM call. Frontend
+contract: GET first on every login, then acknowledge — immediately when
+`reconnection_needed` is false, on the "Let's keep building" click when true
+(acknowledging before the GET would suppress the modal). Reconnection never
+mutates the roadmap, never advances phases, never grants unlocks, and its
+responses carry no scores, thresholds, prompts, or server-only keys.
 
 ## Tests
 

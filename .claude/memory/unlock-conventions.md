@@ -28,7 +28,9 @@ Client surface: `GET /unlocks` only — there is deliberately NO
 `functional_unlock` description; a catalog route would add nothing. Unlock
 views carry exactly {id, unlock_key, project_id, phase, description,
 unlocked_at}; the threshold, the consecutive rule, and raw scores never
-appear in any response (see [[gate-conventions]] — `gate_sessions.score`
+appear in any response (since M11, `unlock_views(unlock_repo, user_id,
+project)` is the public safe-view seam, also used by the reconnection
+summary — see [[reconnection-conventions]]) (see [[gate-conventions]] — `gate_sessions.score`
 stays revoked from client roles, `unlocks` is owner read-only from M2, no
 migration was needed for M10). Unlocks never mutate the roadmap and never
 advance `current_phase` — the gate remains the only phase-advancer.
