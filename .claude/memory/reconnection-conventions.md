@@ -24,7 +24,8 @@ threshold check is `now - last_login_at >= 72h` (instructions: "at or after").
 The summary is deterministic — NO LLM call — and built from already-client-
 visible data only: verbatim `intake_purpose` (spec: shown in large text),
 current phase number/title/`core_concept`, incomplete current-phase tasks
-(via the public `phase_service.current_phase_view(project)` added in M11),
+(via the public `phase_service.current_phase_view(project)` added in M11 and
+`phase_service.incomplete_tasks(view)`, made public there in M12),
 the newest `gate_history_summary` line (attempt counts only — gate_service
 never writes scores into it, see [[gate-conventions]]), earned unlock views
 (via the public `unlock_service.unlock_views` added in M11 — safe fields only,

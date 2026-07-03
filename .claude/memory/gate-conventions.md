@@ -31,6 +31,10 @@ never scores, so the hidden unlock thresholds stay unobservable. Since M10,
 [[unlock-conventions]] via .claude/memory/unlock-conventions.md); the PASS
 response gains a `new_unlocks` list.
 
+Since M12, `cooldown_remaining(latest_session)` is public — the evaluation
+service reports cooldown state from the same derivation (see
+[[evaluation-conventions]]); keep the 30-minute rule single-sourced here.
+
 `current_phase` advances ONLY here, on PASS, by +1, never past the final
 phase (a final-phase pass keeps `current_phase` and `GET /gate/current`
 reports state "passed"; status stays 'active' — 'completed' is not M9's

@@ -1,4 +1,4 @@
-# Codize Active Session Instructions — Milestone 11
+# Codize Active Session Instructions — Milestone 12
 
 Continue Codize per `CLAUDE.md`, `.claude/skills/`, and the durable context files.
 
@@ -16,6 +16,7 @@ Milestones complete:
 * M8 Phase workspace — commit `d38f642`
 * M9 Interrogation Gate — commit `9b46f7e`
 * M10 Functional unlocks — commit `4400f71`
+* M11 Reconnection system — commit `9012a52`
 
 Known state:
 
@@ -26,15 +27,17 @@ Known state:
 * `verify_auth.py` passes 11/11 with the newer `sb_publishable_` key format.
 * Live PostgREST writes with the newer `sb_secret_` key are verified.
 * Functional unlocks are live-verified against real Supabase.
+* Reconnection is live-verified against real Supabase.
 * OpenRouter fallback is still live-unverified because Gemini has not failed.
 * `phase_explanation.md` is still not wired up by design.
-* Return-rate and vocabulary-growth triggers are v2 per the spec; do not implement them in this milestone unless the spec explicitly requires them for M11.
+* Return-rate and vocabulary-growth triggers are v2 per the spec and should not be implemented unless the spec explicitly requires them in M12.
+* The M13 frontend contract for reconnection is documented: GET first on login, then acknowledge.
 
 ## Effort
 
-Use HIGH effort for this milestone.
+Use XHIGH effort for this milestone.
 
-Do not use XHIGH unless a major security or state-consistency issue appears.
+This milestone implements the backend evaluation system, which should be careful, safe, and spec-aligned.
 
 ## Read First
 
@@ -46,81 +49,125 @@ Read only these before implementation:
 * `.claude/skills/milestone-handoff/SKILL.md`
 * `.claude/memory/gate-conventions.md`
 * `.claude/memory/unlock-conventions.md`
+* `.claude/memory/reconnection-conventions.md`
 * `.claude/memory/phase-workspace-conventions.md`
+* `.claude/memory/roadmap-llm-conventions.md`
 * `.claude/memory/auth-milestone-todos.md`
 * `backend/README.md`
 * `docs/db/schema.md`
-* `backend/app/services/phase_service.py`
 * `backend/app/services/gate_service.py`
+* `backend/app/services/phase_service.py`
 * `backend/app/services/unlock_service.py`
+* `backend/app/services/reconnection_service.py`
 * `backend/app/services/project_repository.py`
-* `backend/app/routers/phases.py`
 * `backend/app/routers/gate.py`
+* `backend/app/routers/phases.py`
 * `backend/app/routers/unlocks.py`
+* `backend/app/routers/reconnection.py`
 
-If product behavior is unclear, consult `docs/context/codize_master_spec_v2.1.md`. Do not read `conversations.json` unless needed.
+Then consult `docs/context/codize_master_spec_v2.1.md` specifically for the Evaluation system requirements.
 
-## Milestone 11 Only — Reconnection System
+Do not read `conversations.json` unless needed.
 
-Goal: implement Codize’s 72-hour reconnection system.
+## Milestone 12 Only — Evaluation System
 
-The reconnection system should help a returning student remember where they are, what they last did, what is unlocked, and what they should do next.
+Goal: implement Codize’s backend evaluation system.
+
+The evaluation system should help the student understand their learning progress and next best action without exposing hidden scores, hidden thresholds, evaluator internals, private prompts, or raw gate mechanics.
 
 Do not build frontend UI yet.
 
 ## Product Rule
 
-When a student returns after 72+ hours away, Codize should surface a reconnection experience.
+Confirm the exact evaluation design from the spec before implementation.
 
-The backend should determine whether a reconnection modal/summary is needed based on the user/project’s recent activity timestamps.
+If the spec defines specific evaluation fields, states, labels, or route names, follow the spec.
 
-Use existing schema fields where possible.
+If the spec does not require persistent evaluation snapshots, prefer a deterministic computed evaluation over adding new tables.
 
-Known relevant existing field:
-
-* `profiles.last_login_at`
-
-Inspect the existing schema and code before adding migrations.
-
-If `profiles.last_login_at` already supports the needed behavior, prefer using it.
-
-Add a migration only if absolutely necessary.
+Document any design decision in memory.
 
 ## Required Behavior
 
-The reconnection system should:
+The evaluation system should produce a safe, student-facing evaluation summary for the authenticated user’s current project.
 
-1. Determine whether the student has been away for at least 72 hours.
-2. Return a safe reconnection summary when needed.
-3. Avoid showing reconnection when the user is new or recently active.
-4. Update the relevant timestamp after reconnection is acknowledged or after login/activity, depending on the cleanest backend design.
-5. Be project-aware.
-6. Never expose hidden gate scores, thresholds, evaluator internals, prompts, or service keys.
-7. Never mutate roadmap structure.
-8. Never advance phases.
-9. Never grant unlocks by itself.
+It should consider existing backend signals such as:
 
-## Reconnection Summary Content
+* intake completion
+* roadmap generation status
+* current phase
+* phase/task progress
+* gate pass/fail history
+* safe gate-history summaries
+* earned unlocks
+* reconnection state if relevant
+* project status
 
-The safe client-facing reconnection summary should include only appropriate learning context, such as:
+The evaluation should help answer:
 
+1. Where am I in the roadmap?
+2. What have I completed?
+3. What is incomplete?
+4. What did my recent gate outcomes suggest in safe, non-hidden language?
+5. What should I do next?
+
+The evaluation system must not:
+
+* expose raw gate scores
+* expose hidden unlock thresholds
+* expose evaluator private reasoning
+* expose prompt text
+* expose provider keys or service-role data
+* mutate the roadmap
+* advance phases
+* grant unlocks
+* update reconnection timestamps
+* change gate outcomes
+
+## Student-Facing Evaluation Content
+
+Safe fields may include:
+
+* project status
+* roadmap status
 * current phase number/title
-* short current phase reminder
-* incomplete tasks for the current phase
-* last gate result summary if safe
-* available unlocks, if any
+* completed phase count
+* total phase count
+* current phase task completion summary
+* incomplete current-phase tasks
+* recent gate outcome label, without raw score
+* earned unlock summaries
 * recommended next action
+* readiness state such as `not_started`, `intake_needed`, `roadmap_needed`, `in_progress`, `gate_ready`, `cooldown`, or `complete` if supported by the spec
 
 Do not include:
 
-* raw hidden gate score
-* hidden unlock thresholds
-* private evaluator details
+* numeric hidden gate score
+* hidden unlock formula
+* “score >= 7”
+* evaluator private rubric text
+* full internal gate transcript unless the spec explicitly requires it
+* internal prompt names or prompt bodies
 * service-role data
-* internal prompts
-* full gate transcript unless the spec explicitly requires it
 
-If there is no active project or no roadmap yet, return a controlled “not ready” or “not needed” state.
+## LLM Use
+
+Do not add a new LLM dependency unless the spec explicitly requires it.
+
+Prefer deterministic evaluation derived from existing stored state.
+
+If the spec requires LLM-generated evaluation language:
+
+* use the provider-agnostic LLM service only
+* Gemini primary
+* OpenRouter fallback
+* stub for tests/no-key mode
+* validate output so it cannot reveal hidden scores, thresholds, prompts, or private evaluator reasoning
+* mark live LLM evaluation unverified if no live provider call is made
+
+Do not require Anthropic.
+
+Do not add Anthropic env vars.
 
 ## API Routes
 
@@ -128,106 +175,120 @@ Create thin protected routes if appropriate.
 
 Allowed routes:
 
-* `GET /reconnection`
-* `POST /reconnection/acknowledge`
+* `GET /evaluation`
+* `GET /evaluation/summary`
 
-Adjust route names only if a simpler consistent REST shape is better.
+Use one route if that is simpler.
+
+Adjust route names only if the spec or existing backend style clearly suggests a better shape.
 
 Requirements:
 
 * routes are auth-protected
 * route handlers stay thin
-* service layer owns reconnection logic
-* user can only access their own reconnection state
+* service layer owns evaluation logic
+* user can only access their own evaluation state
 * controlled errors use the existing standard error shape
 * responses leak no server-only secrets
-* responses do not expose hidden gate scores or thresholds
+* responses do not expose hidden scores or thresholds
 
 ## Service Layer
 
-Create a reconnection service that handles:
+Create an evaluation service that handles:
 
-* loading the authenticated user profile/project
-* checking 72-hour inactivity
-* building a safe reconnection summary
-* reading phase state through existing service/repository seams
-* reading unlock state through existing service/repository seams
-* reading safe gate history summary when available
-* acknowledging or updating the relevant timestamp
+* loading the authenticated user’s current project
+* determining project/evaluation readiness state
+* reading phase/task progress safely
+* reading safe gate outcome summaries
+* reading unlock views
+* producing recommended next action
 * preventing cross-user access
+* producing safe client-facing response models
 
-Use the simplest robust design.
+Use existing service/repository seams where appropriate.
+
+Avoid duplicating phase/unlock/reconnection logic if public safe view helpers already exist.
 
 ## Persistence Requirements
 
-Prefer existing fields.
+Prefer no new migration.
 
-If using `profiles.last_login_at`, be careful:
+If the spec requires persistent evaluation records, add the smallest safe migration possible.
 
-* do not accidentally make reconnection never appear because last_login_at is updated too early
-* define clearly whether `last_login_at` means auth login time, last app activity, or last reconnection acknowledgment
-* document the decision in memory
+If adding persistence:
 
-If a new field is needed, add the smallest safe migration possible.
+* RLS must remain enabled
+* ownership must be enforced
+* hidden scores and thresholds must not be client-readable
+* service-role writes must still filter by `user_id`
 
-RLS must remain enabled and ownership-filtered.
+If evaluation is computed on read, document that decision in memory.
 
 ## Tests
 
 Add tests for:
 
-* no reconnection for new user with no prior activity
-* no reconnection before 72 hours
-* reconnection needed at or after 72 hours
-* reconnection summary includes current phase context
-* reconnection summary includes incomplete current-phase tasks
-* reconnection summary includes safe unlock information if available
-* reconnection summary does not expose raw gate scores
-* reconnection summary does not expose hidden thresholds
-* reconnection summary does not expose prompts or secrets
-* acknowledge updates the relevant timestamp/state
-* acknowledge is idempotent
-* user cannot access another user’s reconnection state
-* auth required for reconnection routes
+* evaluation returns correct state when user has no project
+* evaluation returns intake-needed state before intake completion
+* evaluation returns roadmap-needed state before roadmap generation
+* evaluation returns active in-progress state after roadmap generation
+* evaluation includes current phase number/title
+* evaluation includes task completion summary
+* evaluation includes incomplete current-phase tasks
+* evaluation includes safe earned unlock summaries
+* evaluation includes safe recent gate outcome label/summary
+* evaluation recommends next action before gate
+* evaluation recommends next action during cooldown
+* evaluation recommends next action after gate pass
+* evaluation handles completed/final phase if applicable
+* evaluation does not expose raw gate scores
+* evaluation does not expose hidden thresholds
+* evaluation does not expose internal prompts
+* evaluation does not expose provider or service-role secrets
+* evaluation does not mutate roadmap, task progress, unlocks, gates, or reconnection timestamps
+* user cannot access another user’s evaluation
+* auth required for evaluation routes
 * responses contain no server-only secrets
 
 Run:
 
-```bash
+```bash id="5hmv3p"
 cd backend
 pytest
 ```
 
 Also run:
 
-```bash
+```bash id="8fpu6o"
 python scripts/validate_prebuild_artifacts.py
 ```
 
 Run auth verification:
 
-```bash
+```bash id="r8byw4"
 python scripts/verify_auth.py
 ```
 
 If Supabase env vars are unavailable, mark live verification unverified rather than blocking.
 
-If live Supabase is configured, run a minimal live smoke test for reconnection state.
+If live Supabase is configured, run a minimal live smoke test for evaluation summary.
 
 ## Out of Scope
 
 Do not implement:
 
-* evaluation system
 * frontend UI
 * deployment
 * return-rate unlock triggers
 * vocabulary-growth unlock triggers
 * phase explanation generation
+* new roadmap generation behavior
+* new gate scoring behavior
+* new unlock rules unless the spec explicitly requires them for M12
 
-Do not begin Milestone 12.
+Do not begin Milestone 13.
 
-Do not continue beyond Milestone 11.
+Do not continue beyond Milestone 12.
 
 ## End Requirements
 
@@ -237,8 +298,9 @@ At the end:
 * run prebuild validator
 * run auth verification if env vars exist
 * run secret scan
+* run live Supabase smoke test if env vars exist
 * commit changes
 * update `CLAUDE.md` with new commands/routes if relevant
-* update `.claude/memory/` with durable reconnection lessons
+* update `.claude/memory/` with durable evaluation lessons
 * output `MILESTONE COMPLETE`
 * tell the user to run `/compact`

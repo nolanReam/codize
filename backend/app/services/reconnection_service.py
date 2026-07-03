@@ -49,15 +49,6 @@ def _parse_ts(value) -> datetime | None:
     return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
 
 
-def _incomplete_tasks(phase_view: dict) -> list[dict]:
-    return [
-        {"task_id": t["task_id"], "description": t["description"]}
-        for field in ("ai_appropriate_tasks", "human_required_tasks")
-        for t in phase_view[field]
-        if not t["completed"]
-    ]
-
-
 def _last_gate_summary(project: dict) -> str | None:
     """The newest line of gate_history_summary — attempt counts only by
     construction (gate_service never writes scores into it)."""
@@ -82,7 +73,7 @@ async def _build_summary(
     unlock_repo: UnlockRepository, user_id: str, project: dict
 ) -> dict:
     view = phase_service.current_phase_view(project)
-    incomplete = _incomplete_tasks(view)
+    incomplete = phase_service.incomplete_tasks(view)
     return {
         "intake_purpose": project["intake_purpose"],  # spec: shown verbatim
         "current_phase": view["phase"],

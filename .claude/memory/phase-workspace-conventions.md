@@ -24,7 +24,10 @@ service as the one eligibility check.
 Eligibility for every workspace call: intake complete + archetype + roadmap +
 status 'active' (all four checked; not-ready → 409, unknown phase/task → 404).
 Since M11, `current_phase_view(project)` is public — the reconnection service
-builds its summary from it after loading the project once itself.
+builds its summary from it after loading the project once itself. Since M12,
+`incomplete_tasks(phase_view)` is also public here (moved from reconnection's
+private helper) — shared by the reconnection and evaluation services (see
+[[evaluation-conventions]]).
 
 No LLM call in the workspace: the stored roadmap already carries the
 personalized phase content, so `phase_explanation.md` prose generation is

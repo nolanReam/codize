@@ -149,3 +149,18 @@ user B's state independent of A's; RLS client path with real JWTs + anon key
 (each user reads exactly their own `profiles` row). `scripts/verify_auth.py`
 re-run: 11/11 PASS. Security advisors: clean. Test users deleted; cascade left
 zero rows in all four tables.
+
+## Verification record (M12 session, 2026-07-03)
+
+No schema change — the evaluation system (M12) is computed on read from
+existing tables; nothing new is persisted. Live smoke test (12/12) with the
+verify_auth.sql test users: readiness states tracked the full project
+lifecycle (`not_started` → `intake_needed` → `roadmap_needed` →
+`in_progress`); a live task tick reflected in the summary; two consecutive
+qualifying passed gates (scores 8, 7) seeded through the real gate repo
+granted an unlock the evaluation surfaced safely; a fresh FAIL produced the
+`cooldown` state with a bounded retry window; evaluation JSON contained no
+score/threshold strings; a before/after project-row comparison confirmed the
+evaluation is a pure read; user B saw only their own state.
+`scripts/verify_auth.py` re-run: 11/11 PASS. Security advisors: clean. Test
+users deleted; cascade left zero rows in all four tables.

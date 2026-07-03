@@ -313,8 +313,10 @@ async def _load_session(
     return project, phase, session
 
 
-def _cooldown_remaining(latest_session: dict | None) -> int:
-    """Seconds left on the newest failed attempt's cooldown; 0 when none."""
+def cooldown_remaining(latest_session: dict | None) -> int:
+    """Seconds left on the newest failed attempt's cooldown; 0 when none.
+    Public since M12 — the evaluation service reports cooldown state from the
+    same derivation, so the 30-minute rule stays single-sourced here."""
     if not latest_session or latest_session.get("passed") is not False:
         return 0
     failed_at = _parse_ts(latest_session.get("failed_at"))
@@ -342,7 +344,7 @@ async def start_gate(
             raise GateInProgressError(
                 "A gate session is already in progress for this phase — resume it via GET /gate/current."
             )
-        remaining = _cooldown_remaining(latest)
+        remaining = cooldown_remaining(latest)
         if remaining > 0:
             raise GateCooldownError(remaining)
     session = await gate_repo.create_session(
@@ -508,7 +510,7 @@ async def get_current_gate(
         # advances current_phase, so its sessions are no longer "current".
         return {**base, "state": "passed", "reason": latest.get("reason")}
     if latest.get("passed") is False:
-        remaining = _cooldown_remaining(latest)
+        remaining = cooldown_remaining(latest)
         if remaining > 0:
             return {
                 **base,

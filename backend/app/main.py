@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.routers import (
     archetypes,
+    evaluation,
     gate,
     health,
     intake,
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(gate.router)
     app.include_router(unlocks.router)
     app.include_router(reconnection.router)
+    app.include_router(evaluation.router)
     return app
 
 

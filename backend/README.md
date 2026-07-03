@@ -21,7 +21,8 @@ app/
 │                  phases — auth-required phase workspace, M8;
 │                  gate — auth-required Interrogation Gate, M9;
 │                  unlocks — auth-required earned-unlock listing, M10;
-│                  reconnection — auth-required 72h reconnection state, M11)
+│                  reconnection — auth-required 72h reconnection state, M11;
+│                  evaluation — auth-required progress evaluation, M12)
 ├── services/      product logic (template_service.py: archetype template engine, M5;
 │                  intake_service.py + project_repository.py: intake engine, M6
 │                  — project_repository.py also holds the gate_sessions
@@ -31,7 +32,8 @@ app/
 │                  phase_service.py: phase workspace over the stored roadmap, M8;
 │                  gate_service.py: 3-turn Interrogation Gate + evaluator, M9;
 │                  unlock_service.py: hidden-threshold functional unlocks, M10;
-│                  reconnection_service.py: Yeager reconnection engine, M11)
+│                  reconnection_service.py: Yeager reconnection engine, M11;
+│                  evaluation_service.py: deterministic progress evaluation, M12)
 ├── schemas/       request/response models (intake.py, phases.py, gate.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
@@ -142,6 +144,27 @@ contract: GET first on every login, then acknowledge — immediately when
 (acknowledging before the GET would suppress the modal). Reconnection never
 mutates the roadmap, never advances phases, never grants unlocks, and its
 responses carry no scores, thresholds, prompts, or server-only keys.
+
+## Evaluation (M12)
+
+`services/evaluation_service.py` produces a student-facing progress
+evaluation for the caller's current project: `GET /evaluation` returns one
+controlled 200 state — `not_started`, `intake_needed`, `roadmap_needed`,
+`in_progress`, `gate_ready` (all tasks checked off, or a gate session
+mid-flight), `cooldown` (with `cooldown_seconds_remaining`), or `complete`
+(final phase's gate passed) — never an error. The evaluation is deterministic
+and computed on read: no LLM call, no persistence, no schema change (the spec
+defines no evaluation snapshot, and its tracking section forbids showing
+process metrics as numbers or scores). Content is derived only from
+client-visible state via the shared safe-view seams: the current phase view
+(`phase_service.current_phase_view` / `incomplete_tasks`), phase/task counts,
+the newest `gate_history_summary` line or the evaluator's one-sentence reason
+as a `recent_gate` label (never a score), earned unlock views
+(`unlock_service.unlock_views`), and a recommended `next_action`. Cooldown
+state reuses the gate's own derivation (`gate_service.cooldown_remaining`).
+Evaluation is a pure read — it never mutates the roadmap, task progress,
+gates, or unlocks, never advances phases, and never touches reconnection's
+`last_login_at`.
 
 ## Tests
 
