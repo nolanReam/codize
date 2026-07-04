@@ -1,0 +1,15 @@
+# dependencies / builds
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# env — NEVER commit real values; .env.example is the contract
+.env
+.env.local
+.env.*.local
+
+# platform
+.vercel
+.DS_Store

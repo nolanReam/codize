@@ -65,7 +65,7 @@ def test_happy_path_is_sequential_and_completes():
     status = run(get_status(repo, USER))
     assert status == {
         "started": False, "completed": False, "answered_questions": [],
-        "next_question": 1, "archetype_id": None,
+        "next_question": 1, "archetype_id": None, "answers": None,
     }
 
     for n in (1, 2, 3, 4, 5):
@@ -81,6 +81,20 @@ def test_happy_path_is_sequential_and_completes():
     status = run(get_status(repo, USER))
     assert status["completed"] is True
     assert status["archetype_id"] == result["archetype_id"]
+
+
+def test_status_echoes_stored_answers_by_key():
+    repo = InMemoryProjectRepository()
+    run(submit_answer(repo, USER, 1, FIVE_ANSWERS[1]))
+    run(submit_answer(repo, USER, 2, FIVE_ANSWERS[2]))
+    status = run(get_status(repo, USER))
+    assert status["answers"]["purpose"] == FIVE_ANSWERS[1]
+    assert status["answers"]["scope"] == FIVE_ANSWERS[2]
+    # Unanswered questions surface as null, not missing keys.
+    assert status["answers"]["stack"] is None
+    assert set(status["answers"]) == {
+        "purpose", "scope", "stack", "self_assessment", "timeline",
+    }
 
 
 def test_question_one_cannot_be_skipped():
@@ -155,7 +169,7 @@ def test_users_intake_states_are_independent():
     other = run(get_status(repo, OTHER_USER))
     assert other == {
         "started": False, "completed": False, "answered_questions": [],
-        "next_question": 1, "archetype_id": None,
+        "next_question": 1, "archetype_id": None, "answers": None,
     }
     with pytest.raises(IntakeSequenceError):  # B still starts at question 1
         run(submit_answer(repo, OTHER_USER, 5, "just the last one"))

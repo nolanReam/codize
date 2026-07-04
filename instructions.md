@@ -1,276 +1,513 @@
-# Codize Product Vision Reset — Context Update Only
+# Codize M13C.1 Recovery — Resume Frontend Foundation
 
-Do not implement product code in this session.
+Claude Code stopped midway through M13C.1 because of usage limits.
 
-Do not build frontend screens.
+Continue from the current repository state.
 
-Do not modify backend behavior.
+Do not restart the frontend from scratch.
+
+Do not discard partial work unless it is clearly broken, and explain why before replacing it.
+
+Do not reset, checkout, stash, or delete uncommitted changes.
+
+Do not start M13C.2.
+
+Do not implement evidence-aware gate prompts.
+
+Do not modify gate evaluator logic.
 
 Do not create migrations.
 
-Do not start Milestone 13.
-
-This is a context/spec reset after Milestone 12. The goal is to update Codize’s product direction before M13 frontend work begins.
+Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, analytics dashboard, hosted coding runtime, or complex gamification.
 
 ## Current State
 
 Milestones M1–M12 are complete.
 
-Completed milestones:
+Product vision reset is complete.
 
-- M1 Repository foundation + pre-build artifacts — `98ad004`
-- M2 Supabase schema + RLS — `5db4744`
-- M3 Authentication foundation — `1075d2f`
-- M4 FastAPI core — `d6e55be`
-- M5 Archetype template engine — `53d6aa0`
-- M6 Intake engine — `0aacfae`
-- M7 Roadmap generation engine — `6a1c9c8`
-- M8 Phase workspace — `d38f642`
-- M9 Interrogation Gate — `9b46f7e`
-- M10 Functional unlocks — `4400f71`
-- M11 Reconnection system — `9012a52`
-- M12 Evaluation system — `44442b0`
+M13A planning is complete.
 
-## Product Direction Shift
+M13B workflow artifact backend is complete.
 
-The product vision has been clarified.
+Relevant commits:
 
-Codize should no longer be framed mainly as:
+- M12 Evaluation system: `44442b0`
+- Product vision reset: `139d898`
+- M13A planning: `1d3e32b`
+- M13B workflow artifact backend: `de42d5b`
 
-- roadmap generation
-- task checklist
-- understanding gate
-- generic student progress dashboard
+M13C.1 was started but interrupted before completion.
 
-That framing is too narrow and makes Codize feel like a roadmap + quiz app.
+## First Actions
 
-Codize should now be framed as:
+Before coding, inspect the current state:
 
-> An AI coding workflow trainer that helps student builders escape the 80% trap, use AI tools properly, verify what AI generated, and defend the projects they ship.
+```bash
+git status
+git diff --stat
+git log --oneline -5
+```
 
-This is not a random pivot.
+Then inspect the frontend work already present.
 
-It is a correction back toward the original master spec’s thesis: Codize solves a workflow problem, not a laziness problem. Students need to learn where AI belongs in the software development process and where human judgment must remain in control.
+If a frontend app exists, continue it.
+
+If a frontend app was partially created, repair and complete it.
+
+If no frontend app exists, create the minimal Next.js frontend required by M13C.1.
+
+Do not duplicate files or create a second frontend app.
 
 ## Read First
 
 Read:
 
 - `CLAUDE.md`
-- `docs/context/codize_product_vision_v3.md` if it already exists
+- `docs/context/context_authority.md`
+- `docs/context/codize_product_vision_v3.md`
+- `docs/context/m13_ai_workflow_workspace_plan.md`
 - `docs/context/codize_master_spec_v2.1.md`
-- `docs/context/codize_roadmap_v2.html`
-- `.claude/memory/product-vision-v3.md` if it already exists
-- `.claude/memory/` files related to roadmap, phase workspace, gate, unlocks, reconnection, and evaluation
+- `.claude/memory/product-vision-v3.md`
+- `.claude/memory/workflow-artifact-conventions.md`
+- `.claude/memory/phase-workspace-conventions.md`
+- `.claude/memory/gate-conventions.md`
+- `.claude/memory/reconnection-conventions.md`
+- `.claude/memory/evaluation-conventions.md` if it exists
+- frontend files already created during the interrupted M13C.1 run
+- package/config files in the repo root and frontend directory
 
-Do not read `conversations.json` unless needed.
+Do not read `conversations.json` unless genuinely needed.
 
-## Task 1 — Create or Update Product Vision v3
+## Goal
 
-Create or update:
+Finish M13C.1 only:
 
-`docs/context/codize_product_vision_v3.md`
+> Frontend Foundation + Core AI Workflow Workspace
 
-This document is the current product-direction source for Milestone 13+.
-
-If the file already exists, review it and improve it instead of duplicating it.
-
-It should define Codize as:
-
-- an AI coding workflow trainer
-- not an AI coding assistant
-- not a browser IDE
-- not an AI news app
-- not just a quiz/gate platform
-- not a replacement for Claude Code, Cursor, GitHub Copilot, Replit, Codex, or ChatGPT
-
-## Required v3 Product Thesis
-
-Codize helps student builders stop blindly vibe coding by guiding them through a disciplined AI-assisted engineering loop:
+M13C.1 should make the Codize v3 loop visible and usable:
 
 Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
 
-The main user pain is the 80% Trap:
+The frontend should feel like a serious AI engineering cockpit, not a generic roadmap/checklist/quiz app.
 
-AI can generate the first 80% of an app quickly, but the project collapses when the user adds features, hits bugs, or needs to explain architecture they never understood.
+## Required M13C.1 Scope
 
-The main product payoff is the Project Defense Report:
-
-A student leaves with evidence that they planned, prompted, reviewed, verified, and explained their AI-assisted project work.
-
-## MVP v0.1 Scope
-
-Define the narrow MVP as:
-
-One student.
-One project.
-One phase/workflow loop.
-One Project Defense Report.
-
-MVP should include:
+Complete these surfaces enough for a working MVP foundation:
 
 1. Landing page around the 80% Trap
-2. Project Cockpit
-3. Prompt Builder
-4. Review Board
-5. Evidence Panel
-6. Verification Lab
-7. Evidence-Based Understanding Gate
-8. Project Defense Report
-9. Basic pilot analytics/survey hooks if feasible
+2. Auth flow
+3. Protected app shell
+4. Intake flow
+5. Project Cockpit
+6. Phase Workflow Board
+7. Prompt Builder
+8. Review Board
+9. Evidence Panel
+10. Verification Lab
+11. Basic API client and auth session handling
+12. Basic loading, empty, and error states
 
-MVP should not include:
+Gate UI and Project Defense Report may remain skeletons/placeholders in M13C.1 if needed, but navigation should clearly show where they will fit in M13C.2.
 
-- browser IDE
-- full GitHub OAuth
-- AI news digest
-- community/social features
-- tool marketplace
-- random XP/streak gamification
-- elementary/Scratch version
-- full automated verification of arbitrary projects
-- AI coding agent
-- hosted coding runtime
+Do not fully implement Interview Defense Mode.
 
-Manual evidence is acceptable for v0.1:
+Do not fully implement Rescue Mode.
+
+## Backend Routes To Use
+
+M13B added workflow artifact backend routes:
+
+- `GET /workflow/{phase}`
+- `PUT /workflow/{phase}/{section}`
+
+Sections:
+
+- `prompt_builder`
+- `review_board`
+- `evidence`
+- `verification`
+
+Frontend must call backend routes with a Supabase Bearer JWT.
+
+Do not fake backend data when real routes exist.
+
+Use honest placeholders only for unfinished M13C.2 surfaces.
+
+## Required Frontend Env Vars
+
+Document these in the frontend env example:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_API_BASE_URL`
+
+Never expose service-role keys.
+
+Never expose provider keys.
+
+## Landing Page Requirements
+
+Use the 80% Trap positioning.
+
+Headline direction:
+
+> AI built your first 80%. Now you’re stuck fixing the rest.
+
+Core message:
+
+> Generating code is easy. Understanding why it broke is the hard part. Codize helps student builders plan, prompt, review, verify, and defend AI-generated code before their projects collapse into patch loops.
+
+Primary CTA:
+
+> Stop Debugging Blindly
+
+Tone:
+
+- serious
+- direct
+- developer-focused
+- non-shaming
+- not childish
+- not generic SaaS
+
+Avoid calling users lazy, fake, or cheaters.
+
+## Auth Requirements
+
+Implement basic signup/login/logout using Supabase Auth.
+
+After signup/login:
+
+- if no project/intake exists, guide user to intake
+- if project exists, guide user to Project Cockpit/current phase
+
+Frontend must use Supabase client auth only.
+
+Protected backend data must be requested with a valid Bearer JWT.
+
+## API Client Requirements
+
+Create or complete a frontend API client that:
+
+- reads `NEXT_PUBLIC_API_BASE_URL`
+- gets the current Supabase access token
+- attaches `Authorization: Bearer <token>`
+- handles 401, 403, 404, 409, 422, and 500 states cleanly
+- avoids leaking sensitive backend details into the UI
+- keeps implementation simple
+
+Wire existing backend surfaces where practical:
+
+- intake
+- roadmap/project creation
+- current phase / phase workspace
+- workflow artifacts
+- reconnection
+- evaluation if useful for cockpit summary
+
+## Intake Requirements
+
+Build intake according to the master spec.
+
+The first question must remain exactly:
+
+> What problem do you want to solve, and who does solving it help?
+
+The intake should feel conversational, not like a generic form.
+
+After intake completion, move the user toward the project workspace/current phase according to existing backend behavior.
+
+## Project Cockpit Requirements
+
+Project Cockpit should show:
+
+- project name
+- purpose / who it helps
+- current phase
+- current workflow step
+- next required action
+- evidence status
+- verification status
+- gate status if available
+- report progress placeholder
+- reconnection modal/summary if backend says it is needed
+- clear CTA into the current phase workspace
+
+The user should never wonder:
+
+> What do I do next?
+
+## Reconnection Requirements
+
+Preserve existing reconnection invariant:
+
+- call `GET /reconnection` first
+- if reconnection is not needed, acknowledge appropriately
+- if reconnection is needed, show the reconnection summary
+- only acknowledge after the user clicks the equivalent of “Let’s keep building”
+
+Do not turn `GET /reconnection` into an action that suppresses the modal.
+
+## Phase Workflow Board Requirements
+
+The phase page should be framed around the Codize Build Loop:
+
+Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
+
+Do not show it only as a task checklist.
+
+It should include:
+
+- current phase title
+- phase purpose
+- existing phase tasks from backend
+- workflow step navigation
+- status for Prompt Builder / Review / Evidence / Verification
+- CTA to proceed through the loop
+
+Existing task progress can still be visible, but the UX should emphasize workflow.
+
+## Prompt Builder Requirements
+
+Implement deterministic client-side Prompt Builder.
+
+No LLM call is required.
+
+Inputs should include:
+
+- current project goal
+- current phase goal
+- what the user wants AI to do
+- files involved, if any
+- constraints
+- what AI should not change
+- whether to ask for a plan before code
+- whether to ask for tests/checks
+- confusion/uncertainty
+
+Output should include:
+
+- generated prompt text
+- short explanation of why the prompt is stronger
+- optional bad-prompt comparison if easy
+
+Save to:
+
+- `PUT /workflow/{phase}/prompt_builder`
+
+Load from:
+
+- `GET /workflow/{phase}`
+
+## Review Board Requirements
+
+Implement Review Board form.
+
+It should ask:
+
+- What files changed?
+- What did AI generate?
+- What did you accept?
+- What did you reject?
+- What did you edit manually?
+- What assumptions did AI make?
+- What are you least confident about?
+- Did AI change anything outside the requested scope?
+
+Save to:
+
+- `PUT /workflow/{phase}/review_board`
+
+Load from:
+
+- `GET /workflow/{phase}`
+
+## Evidence Panel Requirements
+
+Implement Evidence Panel form.
+
+Manual evidence is acceptable for v0.1.
+
+Fields may include:
 
 - repo URL
 - commit hash
 - changed files
-- pasted terminal output
-- screenshot link/notes
-- what AI generated
-- what the user accepted/rejected/edited
+- terminal output
+- test output
+- screenshot note/link
+- app URL
+- API response example
+- evidence summary
 
-## Task 2 — Create or Update Claude Memory
+Do not fetch GitHub data.
 
-Create or update:
+Do not verify external URLs automatically.
 
-`.claude/memory/product-vision-v3.md`
+Do not implement GitHub OAuth.
 
-This should be a concise durable reminder, not the full product spec.
+Save to:
 
-It should record:
+- `PUT /workflow/{phase}/evidence`
 
-- the vision shifted before M13
-- old roadmap + checklist + gate framing is incomplete
-- current thesis is AI Workflow Trainer / Project Defense Workflow
-- the Codize Build Loop is Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
-- M13 should become AI Workflow Workspace MVP
-- browser IDE, full GitHub OAuth, AI news, community, and tool marketplace are out of scope for v0.1
-- `docs/context/codize_product_vision_v3.md` is the current product-direction source
+Load from:
 
-## Task 3 — Update Context Authority
+- `GET /workflow/{phase}`
 
-Create or update:
+## Verification Lab Requirements
 
-`docs/context/context_authority.md`
+Implement Verification Lab form/checklist.
 
-This file should clearly define source authority.
+It should support:
 
-Use this hierarchy:
+- app runs locally
+- smoke test completed
+- API/route checked
+- UI flow checked
+- failure case tested
+- auth boundary checked when relevant
+- secret exposure checked
+- RLS/wrong-user access checked when relevant
+- user explanation of what the verification proves
 
-1. `instructions.md`
-   - Controls the active Claude Code task/process only.
-   - Does not permanently redefine product vision unless it explicitly updates context docs.
+Do not claim full automated verification.
 
-2. `docs/context/codize_product_vision_v3.md`
-   - Controls current product positioning, UX direction, MVP scope, and M13+ frontend direction.
+This is manual verification evidence.
 
-3. `docs/context/codize_master_spec_v2.1.md`
-   - Controls backend invariants, core architecture, intake, archetypes, security constraints, RLS/auth requirements, and gate mechanics unless explicitly superseded by v3.
+Save to:
 
-4. `CLAUDE.md`, `.claude/skills/`, and `.claude/memory/`
-   - Control durable implementation conventions and operational memory.
+- `PUT /workflow/{phase}/verification`
 
-5. `docs/context/codize_roadmap_v2.html`
-   - Legacy build/learning roadmap.
-   - Useful historical context.
-   - Not current product direction.
-   - Do not use it to define M13 unless explicitly instructed.
+Load from:
 
-6. `docs/context/conversations.json`
-   - Historical product-debate archive only.
-   - Not authoritative.
-   - Do not read unless explicitly needed.
+- `GET /workflow/{phase}`
 
-## What “Legacy” Means
+## Gate Boundary
 
-Do not delete legacy files.
+Do not make the gate evidence-aware yet.
 
-Do not rename legacy files unless necessary.
+Do not change evaluator prompts.
 
-Marking a file as legacy means:
+Do not change gate pass/fail logic.
 
-- future Claude sessions should know it is old context
-- it can still be referenced for history
-- it must not override the current v3 product direction
-- it should not drive M13 frontend decisions
+If showing a gate entry point, use existing M9 gate backend behavior as-is.
 
-Do not edit `codize_roadmap_v2.html` heavily.
+If full gate UI is too large for M13C.1, create a clear placeholder and defer full gate UI to M13C.2.
 
-If adding a note is safe, add only a small comment near the top saying it is legacy. If that risks breaking the HTML, do not edit the HTML file; rely on `context_authority.md`, `CLAUDE.md`, and memory instead.
+## Project Defense Report Boundary
 
-## Task 4 — Update CLAUDE.md
+Do not build a full Project Defense Report if it would make M13C.1 too large.
 
-Update `CLAUDE.md` so future sessions know:
+At minimum, create a placeholder showing that the report will assemble from:
 
-- Codize v3 product direction is AI Workflow Trainer / Project Defense Workflow.
-- The old “roadmap + gate” framing is incomplete.
-- `docs/context/codize_product_vision_v3.md` is the current product-direction source for M13+.
-- `docs/context/codize_master_spec_v2.1.md` still controls backend/security/gate invariants.
-- `docs/context/codize_roadmap_v2.html` is legacy build/learning context.
-- `conversations.json` is historical archive only.
-- M13 must not be started from the old three-screen frontend plan.
-- M13 should implement the AI Workflow Workspace MVP.
-- Browser IDE, AI news, full GitHub OAuth, community, and tool marketplace are out of scope for v0.1.
+- project/intake
+- phase
+- prompt_builder artifact
+- review_board artifact
+- evidence artifact
+- verification artifact
+- gate status
+- evaluation summary
 
-## M13 Direction To Record
+Full report generation can be M13C.2.
 
-Milestone 13 should be renamed/reframed from generic frontend integration to:
+## UX / Design Requirements
 
-> AI Workflow Workspace MVP
+Design should be:
 
-M13 should not simply create old screens for:
+- sharp
+- serious
+- high-contrast
+- developer-focused
+- workflow-oriented
+- closer to Linear / GitHub / VS Code than school LMS
+- not childish
+- not generic SaaS
+- not purple-gradient AI slop
 
-- intake
-- roadmap
-- phase checklist
-- gate modal
+The app should feel like an engineering cockpit, not a quiz app.
 
-M13 should create a frontend experience around:
+Avoid fake polish that hides incomplete functionality.
 
-- Landing page
-- Project Cockpit
-- Prompt Builder
-- Review Board
-- Evidence Panel
-- Verification Lab
-- Evidence-Based Gate
-- Project Defense Report / Evaluation Summary
+Every incomplete feature should have an honest placeholder.
 
-Existing backend routes may still be used, but the UX language and flow should match the v3 product direction.
+## Security Requirements
 
-## Do Not
+Do not expose:
 
-Do not implement frontend code.
-Do not modify backend behavior.
-Do not create migrations.
-Do not start M13.
-Do not delete old context files.
-Do not rewrite the entire master spec.
-Do not overbuild the product vision into a huge platform.
-Do not add AI news, browser IDE, GitHub OAuth, community, or tool marketplace to the MVP.
+- service-role keys
+- provider keys
+- raw gate scores
+- hidden unlock thresholds
+- evaluator reasoning
+- internal prompts
+- `.env` content
+
+Frontend must not assume user ownership.
+
+Backend remains source of truth.
+
+Handle errors safely.
+
+Do not render raw untrusted HTML from user artifacts.
+
+Treat all workflow artifact text as plain text.
+
+## Testing / Verification
+
+Add or update frontend tests if the frontend test setup exists.
+
+If there is no frontend test setup, create only a minimal practical one if it does not derail the milestone.
+
+At minimum, run:
+
+```bash
+cd frontend
+npm install
+npm run lint
+npm run typecheck
+npm run build
+```
+
+If a command is unavailable because scripts do not exist, say so clearly.
+
+Run backend tests only if backend code changed.
+
+Run the prebuild validator if relevant.
+
+Do not claim tests passed unless they actually ran.
+
+Run a secret scan before commit.
+
+## Documentation Updates
+
+Update as needed:
+
+- `frontend/README.md` if frontend is created
+- `CLAUDE.md` if the frontend structure should be remembered
+- `.claude/memory/product-vision-v3.md` only if needed
+- `docs/context/m13_ai_workflow_workspace_plan.md` only if implementation materially changes the plan
+
+Do not rewrite the whole product vision.
 
 ## End Requirements
 
-At the end:
+At the end, output:
 
-- list files created/updated
-- explain the new authority hierarchy
-- explain what is now legacy
-- explain how M13 changes
-- run a quick secret scan if files were changed
-- commit changes
-- output the git commit hash
-- stop
+- what partial work was found
+- files changed
+- frontend app created or updated
+- routes/screens implemented
+- backend routes consumed
+- env vars required
+- commands run
+- test/build results
+- secret scan result
+- known issues
+- git commit hash
+- next step: M13C.2, likely Gate UI + Project Defense Report + polish/pilot flow
+
+Commit all completed M13C.1 changes.
+
+Stop after commit.

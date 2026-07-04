@@ -60,6 +60,10 @@ ANSWER_COLUMNS = {
     5: "intake_timeline",
 }
 
+# Question number → the question's stable key (purpose, scope, …). Lets the
+# status response return answers keyed the way the frontend reads them.
+ANSWER_KEYS = {q["number"]: q["key"] for q in QUESTIONS}
+
 MAX_ANSWER_LENGTH = 4000
 
 ARCHETYPE_NAMES = {aid: name for aid, name in template_service.EXPECTED_TEMPLATES.values()}
@@ -111,6 +115,14 @@ def next_question_number(project: dict | None) -> int | None:
 
 def _build_status(project: dict | None) -> dict:
     nxt = next_question_number(project)
+    # The student's own stored answers, keyed by question key (purpose, scope,
+    # …). Owner-scoped data the frontend echoes back in the intake transcript
+    # and the cockpit "mission" — never scores, prompts, or derived state.
+    answers = (
+        None
+        if project is None
+        else {ANSWER_KEYS[n]: project.get(col) for n, col in ANSWER_COLUMNS.items()}
+    )
     return {
         "started": project is not None,
         "completed": bool(project and project.get("intake_completed_at")),
@@ -119,6 +131,7 @@ def _build_status(project: dict | None) -> dict:
         ],
         "next_question": nxt,
         "archetype_id": project.get("archetype_id") if project else None,
+        "answers": answers,
     }
 
 

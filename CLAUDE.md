@@ -18,6 +18,7 @@ Codize is an educational platform that helps students understand the projects th
 - `scripts/verify_auth.sql` + `python scripts/verify_auth.py` — end-to-end auth/RLS check over the real Auth+PostgREST APIs with real JWTs: run the SQL SETUP via MCP, run the script with `SUPABASE_URL`/`SUPABASE_ANON_KEY` set, then run the SQL CLEANUP. Run after any auth or RLS change.
 - Backend tests: from `backend/`, `.venv\Scripts\python -m pytest` (venv setup: `python -m venv .venv` then `.venv\Scripts\pip install -r requirements.txt`). Run after any backend change.
 - Backend dev server: from `backend/`, `.venv\Scripts\uvicorn app.main:app --reload`.
+- Frontend (M13C, `frontend/` — Next.js App Router): from `frontend/`, `npm install`, then `npm run dev` / `npm run lint` / `npm run typecheck` / `npm run build` / `npm test` (vitest). See `frontend/README.md`. Env: copy `.env.example` → `.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_BASE_URL` — publishable values only; never a service-role or provider key). Supabase is used for **auth only**; all product data flows Frontend → FastAPI (`lib/api.ts`, Bearer JWT). Run the frontend checks after any frontend change.
 
 ## Where the durable context lives
 
