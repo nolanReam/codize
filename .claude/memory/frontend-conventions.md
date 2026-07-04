@@ -46,3 +46,22 @@ returns an `answers` dict keyed by question key (purpose/scope/…) — owner-sc
 data the cockpit "mission" card and intake transcript echo. No other backend
 change; the cockpit REQUIRES the intake purpose, and evaluation deliberately
 doesn't carry it (see [[evaluation-conventions]], [[intake-engine-conventions]]).
+
+Live smoke pass (2026-07-03, after commit `03e3c1f`): drove the full flow in a
+real browser (Playwright) against the live FastAPI backend + Supabase — all 20
+steps green, zero 500s, **no frontend/API integration bugs found**. Run the
+backend with the repo-root `.env` via `uvicorn app.main:app --env-file ../.env`
+from `backend/`; the frontend needs `frontend/.env.local` (public Supabase URL +
+publishable key + `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`). Email
+confirmations are ON, so create a login-capable test user directly via SQL (the
+[[gotrue-sql-test-users]] pattern), and clean it up after.
+
+Two live observations (NOT M13C.1 bugs, left as-is): (1) roadmap generation
+drifted and returned 502 three times in a row with `GEMINI_MODEL=
+gemini-2.5-flash-lite` at temp 0.7 — the fail-closed validator + the intake
+page's retry message handled every 502 correctly, but flash-lite preserves the
+template structure poorly; consider a stronger model for roadmap gen (M7
+concern, not frontend). To unblock downstream smoke steps, seed a valid roadmap
+by writing the archetype template (read as UTF-8!) into `projects.roadmap` +
+`status='active'` via the real repo. (2) Missing `favicon.ico` logs a benign
+404 on every page — cosmetic, deferred.
