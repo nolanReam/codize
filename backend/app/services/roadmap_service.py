@@ -12,13 +12,17 @@ JSONB and flip projects.status 'intake' → 'active' in the same write. The
 status flip therefore cannot happen unless generation succeeded.
 """
 
+import copy
 import json
+import logging
 import re
 from pathlib import Path
 
 from app.services import llm_service, template_service
 from app.services.llm_service import LLMService
 from app.services.project_repository import ProjectRepository
+
+logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 ROADMAP_TEMPERATURE = 0.7  # fixed by prompts/README.md — roadmap_generation.md row
@@ -173,6 +177,102 @@ def validate_roadmap_structure(roadmap: dict, template: dict) -> list[str]:
     return errors
 
 
+# --- deterministic template fallback (M13C.1B) --------------------------------
+#
+# The LLM personalizes wording; the hardcoded template protects structure. When
+# personalization fails (provider error, unparseable output, or structural
+# drift), the student must not be blocked from the workspace — Codize builds a
+# structurally valid roadmap straight from the archetype template instead.
+
+_PLACEHOLDER_RE = re.compile(r"\[[A-Z][A-Z_]*\]")
+
+# The ONLY phase fields that carry [PLACEHOLDER] slots (audited across all three
+# templates). The fallback personalizes exactly these; the fields the validator
+# checks for exact equality (phase number/title, gate_depth, unlock_condition)
+# and the verbatim NOTE:/RLS-first security constraints are copied through
+# untouched, so a fallback roadmap is valid by construction.
+_PERSONALIZABLE_PHASE_FIELDS = (
+    "core_concept",
+    "functional_unlock",
+    "ai_appropriate_tasks",
+    "human_required_tasks",
+    "explanation_gate_targets",
+)
+
+_MAX_PURPOSE_IN_TEMPLATE = 200  # keep the substituted purpose from bloating 20+ slots
+
+
+def _personalize(text: str, purpose: str) -> str:
+    text = text.replace("[PROJECT_PURPOSE]", purpose)
+    # Any other slot (e.g. [PROJECT_SCALE]) → a neutral phrase; never leak a raw
+    # bracket token to the student.
+    return _PLACEHOLDER_RE.sub("your project", text)
+
+
+def _fallback_timeline_estimate(project: dict) -> str:
+    deadline = (project.get("intake_timeline") or "").strip()
+    base = (
+        "Codize built this roadmap from the verified archetype template. Work "
+        "through the phases in order — each one gates on understanding, not speed."
+    )
+    return f'Your stated timeline: "{deadline}". {base}' if deadline else base
+
+
+def build_fallback_roadmap(template: dict, project: dict) -> dict:
+    """A deterministic, structurally valid roadmap built straight from the
+    archetype template — no LLM, no network. Structure is the template's (so it
+    always passes validate_roadmap_structure); wording is lightly personalized
+    by substituting the verbatim intake purpose into the template's
+    personalization slots. No hallucinated or unsupported requirements."""
+    roadmap = copy.deepcopy(template)
+    purpose = (project.get("intake_purpose") or "").strip() or "your project"
+    if len(purpose) > _MAX_PURPOSE_IN_TEMPLATE:
+        purpose = purpose[: _MAX_PURPOSE_IN_TEMPLATE - 1].rstrip() + "…"
+
+    for phase in roadmap["phases"]:
+        for field in _PERSONALIZABLE_PHASE_FIELDS:
+            value = phase[field]
+            if isinstance(value, str):
+                phase[field] = _personalize(value, purpose)
+            elif isinstance(value, list):
+                phase[field] = [
+                    _personalize(item, purpose) if isinstance(item, str) else item
+                    for item in value
+                ]
+    roadmap["timeline_estimate"] = _fallback_timeline_estimate(project)
+    return roadmap
+
+
+async def _personalized_roadmap(
+    template: dict, project: dict, llm: LLMService
+) -> dict | None:
+    """One LLM personalization attempt. Returns a roadmap that passed strict
+    structure validation, or None when the provider failed, returned
+    unparseable output, or drifted — each of which is a signal to fall back to
+    the template, not an error to surface. A drifted roadmap is never stored."""
+    prompt = build_prompt(template, project)  # a bad prompt is a programming error → raises
+    try:
+        raw = await llm.complete(prompt, temperature=ROADMAP_TEMPERATURE)
+        candidate = _parse_roadmap(raw)
+    except (llm_service.LLMError, RoadmapGenerationError) as exc:
+        logger.warning(
+            "roadmap personalization unavailable for project %s; using template fallback: %s",
+            project.get("id"), exc,
+        )
+        return None
+
+    drift = validate_roadmap_structure(candidate, template)
+    if drift:
+        # Log the drift detail for observability; it never reaches the client.
+        logger.warning(
+            "roadmap personalization drifted for project %s (archetype %s); "
+            "using template fallback: %s",
+            project.get("id"), project.get("archetype_id"), "; ".join(drift),
+        )
+        return None
+    return candidate
+
+
 def _roadmap_response(project: dict) -> dict:
     return {
         "roadmap": project["roadmap"],
@@ -197,19 +297,29 @@ async def generate_roadmap(repo: ProjectRepository, llm: LLMService, user_id: st
     if project.get("roadmap"):
         raise RoadmapAlreadyGeneratedError("A roadmap has already been generated for this project.")
 
-    template = template_service.get_template(project["archetype_id"])
-    prompt = build_prompt(template, project)
     try:
-        raw = await llm.complete(prompt, temperature=ROADMAP_TEMPERATURE)
-    except llm_service.LLMError as e:
-        raise RoadmapGenerationError("Roadmap generation failed. Please try again.") from e
+        template = template_service.get_template(project["archetype_id"])
+    except template_service.UnknownArchetypeError as e:
+        # No template to personalize OR to fall back to — fail safely, store nothing.
+        raise RoadmapNotReadyError("This project's archetype is not recognized.") from e
 
-    roadmap = _parse_roadmap(raw)
-    drift = validate_roadmap_structure(roadmap, template)
-    if drift:
-        # Fail closed: a structurally drifted roadmap is never stored.
-        raise RoadmapGenerationError(
-            "Generated roadmap failed structure validation and was discarded."
+    # Personalize with the LLM; fall back to the verified template on any failure
+    # or drift. Either way the stored roadmap is strictly validated — an invalid
+    # structure is never persisted.
+    roadmap = await _personalized_roadmap(template, project, llm)
+    if roadmap is None:
+        roadmap = build_fallback_roadmap(template, project)
+        residual = validate_roadmap_structure(roadmap, template)
+        if residual:
+            # Impossible by construction; never store an invalid structure.
+            logger.error(
+                "template fallback roadmap invalid for archetype %s: %s",
+                project.get("archetype_id"), "; ".join(residual),
+            )
+            raise RoadmapGenerationError("Roadmap generation failed. Please try again.")
+        logger.info(
+            "stored template-fallback roadmap for project %s (archetype %s)",
+            project.get("id"), project.get("archetype_id"),
         )
 
     fields: dict = {"roadmap": roadmap, "status": "active"}

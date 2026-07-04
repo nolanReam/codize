@@ -13,11 +13,26 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
+import json
+
 from app.core import security
 from app.core.config import get_settings
 from app.main import create_app
+from app.services.llm_service import LLMService, StubProvider, get_llm_service
 from app.services.project_repository import get_project_repository
 from tests.fakes import InMemoryProjectRepository
+
+
+class _DriftingProvider:
+    """Valid JSON that drops the final security-checklist phase — the exact
+    drift that returned 502 during the M13C.1 live smoke pass."""
+
+    name = "drifting"
+
+    async def complete(self, prompt: str, temperature: float) -> str:
+        roadmap = json.loads(await StubProvider().complete(prompt, temperature))
+        roadmap["phases"] = roadmap["phases"][:-1]
+        return json.dumps(roadmap)
 
 _key = ec.generate_private_key(ec.SECP256R1())
 
@@ -127,6 +142,25 @@ def test_user_cannot_read_or_generate_another_users_roadmap(client):
     # B sees no roadmap and cannot generate against A's project.
     assert client.get("/roadmap", headers=auth_headers(USER_B)).status_code == 404
     assert client.post("/roadmap/generate", headers=auth_headers(USER_B)).status_code == 409
+
+
+def test_drifting_llm_no_longer_blocks_onboarding(client):
+    """M13C.1B regression: the drift that returned 502 in the live smoke pass
+    now falls back to a valid roadmap, so POST /roadmap/generate returns 200 and
+    the project becomes active — no manual DB seeding required."""
+    client.app.dependency_overrides[get_llm_service] = lambda: LLMService([_DriftingProvider()])
+    try:
+        complete_intake(client)
+        resp = client.post("/roadmap/generate", headers=auth_headers())
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "active"
+        assert len(body["roadmap"]["phases"]) == 7
+        assert body["roadmap"]["phases"][-1]["phase_title"] == "Pre-Deployment Security Checklist"
+        # No internal validation detail leaks into the response.
+        assert "drift" not in resp.text.lower() and "traceback" not in resp.text.lower()
+    finally:
+        client.app.dependency_overrides.pop(get_llm_service, None)
 
 
 def test_roadmap_responses_contain_no_secrets(client, monkeypatch):

@@ -11,7 +11,6 @@ from app.services import roadmap_service, template_service
 from app.services.llm_service import LLMError, LLMService, StubProvider
 from app.services.roadmap_service import (
     RoadmapAlreadyGeneratedError,
-    RoadmapGenerationError,
     RoadmapNotFoundError,
     RoadmapNotReadyError,
     build_prompt,
@@ -141,14 +140,70 @@ def test_successful_generation_stores_roadmap_and_flips_status():
 
 
 @pytest.mark.parametrize("provider", [FailingProvider, BadJSONProvider, DriftingProvider])
-def test_generation_failure_does_not_flip_status(provider):
+def test_personalization_failure_falls_back_to_valid_template_roadmap(provider):
+    """M13C.1B: a provider error, unparseable output, or structural drift must
+    NOT block the student. Codize discards the bad LLM output and falls back to
+    a valid template-backed roadmap; the project becomes active."""
     repo = InMemoryProjectRepository()
-    seed_project(repo)
-    with pytest.raises(RoadmapGenerationError):
-        run(generate_roadmap(repo, LLMService([provider()]), USER))
+    seed_project(repo, archetype_id=2)
+    result = run(generate_roadmap(repo, LLMService([provider()]), USER))
+
+    template = template_service.get_template(2)
+    # The stored structure is fully valid — invalid LLM output was never stored.
+    assert validate_roadmap_structure(result["roadmap"], template) == []
+    assert result["status"] == "active"
     project = run(repo.get_project(USER))
-    assert project["status"] == "intake"  # fail closed: nothing stored
+    assert project["status"] == "active"
+    assert project["roadmap"] == result["roadmap"]
+    # DriftingProvider drops the final phase; the fallback keeps all of them.
+    assert len(result["roadmap"]["phases"]) == len(template["phases"])
+    assert result["roadmap"]["phases"][-1]["phase_title"] == "Pre-Deployment Security Checklist"
+
+
+def test_fallback_equals_deterministic_builder_and_weaves_in_purpose():
+    repo = InMemoryProjectRepository()
+    project = seed_project(repo, archetype_id=1)
+    result = run(generate_roadmap(repo, LLMService([FailingProvider()]), USER))
+    template = template_service.get_template(1)
+    assert result["roadmap"] == roadmap_service.build_fallback_roadmap(template, project)
+    blob = json.dumps(result["roadmap"])
+    assert "[PROJECT_PURPOSE]" not in blob  # no raw placeholder tokens leak
+    assert "[PROJECT_SCALE]" not in blob
+    assert "volleyball" in blob  # the intake purpose is woven into the wording
+
+
+@pytest.mark.parametrize("archetype_id", [1, 2, 3])
+def test_build_fallback_roadmap_passes_existing_validation(archetype_id):
+    repo = InMemoryProjectRepository()
+    project = seed_project(repo, archetype_id=archetype_id)
+    template = template_service.get_template(archetype_id)
+    fallback = roadmap_service.build_fallback_roadmap(template, project)
+    assert validate_roadmap_structure(fallback, template) == []
+    assert fallback["phases"][-1]["phase_title"] == "Pre-Deployment Security Checklist"
+    assert isinstance(fallback["timeline_estimate"], str) and fallback["timeline_estimate"].strip()
+
+
+def test_unsupported_archetype_fails_safely_without_storing():
+    """No template for the archetype → controlled failure, nothing stored, no
+    fabricated fallback (safe failure preserved)."""
+    repo = InMemoryProjectRepository()
+    seed_project(repo, archetype_id=99)  # never produced by classification
+    with pytest.raises(RoadmapNotReadyError):
+        run(generate_roadmap(repo, stub_llm(), USER))
+    project = run(repo.get_project(USER))
+    assert project["status"] == "intake"
     assert project["roadmap"] is None
+
+
+def test_fallback_response_leaks_no_validator_internals():
+    """The fallback path returns a normal roadmap — no drift descriptions,
+    validator prompts, or stack traces reach the caller."""
+    repo = InMemoryProjectRepository()
+    seed_project(repo, archetype_id=2)
+    result = run(generate_roadmap(repo, LLMService([DriftingProvider()]), USER))
+    blob = json.dumps(result)
+    for leak in ("Traceback", "drifted", "failed structure validation", "phase keys changed"):
+        assert leak not in blob
 
 
 def test_get_roadmap_before_generation_is_not_found():

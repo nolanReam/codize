@@ -1,30 +1,22 @@
-# Codize M13C.1 Live Smoke Pass — Browser/API Integration Fixes Only
+# Codize M13C.1B — Roadmap Generation Reliability Hotfix
 
-M13C.1 is committed as `03e3c1f`.
+Fix the roadmap-generation reliability blocker found during the M13C.1 live smoke pass.
 
-Do not start M13C.2 yet.
+This is a narrow backend/product-flow reliability milestone.
 
-This is a short live smoke/fix pass for the M13C.1 frontend foundation.
+Do not start M13C.2.
 
-Do not add major new features.
+Do not implement Gate UI.
 
-Do not implement the full gate flow.
-
-Do not implement the full Project Defense Report.
+Do not implement full Project Defense Report.
 
 Do not make the gate evidence-aware.
 
 Do not modify evaluator logic.
 
-Do not create migrations.
+Do not create frontend features except tiny error-message fixes if absolutely necessary.
 
-Do not add GitHub OAuth, AI news, browser IDE, community, marketplace, analytics dashboard, hosted coding runtime, or gamification.
-
-## Goal
-
-Verify that the M13C.1 frontend actually works in a browser against the existing backend and Supabase auth flow.
-
-Fix only frontend/API integration bugs that block the M13C.1 flow.
+Do not add GitHub OAuth, AI news, browser IDE, community, marketplace, hosted runtime, or analytics dashboard.
 
 ## Current State
 
@@ -32,147 +24,165 @@ Relevant commits:
 
 - M13B workflow artifact backend: `de42d5b`
 - M13C.1 frontend foundation: `03e3c1f`
+- M13C.1 live smoke pass: `3cb6275`
 
-M13C.1 implemented:
+The live smoke pass verified the frontend flow in a real browser against live FastAPI + Supabase.
 
-- landing page
-- login/signup
-- protected app shell
-- intake
-- cockpit
-- phase board
-- prompt builder
-- review board
-- evidence panel
-- verification lab
-- gate placeholder
-- report placeholder
+However, roadmap generation failed three times in a row with 502 due to LLM roadmap drift using the current Gemini config. The validator correctly failed closed, and the frontend handled the error, but this blocks real testers from reaching the workspace unless a valid roadmap is manually seeded.
 
-## First Actions
+## Goal
 
-Inspect current state:
+Make roadmap generation reliable enough for pilot users.
 
-```bash
-git status
-git log --oneline -5
-```
+A user who completes intake should not be blocked by LLM structure drift if a valid archetype template exists.
 
-Then read:
+The solution must preserve safety:
+
+- Do not accept malformed LLM roadmaps.
+- Do not weaken validation.
+- Do not store invalid structures.
+- Do not hide real unexpected failures.
+- Do not require manual DB seeding.
+
+## Read First
+
+Read:
 
 - `CLAUDE.md`
-- `.claude/memory/frontend-conventions.md`
+- `docs/context/context_authority.md`
+- `docs/context/codize_product_vision_v3.md`
+- `docs/context/m13_ai_workflow_workspace_plan.md`
+- `docs/context/codize_master_spec_v2.1.md`
 - `.claude/memory/product-vision-v3.md`
-- `.claude/memory/workflow-artifact-conventions.md`
-- `frontend/README.md`
-- frontend API client/auth files
-- backend route docs if needed
+- `.claude/memory/frontend-conventions.md`
+- backend roadmap routes/services/schemas
+- archetype template engine/service
+- roadmap validation logic
+- LLM provider layer
+- tests around roadmap generation
+- M13C.1 live smoke notes in memory/docs if present
 
-## Run Locally
+Do not read `conversations.json` unless genuinely needed.
 
-Start backend according to existing README.
+## Problem To Solve
 
-Start frontend according to `frontend/README.md`.
+Current behavior appears to be:
 
-Use the required frontend env vars:
+1. User completes intake.
+2. Backend calls LLM for roadmap generation.
+3. LLM returns a roadmap that drifts from the required template structure.
+4. Validator rejects it.
+5. Backend returns 502.
+6. User can retry, but repeated drift can block onboarding.
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_API_BASE_URL`
+This is fail-closed, which is good for safety, but it is not good enough for pilot usability.
 
-Do not print secret values.
+## Required Product Behavior
 
-Do not expose `.env` contents.
+If LLM output is invalid but a valid hardcoded archetype template exists, Codize should still be able to create a valid roadmap.
 
-## Smoke Test Flow
+Preferred behavior:
 
-Verify this flow manually or with the available browser/dev tooling:
+1. Try LLM personalization.
+2. Validate output strictly.
+3. If valid, store and return it.
+4. If invalid after the allowed attempts, fall back to a deterministic template-backed roadmap.
+5. Store only the valid fallback roadmap.
+6. Do not expose internal validation details to the user.
+7. Log or record that personalization fell back, if the existing logging/docs pattern supports it.
 
-1. Landing page loads.
-2. CTA routes to login/signup.
-3. Login/signup page renders.
-4. Supabase auth session is handled.
-5. Protected app redirects unauthenticated users.
-6. Authenticated user can reach `/app`.
-7. If no project/intake exists, user is guided to intake.
-8. Intake first question is exactly:
+The fallback should be structurally valid and based on the existing archetype template.
 
-   > What problem do you want to solve, and who does solving it help?
+The fallback may be less personalized, but it should still let the student enter the AI Workflow Workspace.
 
-9. Intake can be completed.
-10. User reaches cockpit.
-11. Cockpit shows project purpose / mission.
-12. Phase page loads.
-13. Prompt Builder loads existing workflow data and saves to backend.
-14. Review Board loads/saves to backend.
-15. Evidence Panel loads/saves to backend.
-16. Verification Lab loads/saves to backend.
-17. Refreshing the page preserves saved workflow artifacts.
-18. Gate page does not 404 and honestly shows placeholder/current gate status.
-19. Report page does not 404 and honestly shows real collected source statuses.
-20. Logout works.
+## Important Principle
 
-## Fix Scope
+The LLM should personalize language.
 
-Fix only issues that block or seriously degrade the above flow.
+The hardcoded archetype template should protect structure.
 
-Allowed fixes:
+If the LLM cannot preserve structure, the product should prefer a valid template-backed roadmap over blocking the user.
 
-- broken route paths
-- bad redirects
-- missing loading/error states
-- incorrect API client call shape
-- missing Bearer token
-- frontend type mismatch with backend response
-- workflow artifact save/load bugs
-- unsafe rendering bug
-- obvious UX dead-end
+## Possible Implementation Options
 
-Not allowed:
+Inspect the existing code and choose the smallest safe fix.
 
-- full gate implementation
-- full report implementation
-- evidence-aware gate changes
-- major redesign
-- new backend features unless absolutely required to fix a bug introduced by M13C.1
+Acceptable options include:
 
-If a backend issue is discovered, explain it clearly and make the smallest safe fix only if necessary.
+- deterministic fallback roadmap generated from the selected archetype template
+- stricter/lower-temperature roadmap generation config if already configurable
+- retry prompt tightening if small and testable
+- clearer frontend error message only as a supplement, not the main fix
+
+Do not solve this by:
+
+- weakening validation
+- accepting partially invalid LLM output
+- making the frontend manually seed roadmaps
+- hardcoding a single user/project workaround
+- adding a large new roadmap system
+- adding paid-model-specific assumptions
+- requiring a new external service
+
+## Model Configuration Boundary
+
+Do not hardcode a paid model as the only path.
+
+If a stronger roadmap-generation model is recommended, document it as an environment/config option only.
+
+The code should remain provider-agnostic.
+
+The reliability fix should work even when the LLM returns invalid output or errors.
+
+## Fallback Requirements
+
+The fallback roadmap must:
+
+- use the correct archetype template
+- include valid phases/tasks according to existing schema
+- pass existing roadmap validation
+- produce a project status that lets the user continue
+- preserve the intake purpose/scope/stack where safely possible
+- avoid hallucinated unsupported requirements
+- avoid exposing internal fallback/debug text in user-facing fields unless intentionally phrased
+
+User-facing language may say something like:
+
+“Codize created a structured starter roadmap from the verified template.”
+
+But do not overcomplicate the UX.
+
+## Tests Required
+
+Add or update backend tests covering:
+
+1. Valid LLM roadmap still succeeds.
+2. Invalid/drifting LLM output does not store invalid data.
+3. Invalid/drifting LLM output falls back to a valid template-backed roadmap when a template exists.
+4. LLM provider error falls back to a valid template-backed roadmap when a template exists.
+5. If no template exists or the archetype is unsupported, behavior remains safely failed.
+6. Fallback roadmap passes existing validation.
+7. Project becomes usable/active after fallback.
+8. Frontend-facing error details do not leak internal validator prompts or stack traces.
+9. Existing roadmap tests still pass.
+10. No unrelated gate/workflow/evaluation behavior changes.
+
+If there is already a test pattern for fake/stub LLM providers, use it.
+
+## Optional Tiny Frontend Fix
+
+Only if needed:
+
+- make the intake retry message clearer
+- make it obvious that no data was lost
+- do not create new frontend features
+
+If the backend fallback eliminates the blocker, frontend changes may not be needed.
 
 ## Verification Commands
 
 Run:
 
 ```bash
-cd frontend
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
-
-Run backend tests only if backend code changed:
-
-```bash
 cd backend
 pytest
-```
-
-Run a secret scan before commit.
-
-## End Requirements
-
-At the end, output:
-
-- smoke flow results
-- bugs found
-- fixes made
-- files changed
-- commands run
-- test/build results
-- secret scan result
-- known issues
-- git commit hash
-- next step: M13C.2 Gate UI + Project Defense Report + pilot polish
-
-Commit fixes if any.
-
-If no fixes are needed, commit only if docs or notes changed; otherwise report no-code-change smoke pass and stop.

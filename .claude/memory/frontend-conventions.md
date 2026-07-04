@@ -60,8 +60,8 @@ Two live observations (NOT M13C.1 bugs, left as-is): (1) roadmap generation
 drifted and returned 502 three times in a row with `GEMINI_MODEL=
 gemini-2.5-flash-lite` at temp 0.7 — the fail-closed validator + the intake
 page's retry message handled every 502 correctly, but flash-lite preserves the
-template structure poorly; consider a stronger model for roadmap gen (M7
-concern, not frontend). To unblock downstream smoke steps, seed a valid roadmap
-by writing the archetype template (read as UTF-8!) into `projects.roadmap` +
-`status='active'` via the real repo. (2) Missing `favicon.ico` logs a benign
-404 on every page — cosmetic, deferred.
+template structure poorly. **FIXED in M13C.1B**: roadmap generation now falls
+back to a deterministic template-backed roadmap on drift/failure, so a real
+tester is no longer blocked (no manual seeding) — see
+[[roadmap-llm-conventions]]. (2) Missing `favicon.ico` logs a benign 404 on
+every page — cosmetic, deferred.
