@@ -197,6 +197,14 @@ export interface Evaluation {
   cooldown_seconds_remaining?: number;
 }
 
+export interface GateTurn {
+  turn: number;
+  question: string;
+  answer: string | null;
+}
+
+export type GateNextAction = "turn1" | "turn2" | "turn3" | "evaluate";
+
 export interface GateCurrent {
   phase: number;
   phase_title: string;
@@ -205,7 +213,30 @@ export interface GateCurrent {
   reason?: string | null;
   cooldown_seconds_remaining?: number;
   gate_session_id?: string;
-  next_action?: string;
+  next_action?: GateNextAction;
   anchor_statement?: string | null;
-  turns?: { turn: number; question: string; answer: string | null }[];
+  turns?: GateTurn[];
+}
+
+export interface GateStartResult {
+  gate_session_id: string;
+  phase: number;
+  phase_title: string;
+  anchor_prompt: string;
+}
+
+export interface GateTurnResult {
+  gate_session_id: string;
+  turn: number;
+  question: string;
+}
+
+export interface GateEvaluationResult {
+  gate_session_id: string;
+  phase: number;
+  verdict: "PASS" | "FAIL";
+  reason: string;
+  current_phase: number;
+  new_unlocks?: UnlockView[];
+  cooldown_seconds?: number;
 }

@@ -16,7 +16,7 @@ const NAV = [
   { href: "/app/phase/review", label: "Review Board" },
   { href: "/app/phase/evidence", label: "Evidence Panel" },
   { href: "/app/phase/verify", label: "Verification Lab" },
-  { href: "/app/gate", label: "Interrogation Gate" },
+  { href: "/app/gate", label: "Project Defense" },
   { href: "/app/report", label: "Defense Report" },
 ];
 

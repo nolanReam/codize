@@ -37,11 +37,14 @@ app/
       review/page.tsx   Review Board
       evidence/page.tsx Evidence Panel
       verify/page.tsx   Verification Lab
-    gate/page.tsx       Interrogation Gate — status view (interactive flow: M13C.2)
-    report/page.tsx     Project Defense Report — sources placeholder (full: M13C.2)
+    gate/page.tsx       Project Defense — live Interrogation Gate flow
+                        (anchor → 3 turns → evaluate → pass/fail), resume-safe
+    report/page.tsx     Project Defense Report — full client-assembled report
+                        with Markdown copy/download
+  icon.svg              App favicon (served by Next as the tab icon)
 components/             Async, NotReady, SaveBar, WorkflowSteps, ReconnectionModal
 lib/                    api client, supabase client, types, prompt builder + test,
-                        useWorkflowSection hook
+                        report builder + test, useWorkflowSection hook
 ```
 
 ## Backend routes consumed
@@ -49,8 +52,10 @@ lib/                    api client, supabase client, types, prompt builder + tes
 Intake (`/intake/*`), roadmap (`/roadmap/generate`, `/roadmap`), phases
 (`/phases*`), workflow artifacts (`GET /workflow/{phase}`,
 `PUT /workflow/{phase}/{section}`), reconnection (`GET /reconnection`,
-`POST /reconnection/acknowledge`), evaluation (`GET /evaluation`), and gate status
-(`GET /gate/current`). The interactive gate turn flow is not yet wired (M13C.2).
+`POST /reconnection/acknowledge`), evaluation (`GET /evaluation`), and the full
+gate flow (`GET /gate/current`, `POST /gate/start`,
+`POST /gate/{id}/turn1|turn2|turn3|evaluate`). The Project Defense Report is
+assembled client-side from these routes — no dedicated report endpoint.
 
 ## Environment
 
@@ -71,12 +76,20 @@ npm run dev        # local dev server
 npm run lint
 npm run typecheck
 npm run build
-npm test           # vitest — deterministic prompt builder
+npm test           # vitest — deterministic prompt builder + report builder
 ```
 
-## Status (M13C.1)
+## Status (M13C.2)
 
 Complete: landing, auth, app shell + reconnection, intake, cockpit, phase board,
-Prompt Builder, Review Board, Evidence Panel, Verification Lab, API client, and
-honest loading/empty/error states. Placeholders (real backend reads, deferred
-interactive UI): Interrogation Gate and Project Defense Report → **M13C.2**.
+Prompt Builder, Review Board, Evidence Panel, Verification Lab, the **live
+Project Defense (Interrogation Gate) flow**, the **full client-assembled Project
+Defense Report** (Markdown copy/download), API client, favicon, and honest
+loading/empty/error states. The whole Build Loop is now walkable end-to-end;
+this was live-verified in a browser against the real FastAPI backend + Supabase
+(intake → roadmap → phase artifact → full gate PASS → report → export → logout).
+
+The gate is **not evidence-aware** by design (it uses the existing M9 evaluator;
+saved workflow artifacts are the student's own reference and feed only the
+client-assembled report, never the evaluator). Raw gate scores, evaluator
+reasoning, hidden thresholds, and internal prompts never reach the client.

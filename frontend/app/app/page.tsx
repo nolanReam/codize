@@ -83,7 +83,7 @@ export default function CockpitPage() {
                 </Link>
                 {(evaluation.state === "gate_ready" || evaluation.state === "cooldown") && (
                   <Link href="/app/gate" className="btn">
-                    Interrogation Gate
+                    Project Defense
                   </Link>
                 )}
               </div>
@@ -187,11 +187,18 @@ export default function CockpitPage() {
             <div className="card" style={{ marginTop: 14 }}>
               <h3>Project Defense Report</h3>
               <p className="muted">
-                {savedCount} of 4 workflow artifacts captured for this phase. The report
-                assembles from your intake, phases, artifacts, gate outcomes, and unlocks —{" "}
-                <Link href="/app/report">see what&rsquo;s collected so far</Link>. Full report
-                view lands in M13C.2.
+                {savedCount} of 4 workflow artifacts captured for this phase. Your report
+                assembles from your intake, phases, artifacts, gate outcome, and unlocks — and you
+                can copy or download it as Markdown for a demo or interview.
               </p>
+              <div className="row" style={{ marginTop: 12 }}>
+                <Link href="/app/report" className="btn">
+                  Open Defense Report
+                </Link>
+                <Link href="/app/gate" className="btn">
+                  Project Defense
+                </Link>
+              </div>
             </div>
           </>
         )}

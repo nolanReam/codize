@@ -8,6 +8,9 @@ import type {
   Evaluation,
   EvidenceArtifact,
   GateCurrent,
+  GateEvaluationResult,
+  GateStartResult,
+  GateTurnResult,
   IntakeCompleteResult,
   IntakeQuestion,
   IntakeStatus,
@@ -137,3 +140,23 @@ export const acknowledgeReconnection = () =>
   request<{ acknowledged: boolean }>("/reconnection/acknowledge", { method: "POST" });
 export const getEvaluation = () => request<Evaluation>("/evaluation");
 export const getCurrentGate = () => request<GateCurrent>("/gate/current");
+
+// Interrogation Gate flow (M9 backend). start creates the session; turn1 is the
+// anchor statement; turn2/turn3 submit the prior answer and return the next
+// question; evaluate submits the final answer and returns the pass/fail verdict.
+export const startGate = () => request<GateStartResult>("/gate/start", { method: "POST" });
+export const submitGateAnchor = (sessionId: string, anchorStatement: string) =>
+  request<GateTurnResult>(`/gate/${sessionId}/turn1`, {
+    method: "POST",
+    body: { anchor_statement: anchorStatement },
+  });
+export const submitGateAnswer = (sessionId: string, turn: 2 | 3, answer: string) =>
+  request<GateTurnResult>(`/gate/${sessionId}/turn${turn}`, {
+    method: "POST",
+    body: { answer },
+  });
+export const evaluateGate = (sessionId: string, answer: string) =>
+  request<GateEvaluationResult>(`/gate/${sessionId}/evaluate`, {
+    method: "POST",
+    body: { answer },
+  });

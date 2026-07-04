@@ -35,11 +35,53 @@ replace and prefill from `GET /workflow/{phase}` (see
 
 M13C.1 scope done: landing (80% Trap), auth, protected shell, intake, cockpit,
 phase board, Prompt Builder, Review Board, Evidence Panel, Verification Lab,
-API client, honest async states. **Gate and Report pages are honest
-placeholders** — they do REAL backend reads (`GET /gate/current`, evaluation +
-workflow) but defer the interactive gate turn flow and full report assembly to
-**M13C.2**. Do not add a gate "start" button in M13C.1 — starting a session
-with no turn UI strands the user mid-flow.
+API client, honest async states.
+
+**M13C.2 done — the Build Loop is now walkable end-to-end.** Two headline
+surfaces went from placeholder to live:
+
+- **Project Defense gate** (`app/app/gate/page.tsx`): the full M9 flow —
+  `POST /gate/start` → `turn1` (anchor) → `turn2`/`turn3` (submit prior answer,
+  get next question) → `evaluate` (verdict). The page's local `gate` state IS the
+  `GateCurrent` shape and is advanced from each POST response (no full reload,
+  no transcript flash); `GET /gate/current` is used only on load, which makes
+  **resume free** (turns[] + next_action restore the transcript — live-verified).
+  `next_action` drives the whole state machine: turn1=anchor input, else the last
+  (unanswered) turn is the pending question and its endpoint = next_action. 422
+  (bad anchor) and 502 (LLM fail) leave the session where it was, so the typed
+  input is kept and the same step is retryable. The PASS screen shows the
+  evaluator's one-sentence reason + any `new_unlocks`; do NOT reload after
+  evaluate (a non-final PASS advances current_phase, so GET would show the *next*
+  phase). Gate is **not evidence-aware** — workflow artifacts are reference-only,
+  never evaluator input (spec-guardian-gated future change). v3 language:
+  "Project Defense", "defend what you built", never "quiz"/"cheating".
+- **Project Defense Report** (`app/app/report/page.tsx` + pure `lib/report.ts`,
+  unit-tested like `promptBuilder.ts`): client-assembled from evaluation + intake
+  answers + current-phase workflow sections + `GET /gate/current` + current phase.
+  No report endpoint (client-assembled per the M13 plan). Export = copy Markdown
+  (+ download .md). **Honesty rules baked in**: missing artifacts say "missing",
+  verification is labelled self-reported, and `defenseStatus` reflects the CURRENT
+  phase's gate state ONLY — a prior-phase pass shows as a separate "latest gate
+  note", never conflated into "this phase passed" (the project-level "passed any
+  gate?" signal lives in the Skills section, keyed off `completed_phases`).
+  Interview questions are derived client-side (no LLM). Archetype id→name is a
+  fixed 3-entry map (never a fourth). Never renders raw HTML; artifacts are plain
+  text; no score/evaluator-reasoning/threshold/key ever appears in the export.
+
+Favicon added at `app/icon.svg` (Next serves it as the tab icon — kills the
+benign 404). Sidebar/cockpit gate label is now "Project Defense" (v3).
+
+Live browser smoke (2026-07-04, real FastAPI + Supabase): full walk — SQL test
+user → intake (5 Qs) → roadmap (personalized, 7-phase full-stack) → save a
+Prompt Builder artifact → **full gate PASS** (anchor + 3 real Gemini turns +
+temp-0 evaluate; also verified mid-flow resume) → report shows real data with
+corrected defense status → copy Markdown (verified clean: no score/service-role/
+Gemini/JWT leakage) → logout. All green; the one oddity (flash-lite leaking
+"valid anchor…" preamble into the Turn 1 question text) is a backend gate-prompt/
+model quirk, NOT a frontend bug and out of M13C.2 scope — the UI faithfully shows
+whatever the backend returns. Historical M13C.1 note: a gate "start" button with
+no turn UI would strand the user — that constraint is now satisfied by the full
+flow.
 
 Backend touch during M13C.1 (only one): `intake_service._build_status` now
 returns an `answers` dict keyed by question key (purpose/scope/…) — owner-scoped

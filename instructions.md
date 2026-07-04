@@ -1,22 +1,29 @@
-# Codize M13C.1B — Roadmap Generation Reliability Hotfix
+# Codize M13C.2 — Gate UI + Project Defense Report + Pilot Polish
 
-Fix the roadmap-generation reliability blocker found during the M13C.1 live smoke pass.
+Implement the next frontend milestone for Codize’s v3 AI Workflow Workspace MVP.
 
-This is a narrow backend/product-flow reliability milestone.
+This milestone should complete the user-facing loop after M13C.1:
 
-Do not start M13C.2.
+Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
 
-Do not implement Gate UI.
+M13C.2 focuses on:
 
-Do not implement full Project Defense Report.
+1. Live Interrogation Gate UI using the existing M9 backend
+2. Full client-assembled Project Defense Report
+3. Pilot-readiness polish
+4. Small cosmetic fixes such as favicon if quick
 
-Do not make the gate evidence-aware.
+Do not start M14.
 
-Do not modify evaluator logic.
+Do not implement evidence-aware gate prompts yet.
 
-Do not create frontend features except tiny error-message fixes if absolutely necessary.
+Do not modify gate evaluator logic.
 
-Do not add GitHub OAuth, AI news, browser IDE, community, marketplace, hosted runtime, or analytics dashboard.
+Do not weaken gate validation.
+
+Do not create migrations.
+
+Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, analytics dashboard, hosted coding runtime, or complex gamification.
 
 ## Current State
 
@@ -25,24 +32,24 @@ Relevant commits:
 - M13B workflow artifact backend: `de42d5b`
 - M13C.1 frontend foundation: `03e3c1f`
 - M13C.1 live smoke pass: `3cb6275`
+- M13C.1B roadmap reliability hotfix: `6eb7e57`
 
-The live smoke pass verified the frontend flow in a real browser against live FastAPI + Supabase.
+M13C.1 implemented the frontend foundation:
 
-However, roadmap generation failed three times in a row with 502 due to LLM roadmap drift using the current Gemini config. The validator correctly failed closed, and the frontend handled the error, but this blocks real testers from reaching the workspace unless a valid roadmap is manually seeded.
+- landing page
+- login/signup
+- protected app shell
+- intake
+- cockpit
+- phase board
+- prompt builder
+- review board
+- evidence panel
+- verification lab
+- gate placeholder
+- report placeholder
 
-## Goal
-
-Make roadmap generation reliable enough for pilot users.
-
-A user who completes intake should not be blocked by LLM structure drift if a valid archetype template exists.
-
-The solution must preserve safety:
-
-- Do not accept malformed LLM roadmaps.
-- Do not weaken validation.
-- Do not store invalid structures.
-- Do not hide real unexpected failures.
-- Do not require manual DB seeding.
+M13C.1B fixed the roadmap-generation pilot blocker by adding deterministic template fallback.
 
 ## Read First
 
@@ -52,137 +59,395 @@ Read:
 - `docs/context/context_authority.md`
 - `docs/context/codize_product_vision_v3.md`
 - `docs/context/m13_ai_workflow_workspace_plan.md`
-- `docs/context/codize_master_spec_v2.1.md`
 - `.claude/memory/product-vision-v3.md`
 - `.claude/memory/frontend-conventions.md`
-- backend roadmap routes/services/schemas
-- archetype template engine/service
-- roadmap validation logic
-- LLM provider layer
-- tests around roadmap generation
-- M13C.1 live smoke notes in memory/docs if present
+- `.claude/memory/workflow-artifact-conventions.md`
+- `.claude/memory/gate-conventions.md`
+- `.claude/memory/evaluation-conventions.md` if it exists
+- `.claude/memory/roadmap-llm-conventions.md`
+- frontend files from M13C.1
+- backend gate router/service/schemas
+- backend workflow router/service/schemas
+- backend evaluation route/service/schemas
 
 Do not read `conversations.json` unless genuinely needed.
 
-## Problem To Solve
+## First Actions
 
-Current behavior appears to be:
+Inspect current state:
 
-1. User completes intake.
-2. Backend calls LLM for roadmap generation.
-3. LLM returns a roadmap that drifts from the required template structure.
-4. Validator rejects it.
-5. Backend returns 502.
-6. User can retry, but repeated drift can block onboarding.
+```bash
+git status
+git log --oneline -5
+```
 
-This is fail-closed, which is good for safety, but it is not good enough for pilot usability.
+Then inspect existing frontend routes:
 
-## Required Product Behavior
+- `/app/gate`
+- `/app/report`
+- app shell/sidebar/nav
+- frontend API client
+- frontend auth/session handling
+- workflow artifact components
 
-If LLM output is invalid but a valid hardcoded archetype template exists, Codize should still be able to create a valid roadmap.
+Do not duplicate existing pages.
 
-Preferred behavior:
+Extend the current frontend.
 
-1. Try LLM personalization.
-2. Validate output strictly.
-3. If valid, store and return it.
-4. If invalid after the allowed attempts, fall back to a deterministic template-backed roadmap.
-5. Store only the valid fallback roadmap.
-6. Do not expose internal validation details to the user.
-7. Log or record that personalization fell back, if the existing logging/docs pattern supports it.
+## Goal
 
-The fallback should be structurally valid and based on the existing archetype template.
+Make Codize’s main MVP loop feel complete enough for a pilot user:
 
-The fallback may be less personalized, but it should still let the student enter the AI Workflow Workspace.
+1. User builds/reviews/verifies a phase.
+2. User opens Gate.
+3. User completes a live defense flow.
+4. User opens Project Defense Report.
+5. User sees a useful report assembled from real collected data.
+6. User can copy/export the report text for portfolio/interview prep.
 
-## Important Principle
+## Part 1 — Live Interrogation Gate UI
 
-The LLM should personalize language.
+Replace the current `/app/gate` placeholder with a real UI around the existing M9 gate backend.
 
-The hardcoded archetype template should protect structure.
+Use existing backend route shapes.
 
-If the LLM cannot preserve structure, the product should prefer a valid template-backed roadmap over blocking the user.
+Do not invent route names if backend already has gate routes.
 
-## Possible Implementation Options
+Inspect backend gate router/schemas before coding.
 
-Inspect the existing code and choose the smallest safe fix.
+The UI should support the existing M9 flow:
 
-Acceptable options include:
+- show current gate status
+- show current phase
+- show readiness/cooldown state
+- start or resume gate session if backend supports it
+- display the anchor prompt/anchor step if backend uses one
+- collect user answers turn by turn
+- submit answers to backend
+- show the next question/turn from backend
+- show final pass/fail outcome
+- show cooldown if failed
+- avoid exposing raw scores, evaluator reasoning, hidden thresholds, or internal prompts
 
-- deterministic fallback roadmap generated from the selected archetype template
-- stricter/lower-temperature roadmap generation config if already configurable
-- retry prompt tightening if small and testable
-- clearer frontend error message only as a supplement, not the main fix
+If the backend route model differs from the above, follow the actual backend contract.
 
-Do not solve this by:
+## Gate UI Requirements
 
-- weakening validation
-- accepting partially invalid LLM output
-- making the frontend manually seed roadmaps
-- hardcoding a single user/project workaround
-- adding a large new roadmap system
-- adding paid-model-specific assumptions
-- requiring a new external service
+The gate page should feel like:
 
-## Model Configuration Boundary
+> Defend what you built.
 
-Do not hardcode a paid model as the only path.
+Not:
 
-If a stronger roadmap-generation model is recommended, document it as an environment/config option only.
+> Take a random quiz.
 
-The code should remain provider-agnostic.
+Use v3 language:
 
-The reliability fix should work even when the LLM returns invalid output or errors.
+- “Project Defense”
+- “Explain the implementation”
+- “Show you understand what changed”
+- “Be ready to defend this project”
 
-## Fallback Requirements
+Do not shame the user.
 
-The fallback roadmap must:
+Do not say they are cheating or fake.
 
-- use the correct archetype template
-- include valid phases/tasks according to existing schema
-- pass existing roadmap validation
-- produce a project status that lets the user continue
-- preserve the intake purpose/scope/stack where safely possible
-- avoid hallucinated unsupported requirements
-- avoid exposing internal fallback/debug text in user-facing fields unless intentionally phrased
+The gate should clearly explain:
 
-User-facing language may say something like:
+- why the gate exists
+- what the user is defending
+- what happens if they pass
+- what happens if they fail
+- that the gate currently uses the existing M9 backend and is not yet evidence-aware
 
-“Codize created a structured starter roadmap from the verified template.”
+## Gate Boundaries
 
-But do not overcomplicate the UX.
+Do not make the gate evidence-aware.
 
-## Tests Required
+Do not send workflow artifacts into the evaluator unless the backend already does this.
 
-Add or update backend tests covering:
+Do not alter evaluator prompts.
 
-1. Valid LLM roadmap still succeeds.
-2. Invalid/drifting LLM output does not store invalid data.
-3. Invalid/drifting LLM output falls back to a valid template-backed roadmap when a template exists.
-4. LLM provider error falls back to a valid template-backed roadmap when a template exists.
-5. If no template exists or the archetype is unsupported, behavior remains safely failed.
-6. Fallback roadmap passes existing validation.
-7. Project becomes usable/active after fallback.
-8. Frontend-facing error details do not leak internal validator prompts or stack traces.
-9. Existing roadmap tests still pass.
-10. No unrelated gate/workflow/evaluation behavior changes.
+Do not alter pass/fail logic.
 
-If there is already a test pattern for fake/stub LLM providers, use it.
+Do not expose hidden score.
 
-## Optional Tiny Frontend Fix
+Do not expose private evaluator reasoning.
 
-Only if needed:
+Do not expose internal LLM prompt text.
 
-- make the intake retry message clearer
-- make it obvious that no data was lost
-- do not create new frontend features
+If workflow artifact context is shown on the side of the UI, make it read-only helper context for the student, not backend evaluator input.
 
-If the backend fallback eliminates the blocker, frontend changes may not be needed.
+## Gate UX Details
 
-## Verification Commands
+Add practical UI states:
+
+- loading
+- not ready / no active project
+- ready to defend
+- active session
+- awaiting next answer
+- passed
+- failed with cooldown
+- backend error
+- retry-safe error message
+
+If failed/cooldown:
+
+- show cooldown time if backend returns it
+- explain that the user should review their work before trying again
+- link back to Review / Evidence / Verification pages
+
+If passed:
+
+- show next step
+- link to Project Defense Report
+- link back to cockpit/current phase
+
+## Part 2 — Project Defense Report
+
+Replace the `/app/report` placeholder with a full client-assembled report.
+
+The report should assemble from real sources:
+
+- intake/project purpose
+- current project/phase
+- phase tasks
+- workflow artifacts:
+  - prompt_builder
+  - review_board
+  - evidence
+  - verification
+- gate status/outcome
+- evaluation summary
+- unlocks if available
+- reconnection/evaluation next-action data if useful
+
+Use existing backend routes.
+
+Do not create a new backend report endpoint in this milestone.
+
+## Report Content Requirements
+
+The report should include sections like:
+
+1. Project Overview
+   - project name
+   - problem being solved
+   - who it helps
+   - archetype
+   - current phase
+
+2. AI Workflow Evidence
+   - generated prompt
+   - why the prompt is stronger
+   - what files changed
+   - what AI generated
+   - what user accepted/rejected/edited
+   - AI assumptions identified
+
+3. Verification Evidence
+   - checks completed
+   - test output or terminal output
+   - app/API/UI check notes
+   - security/auth/RLS checks where relevant
+   - what the verification proved
+
+4. Project Defense Status
+   - gate status/outcome
+   - no raw hidden score
+   - no evaluator private reasoning
+   - cooldown if relevant
+   - defense readiness label if already derivable safely
+
+5. Skills Demonstrated
+   - planning
+   - prompting
+   - reviewing
+   - verification
+   - explanation
+   - security awareness if relevant
+
+6. Weak Spots / Next Actions
+   - missing evidence
+   - incomplete verification
+   - gate not attempted
+   - failed gate/cooldown
+   - recommended next action
+
+7. Interview / Defense Questions
+   - derived client-side from the project/phase/artifacts
+   - no LLM required
+   - examples:
+     - “Walk me through your project’s data flow.”
+     - “What did AI generate that you had to verify?”
+     - “What would break if this route or table changed?”
+     - “How do you know this feature works?”
+     - “What assumption did AI make?”
+
+## Report Export / Copy
+
+Add at least one practical export method.
+
+Preferred for M13C.2:
+
+- copy report as Markdown to clipboard
+
+Optional if easy:
+
+- download `.md` file
+
+Do not implement PDF export unless it is trivial and does not derail the milestone.
+
+The copied report should be clean, readable Markdown.
+
+Do not include raw private backend data.
+
+Do not include hidden scores or evaluator reasoning.
+
+## Report Honesty Requirements
+
+The report must not overclaim.
+
+If evidence is missing, say missing.
+
+If gate has not been attempted, say not attempted.
+
+If verification is self-reported, say it is self-reported.
+
+Do not call the report cryptographic proof.
+
+Do not say Codize guarantees the project works.
+
+Use language like:
+
+- “Submitted evidence”
+- “Self-reported verification”
+- “Defense status”
+- “Ready to review”
+- “Needs more evidence”
+
+## Part 3 — Pilot Polish
+
+Make the app ready for a small pilot with real testers.
+
+Allowed pilot polish:
+
+- fix favicon if quick
+- improve obvious empty states
+- improve obvious error copy
+- make CTA paths clearer
+- make cockpit next action clearer
+- make sidebar/nav flow clearer
+- make save confirmations clear
+- add a simple “copied” state for report export
+- add small links from report missing sections back to the relevant workspace pages
+
+Do not redesign the whole frontend.
+
+Do not add major new screens.
+
+Do not add analytics dashboard.
+
+Do not add AI news/tool recommendations.
+
+## Optional Roadmap Fallback Note
+
+M13C.1B made fallback silent server-side.
+
+If it is easy and supported by backend data, the frontend may show a gentle note when a roadmap is template-backed.
+
+If backend does not expose fallback metadata, do not add this.
+
+Do not invent fake fallback status.
+
+## Security Requirements
+
+Do not expose:
+
+- service-role keys
+- provider keys
+- raw gate scores
+- hidden unlock thresholds
+- evaluator private reasoning
+- internal prompts
+- `.env` content
+
+Do not render raw untrusted HTML.
+
+Treat all user-submitted workflow artifacts as plain text.
+
+Keep frontend auth through Supabase publishable key only.
+
+Backend remains source of truth for project ownership and protected data.
+
+## Testing / Verification
 
 Run:
 
 ```bash
+cd frontend
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+If backend code changes, run:
+
+```bash
 cd backend
 pytest
+```
+
+If backend code does not change, backend tests are optional, but say whether they were run.
+
+Run a focused browser smoke test if possible:
+
+1. login
+2. reach app
+3. open phase
+4. confirm artifacts still load
+5. open gate
+6. start/continue gate flow as far as test state allows
+7. open report
+8. verify report shows real collected data
+9. copy/export report
+10. logout
+
+Run a secret scan before commit.
+
+Do not claim tests passed unless they actually ran.
+
+## Documentation Updates
+
+Update as needed:
+
+- `frontend/README.md`
+- `CLAUDE.md`
+- `.claude/memory/frontend-conventions.md`
+- `docs/context/m13_ai_workflow_workspace_plan.md` only if implementation materially changes the plan
+
+Do not rewrite the whole product vision.
+
+## End Requirements
+
+At the end, output:
+
+- files changed
+- routes/screens implemented
+- gate backend routes consumed
+- report data sources consumed
+- export/copy behavior implemented
+- pilot polish completed
+- commands run
+- test/build results
+- browser smoke result if run
+- secret scan result
+- known issues
+- git commit hash
+- next step: pilot test prep / M13C.3 if needed
+
+Commit completed M13C.2 changes.
+
+Stop after commit.
