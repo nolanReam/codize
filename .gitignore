@@ -18,6 +18,13 @@ node_modules/
 dist/
 build/
 
+# Logs / local runtime artifacts
+*.log
+logs/
+
+# Deployment platform (local CLI state)
+.vercel/
+
 # OS / editor
 .DS_Store
 Thumbs.db

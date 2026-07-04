@@ -1,22 +1,24 @@
-# Codize Pilot Prep — Tester Script, Survey, Demo Checklist
+# Codize M13D — Pre-Pilot Deployment + Demo Prep
 
-Prepare Codize for a small real-user pilot.
+Prepare Codize to be demoed and piloted with real testers.
 
-This is a documentation, research, and pilot-readiness milestone.
+This is a deployment-readiness, demo-readiness, and operational-prep milestone.
 
 Do not start M14.
 
-Do not add new product features.
-
-Do not modify backend behavior.
+Do not add major product features.
 
 Do not modify gate evaluator logic.
 
-Do not create migrations.
+Do not make the gate evidence-aware.
 
-Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, analytics dashboard, hosted coding runtime, or complex gamification.
+Do not create migrations unless an existing deployment blocker absolutely requires it, and explain first.
 
-Do not run a real pilot yet.
+Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, analytics dashboard, hosted coding runtime, or gamification.
+
+Do not invent pilot results.
+
+Do not run the real pilot yet.
 
 ## Current State
 
@@ -24,301 +26,290 @@ Relevant commits:
 
 - M13C.2 Gate UI + Project Defense Report: `8161dce`
 - M13C.2B Gate Question Cleanliness Hotfix: `c0320f5`
+- Pilot prep docs: `5fd7d9b`
 
 Codize now has:
 
-- landing page
-- auth
-- intake
-- roadmap generation with deterministic fallback
-- cockpit
-- phase workflow board
-- prompt builder
-- review board
-- evidence panel
-- verification lab
-- live gate UI
+- frontend MVP
+- backend MVP
+- Supabase auth/data
+- roadmap fallback reliability
+- workflow artifacts
+- live gate
 - Project Defense Report
-- Markdown copy/download export
-- clean gate-question sanitizer
+- pilot kit in `docs/pilot/`
 
 ## Goal
 
-Create a small pilot kit that lets the user test Codize with 3–10 student builders.
+Make Codize ready for a first 3–5 tester pilot.
 
-The pilot should answer:
+At the end, I should know exactly:
 
-1. Can users understand what Codize is for?
-2. Can users complete the core workflow without help?
-3. Does Codize help users write better AI prompts?
-4. Does Codize help users review what AI changed?
-5. Does Codize make users complete verification steps they normally skip?
-6. Does Codize make users feel more able to defend/explain their project?
-7. Where does the app feel confusing, slow, annoying, or unnecessary?
+1. How to run a clean local demo.
+2. How to deploy or prepare deployment.
+3. Which environment variables are needed.
+4. Which secrets must never go to the frontend.
+5. How to create or use a test account safely.
+6. How to run the pre-pilot smoke test.
+7. What known issues remain.
+8. Whether the app is ready for testers.
 
 ## Read First
 
 Read:
 
 - `CLAUDE.md`
-- `docs/context/context_authority.md`
-- `docs/context/codize_product_vision_v3.md`
-- `docs/context/m13_ai_workflow_workspace_plan.md`
-- `.claude/memory/product-vision-v3.md`
+- `frontend/README.md`
+- `backend/README.md`
+- `docs/pilot/README.md`
+- `docs/pilot/demo_checklist.md`
 - `.claude/memory/frontend-conventions.md`
 - `.claude/memory/gate-conventions.md`
-- frontend README
-- current frontend routes if needed
+- `.claude/memory/roadmap-llm-conventions.md`
+- root package/config files if present
+- frontend deployment config if present
+- backend deployment config if present
+- CORS configuration
+- env examples
 
 Do not read `conversations.json` unless genuinely needed.
 
-## Pilot Target Users
+## First Actions
 
-The first pilot should target:
+Inspect current state:
 
-- AP CSA students
-- high school CS students
-- hackathon friends
-- older TheCoderSchool students if allowed
-- Spark Code volunteers/instructors
-- peers who have used Claude Code, Cursor, Replit, ChatGPT, or Copilot for coding
+```bash
+git status
+git log --oneline -8
+```
 
-Do not design this first pilot for elementary Scratch students.
+Then inspect:
 
-Do not collect sensitive personal information.
+- frontend app config
+- backend app config
+- env examples
+- CORS settings
+- deployment-related docs/config
+- gitignore rules for `.env`, `.env.local`, `.next`, `node_modules`, Playwright artifacts, logs
 
-Do not require full names, school names, addresses, phone numbers, or private account credentials.
-
-Use first name or nickname only if needed.
-
-## Task 1 — Create Pilot Folder
+## Task 1 — Deployment Readiness Audit
 
 Create:
 
-`docs/pilot/`
-
-Add these files:
-
-1. `docs/pilot/pilot_plan.md`
-2. `docs/pilot/tester_script.md`
-3. `docs/pilot/pre_survey.md`
-4. `docs/pilot/post_survey.md`
-5. `docs/pilot/observation_notes_template.md`
-6. `docs/pilot/bug_report_template.md`
-7. `docs/pilot/demo_checklist.md`
-8. `docs/pilot/results_summary_template.md`
-
-## Task 2 — Pilot Plan
-
-`pilot_plan.md` should define:
-
-- pilot goal
-- target tester profile
-- number of testers: 3–10 for first pilot
-- estimated time: 30–45 minutes
-- what testers need before starting
-- what project type testers should use
-- what data to collect
-- what not to collect
-- success criteria
-- failure criteria
-- how to summarize results honestly
-
-The pilot should be framed around one core task:
-
-> Build or continue one AI-assisted project phase using Codize, then generate a Project Defense Report.
-
-Success is not “tester liked the app.”
-
-Success is whether Codize helped the tester:
-
-- create a better prompt
-- identify what AI changed
-- verify something they normally skip
-- explain the project more clearly
-- produce a useful Project Defense Report
-
-## Task 3 — Tester Script
-
-`tester_script.md` should be a step-by-step script the user can give testers.
-
-It should include:
-
-1. What Codize is
-2. What the tester will do
-3. How long it takes
-4. What they should not worry about
-5. Start at landing page
-6. Sign up/log in
-7. Complete intake
-8. Open current phase
-9. Use Prompt Builder
-10. Use their preferred AI coding tool externally
-11. Return to Codize
-12. Fill Review Board
-13. Fill Evidence Panel
-14. Complete Verification Lab
-15. Complete Gate if ready
-16. Open Project Defense Report
-17. Copy/export report
-18. Complete post-survey
-
-Tone should be simple and non-technical enough for high school CS students.
-
-## Task 4 — Pre-Survey
-
-`pre_survey.md` should include short questions using mostly 1–5 scales.
-
-Include questions like:
-
-- How often do you use AI tools for coding?
-- How confident are you writing prompts for coding help?
-- How confident are you reviewing AI-generated code?
-- How often do you verify AI-generated code before moving on?
-- How confident are you explaining a project AI helped you build?
-- Have you ever gotten stuck in an AI patch loop?
-- What AI coding tool do you usually use?
-
-Do not ask for sensitive personal data.
-
-## Task 5 — Post-Survey
-
-`post_survey.md` should measure whether Codize helped.
-
-Include questions like:
-
-- Did Codize help you write a better AI prompt?
-- Did Codize help you notice something AI changed?
-- Did Codize make you verify something you might normally skip?
-- Did the gate feel useful, annoying, confusing, or fair?
-- Did the Project Defense Report feel useful?
-- How confident are you now explaining the project?
-- What was the most useful part?
-- What felt like unnecessary friction?
-- Where did you get confused?
-- Would you use Codize again on another project?
-- What one thing should be improved first?
-
-Include a before/after comparison section.
-
-## Task 6 — Observation Notes Template
-
-`observation_notes_template.md` should help the user observe testers without over-directing them.
-
-Track:
-
-- where tester hesitated
-- where tester asked for help
-- what page confused them
-- what wording confused them
-- whether they understood the 80% Trap positioning
-- whether they used the generated prompt
-- whether they completed verification honestly
-- whether they could explain their code better after the gate/report
-- any bugs or crashes
-
-## Task 7 — Bug Report Template
-
-`bug_report_template.md` should collect:
-
-- page/route
-- what tester was doing
-- expected behavior
-- actual behavior
-- screenshot/log if available
-- severity
-- whether it blocked completion
-- browser/device
-- account/tester label, not full personal identity
-
-## Task 8 — Demo Checklist
-
-`demo_checklist.md` should be the checklist the user runs before showing Codize to testers or recording a demo.
+`docs/deployment/deployment_readiness_audit.md`
 
 Include:
 
-- backend running
-- frontend running
-- env vars present
-- test account ready
-- Supabase email confirmation handling known
-- roadmap generation works without manual seeding
-- intake works
-- artifact save/load works
-- gate flow works
-- report export works
-- logout works
-- no secrets in frontend
+- current frontend framework and start/build commands
+- current backend framework and start command
+- required frontend env vars
+- required backend env vars
+- which env vars are public vs secret
+- Supabase auth assumptions
+- CORS requirements
+- local ports
+- known deployment blockers
+- recommended deployment path for first pilot
+- risks and mitigations
+
+Do not include real secret values.
+
+Do not print `.env` contents.
+
+## Task 2 — Local Demo Runbook
+
+Create:
+
+`docs/deployment/local_demo_runbook.md`
+
+This should be a step-by-step guide for running Codize locally for a demo or pilot.
+
+Include:
+
+1. Start backend.
+2. Start frontend.
+3. Confirm env vars exist without printing values.
+4. Confirm Supabase auth works.
+5. Create or use a test account safely.
+6. Complete intake.
+7. Generate roadmap.
+8. Fill Prompt Builder.
+9. Fill Review Board.
+10. Fill Evidence.
+11. Fill Verification.
+12. Run Gate.
+13. Export Project Defense Report.
+14. Logout.
+15. Clean up test data if needed.
+
+Include troubleshooting for:
+
+- missing env vars
+- frontend cannot reach backend
+- CORS issue
+- Supabase email confirmation issue
+- roadmap fallback path
+- gate provider/model issue
+- report shows missing sections
+
+## Task 3 — Hosted Deployment Plan
+
+Create:
+
+`docs/deployment/hosted_deployment_plan.md`
+
+This should explain the simplest hosted path for a small pilot.
+
+Recommended default unless repo constraints suggest otherwise:
+
+- frontend: Vercel or equivalent Next.js host
+- backend: a simple FastAPI host
+- database/auth: existing Supabase project
+
+Do not actually create external accounts.
+
+Do not deploy without explicit user confirmation.
+
+Do not require paid services as the only path.
+
+Include:
+
+- recommended architecture
+- required environment variables for each service
+- CORS origin update needed for deployed frontend URL
+- backend base URL needed by frontend
+- smoke test after deployment
+- rollback plan
+- security checklist
+
+## Task 4 — Env Example / Docs Cleanup
+
+Review env examples and docs.
+
+If needed, update:
+
+- `frontend/.env.example`
+- backend `.env.example`
+- frontend README
+- backend README
+- root README if present
+
+Make sure docs clearly distinguish:
+
+Frontend public vars:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_API_BASE_URL`
+
+Backend secret/server vars may include:
+
+- Supabase service/server key if used
+- Gemini/OpenRouter provider keys
+- database/Supabase URLs
+- model config
+
+Never put secret values into docs.
+
+## Task 5 — Pre-Pilot Smoke Checklist
+
+Create or update:
+
+`docs/deployment/pre_pilot_smoke_checklist.md`
+
+This should be the final checklist before inviting testers.
+
+Include:
+
 - clean working tree
-- known issues listed
+- backend starts
+- frontend starts
+- landing page loads
+- login works
+- intake works
+- roadmap reaches active project without manual seeding
+- artifacts save and reload
+- gate runs with clean question text
+- report exports Markdown
+- logout works
+- no console errors except known harmless ones
+- no secrets in frontend bundle/source
+- test data cleanup completed
+- known issues recorded
 
-## Task 9 — Results Summary Template
+## Task 6 — Demo Script
 
-`results_summary_template.md` should help convert the pilot into useful evidence.
+Create:
 
-Include sections:
+`docs/deployment/demo_script.md`
 
-- pilot date
-- number of testers
-- tester profiles, non-identifying
-- projects attempted
-- completion rate
-- average pre/post confidence explaining AI-generated code
-- how many generated a prompt
-- how many completed review board
-- how many submitted evidence
-- how many completed verification
-- how many attempted/passed gate
-- how many exported report
-- top 3 useful moments
-- top 3 friction points
-- bugs found
-- changes to make next
-- honest conclusion
+This is the script I can use when showing Codize to a mentor, tester, or recording a short demo.
 
-It should include a sample sentence structure for college-app-style evidence, but it must warn not to overclaim.
+It should be concise and persuasive.
 
-Example:
+Structure:
 
-“In an early pilot with X student builders, Y completed a verification step they said they normally would skip, and average confidence explaining an AI-assisted project changed from A/5 to B/5.”
+1. Problem: AI gets you to 80%, then you get stuck.
+2. Codize promise: learn to plan, prompt, review, verify, and defend.
+3. Show landing.
+4. Show intake.
+5. Show cockpit.
+6. Show phase workflow.
+7. Show Prompt Builder.
+8. Show Review/Evidence/Verification.
+9. Show Gate.
+10. Show Project Defense Report.
+11. Close with what pilot is measuring.
 
-## Task 10 — Optional Pilot README
+Keep it natural, not salesy.
 
-If useful, create:
+## Task 7 — Optional Small Fixes
 
-`docs/pilot/README.md`
+Allowed only if quick and clearly deployment/demo related:
 
-It should briefly explain how all pilot files fit together.
+- fix broken README command
+- fix missing env example
+- fix incorrect CORS method/origin documentation
+- fix favicon/document metadata if still broken
+- fix obvious typo in demo-facing copy
+- add missing `.gitignore` entry for local deployment artifacts
 
-## Boundaries
+Do not redesign UI.
 
-Do not modify product code unless there is a tiny docs link or typo fix that is clearly necessary.
-
-Do not create a survey backend.
-
-Do not create analytics tracking.
-
-Do not create a Google Form.
-
-Do not create external accounts.
-
-Do not collect real tester data in the repo.
-
-Do not invent pilot results.
-
-## Optional Final Smoke Note
-
-If time and env are available, run a quick no-code smoke check of the existing app and note whether it is ready for pilot.
-
-Do not block the docs milestone if live env is unavailable.
+Do not add features.
 
 ## Verification
 
+Run docs/code checks as appropriate.
+
+At minimum:
+
+```bash
+git status
+```
+
+If frontend docs/config changed, run:
+
+```bash
+cd frontend
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+If backend code/config changed, run:
+
+```bash
+cd backend
+pytest
+```
+
+If only docs changed, tests are optional, but say clearly that no product code changed.
+
 Run a secret scan before commit.
 
-No frontend/backend tests are required unless product code changes.
-
-If product code changes accidentally, run the relevant tests.
+Do not claim tests passed unless they actually ran.
 
 ## Documentation Updates
 
@@ -326,9 +317,9 @@ Update if needed:
 
 - `CLAUDE.md`
 - `.claude/memory/frontend-conventions.md`
-- `.claude/memory/product-vision-v3.md`
+- `docs/pilot/demo_checklist.md`
 
-Only update them if the pilot workflow should be remembered.
+Only update these if deployment/demo workflow should be remembered.
 
 Do not rewrite the whole product vision.
 
@@ -337,14 +328,18 @@ Do not rewrite the whole product vision.
 At the end, output:
 
 - files created/updated
-- pilot plan summary
-- recommended first tester group
-- what metrics to track
-- what not to claim yet
+- whether product code changed
+- deployment readiness summary
+- recommended first deployment path
+- local demo command summary
+- pre-pilot smoke checklist location
+- known blockers
+- commands run
+- test/build results if run
 - secret scan result
 - git commit hash
-- next step: run pilot with 3–5 testers or do final deployment/demo prep
+- next step: run local pre-pilot smoke, then invite 3–5 testers
 
-Commit completed pilot prep docs.
+Commit completed deployment/demo prep.
 
 Stop after commit.

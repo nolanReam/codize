@@ -49,13 +49,20 @@ From `backend/`:
 ```bash
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt   # (Windows; use .venv/bin/pip elsewhere)
-.venv\Scripts\uvicorn app.main:app --reload
+.venv\Scripts\uvicorn app.main:app --env-file ../.env --reload
 ```
 
-Configuration comes from environment variables or a `.env` file in the working
-directory — see the repo-root `.env.example` for the contract. Never commit a
-real `.env`; server-only values (`SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`,
-`OPENROUTER_API_KEY`) exist only in the backend environment.
+Configuration comes from environment variables or a `.env` file. The real
+secrets live in the **repo-root** `.env` (see the repo-root `.env.example` for
+the contract). Note `Settings` reads `env_file=".env"` **relative to the current
+working directory**, so running uvicorn from `backend/` will NOT pick up the
+repo-root `.env` on its own — pass `--env-file ../.env` (as above) so uvicorn
+loads it into the process environment. (Alternatively set the vars in your shell
+or host environment, or place a `.env` in `backend/`.) Without them the backend
+runs in no-key mode: the LLM falls back to the deterministic stub and Supabase
+calls are unconfigured. Never commit a real `.env`; server-only values
+(`SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`) exist only
+in the backend environment.
 
 ## LLM providers (M7)
 
