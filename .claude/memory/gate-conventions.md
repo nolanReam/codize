@@ -17,6 +17,23 @@ composition tails appended to the prompt files at call time were live-tuned
 in M9 — "respond with ONLY the text of the one question" is what stops
 Gemini from prefixing validation commentary. Don't remove the tails.
 
+Every user-facing generated question is passed through `clean_gate_question`
+(M13C.2B) at the generation boundary — Turn 1 (after the ANCHOR_REJECTED
+check), Turn 2, and Turn 3. It is a **deterministic** guard (no extra LLM
+call): `sanitize_gate_question` unwraps code fences/quotes, removes an inline
+"…here is the Turn 1 question:" hand-off, and drops leading meta/preamble
+sentences (`_META_SENTENCE`: "the student…", "valid anchor", rubric/evaluator
+language, "Step 2"/"Turn 1", "I will now ask", etc.) — but never a sentence
+ending in `?` and never the last remaining sentence, so legitimate questions
+(imperatives, anchor-referencing, gate_turn_2's "Good — you covered…"
+phrasing) pass through byte-for-byte. If the result is empty or still all-meta,
+it raises `GateGenerationError`, which the existing turn flow already treats as
+retryable (nothing stored). The evaluator is NOT routed through it — verdicts
+stay on `parse_evaluation`. This fixed the flash-lite "valid anchor…" preamble
+leak found in the M13C.2 smoke; prompts were deliberately left unchanged (so
+the adversarial/prebuild suites did not need re-running). Add a deterministic
+unit test to `test_gate_service.py` for any change to the meta patterns.
+
 The evaluator parse is strict AND fail-closed (`parse_evaluation`): verdict ∈
 {PASS, FAIL}, non-empty one-sentence reason, score an int 0–10 (bool and
 float rejected). Malformed → 502, the turn-3 answer is NOT stored, retry

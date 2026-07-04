@@ -229,6 +229,112 @@ def _evaluation_prompt(session: dict, answer: str) -> str:
     })
 
 
+# ---------------------------------------------------------------------------
+# User-facing question cleanliness (M13C.2B)
+# ---------------------------------------------------------------------------
+#
+# flash-lite occasionally leaks meta/preamble text into a generated question —
+# "The student's reply is a valid anchor... Here is the Turn 1 question: ...",
+# rubric language, internal step labels — despite the prompt asking for the
+# bare question. The frontend faithfully renders whatever the backend returns,
+# so the clean-up belongs here, at the generation boundary, as a deterministic
+# guard (no extra LLM call). It strips leading meta sentences and, as a last
+# resort, rejects an all-meta output so the existing retry path re-runs the
+# turn. It NEVER touches the evaluator (that stays parse_evaluation), pass/fail
+# logic, scores, cooldown, or the prompts.
+
+_GENERIC_RETRY = "The gate could not generate the next step. Please try again."
+
+# A leading meta/preamble sentence — the model talking ABOUT the task, the
+# anchor, or the rubric instead of asking the student a question. Deliberately
+# narrow: it must not match a legitimate question opener (imperatives like
+# "Explain…", "Walk me through…", conversational "Good — you covered…", or any
+# question that references the student's own anchor). None of these begin with
+# the third-person/rubric phrasings enumerated here.
+_META_SENTENCE = re.compile(
+    r"^\s*(?:"
+    r"the student\b|"
+    r"(?:the\s+|this\s+|that\s+|your\s+|their\s+)?(?:reply|response|answer|anchor(?:\s+statement)?)\s+(?:is|looks|counts|qualifies|names|is\s+a)\b[^?]*\bvalid\b|"
+    r"valid anchor\b|"
+    r"this\s+is\s+a\s+valid\b|"
+    r"that(?:'s| is)\s+a\s+valid\b|"
+    r"the anchor(?:\s+statement)?\s+is\b|"
+    r"here(?:'s| is| are)\b[^?]*\b(?:question|hypothetical|follow[\s-]?up|turn)\b|"
+    r"(?:according to|as per|per)\s+(?:the\s+)?(?:rubric|evaluator|criteria|instructions?|gate\s+targets?)\b|"
+    r"based on\s+(?:the\s+)?(?:rubric|criteria|evaluator|gate\s+targets?)\b|"
+    r"i(?:'ll| will| am going to| shall)\s+(?:now\s+)?ask\b|"
+    r"i(?:'ll| will)?\s*now\s+ask\b|"
+    r"(?:step|turn)\s*\d\b|"
+    r"note\s*:|"
+    r"as instructed\b|"
+    r"the student (?:must|should|needs|has to)\b"
+    r")",
+    re.IGNORECASE,
+)
+
+# An inline hand-off: preamble that ends by announcing the question on the same
+# line ("… Here is the Turn 1 question: <q>"). Removed up to and including the
+# colon so a question with no space after the colon is still recovered.
+_HANDOFF = re.compile(
+    r"^.*?(?:here(?:'s| is| are)|this is|below is|the following is)"
+    r"[^:?]{0,80}?(?:question|hypothetical|follow[\s-]?up)[^:?]{0,20}?:\s*",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _sentences(text: str) -> list[str]:
+    parts = re.split(r"(?<=[.:!?])\s+", text.strip())
+    return [p for p in parts if p.strip()]
+
+
+def _unwrap(text: str) -> str:
+    fenced = re.match(r"^```(?:\w+)?\s*(.*?)\s*```$", text, flags=re.DOTALL)
+    if fenced:
+        text = fenced.group(1).strip()
+    quotes = "\"'“”‘’"
+    if len(text) >= 2 and text[0] in quotes and text[-1] in quotes:
+        text = text[1:-1].strip()
+    return text
+
+
+def _is_meta(sentence: str) -> bool:
+    # Never treat the actual question as meta: a real question ends with "?".
+    if sentence.rstrip().endswith("?"):
+        return False
+    return bool(_META_SENTENCE.match(sentence))
+
+
+def sanitize_gate_question(raw: str) -> str:
+    """Strip leading meta/preamble from a generated question, deterministically.
+
+    Returns the cleaned question text (possibly empty if the output was only
+    preamble). Leaves already-clean output byte-for-byte unchanged."""
+    text = _unwrap(raw.strip())
+    handoff = _HANDOFF.sub("", text, count=1)
+    text = handoff.strip()
+
+    sentences = _sentences(text)
+    dropped = 0
+    # Drop leading meta sentences, but never strip the final remaining one.
+    while len(sentences) - dropped > 1 and _is_meta(sentences[dropped]):
+        dropped += 1
+    if dropped == 0:
+        return text  # nothing to strip — preserve original formatting
+    return " ".join(s.strip() for s in sentences[dropped:]).strip()
+
+
+def clean_gate_question(raw: str) -> str:
+    """Sanitize a generated question and reject an unusable/all-meta result.
+
+    Rejection raises GateGenerationError, which the existing turn flow treats
+    as a retryable failure (nothing is stored), so the student simply re-runs
+    the step and a clean question is generated."""
+    cleaned = sanitize_gate_question(raw)
+    if not cleaned or _is_meta(cleaned):
+        raise GateGenerationError(_GENERIC_RETRY)
+    return cleaned
+
+
 def parse_evaluation(raw: str) -> dict:
     """Strict, fail-closed parse of the evaluator's JSON verdict."""
     text = raw.strip()
@@ -376,15 +482,16 @@ async def submit_anchor(
     raw = (await _complete(llm, _turn1_prompt(project, phase, anchor), TURN_TEMPERATURE)).strip()
     if raw.startswith(_ANCHOR_REJECTED):
         raise AnchorInvalidError(raw[len(_ANCHOR_REJECTED):].strip() or _ANCHOR_HELP)
-    if not raw:
-        raise GateGenerationError("The gate could not generate the next step. Please try again.")
+    # Deterministic cleanliness guard: strip any leaked preamble/meta, reject
+    # an all-meta output (retryable — nothing stored below on the raise).
+    question = clean_gate_question(raw)
 
     # Anchor + question in one write: an LLM failure leaves nothing stored.
     await gate_repo.update_session(
         user_id, session_id,
-        {"anchor_statement": anchor, "turns": [{"turn": 1, "question": raw, "answer": None}]},
+        {"anchor_statement": anchor, "turns": [{"turn": 1, "question": question, "answer": None}]},
     )
-    return {"gate_session_id": session_id, "turn": 1, "question": raw}
+    return {"gate_session_id": session_id, "turn": 1, "question": question}
 
 
 async def generate_followup(
@@ -406,9 +513,9 @@ async def generate_followup(
         _turn2_prompt(session, answer) if turn == 2
         else _turn3_prompt(project, session, answer)
     )
-    question = (await _complete(llm, prompt, TURN_TEMPERATURE)).strip()
-    if not question:
-        raise GateGenerationError("The gate could not generate the next step. Please try again.")
+    # Deterministic cleanliness guard (same as Turn 1): strip leaked
+    # preamble/meta, reject an all-meta output (retryable — nothing stored).
+    question = clean_gate_question(await _complete(llm, prompt, TURN_TEMPERATURE))
 
     turns = list(session["turns"])
     turns[-1] = {**turns[-1], "answer": answer}

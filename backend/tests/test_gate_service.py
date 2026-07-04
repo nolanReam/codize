@@ -24,10 +24,12 @@ from app.services.gate_service import (
     GateNotReadyError,
     GateOutOfOrderError,
     GateSessionNotFoundError,
+    clean_gate_question,
     evaluate_gate,
     generate_followup,
     get_current_gate,
     parse_evaluation,
+    sanitize_gate_question,
     start_gate,
     submit_anchor,
 )
@@ -356,6 +358,140 @@ def test_parse_evaluation_accepts_strict_and_fenced_json():
     fenced = f"```json\n{FAIL_VERDICT}\n```"
     parsed = parse_evaluation(fenced)
     assert parsed == {"verdict": "FAIL", "reason": "No implementation specificity.", "score": 3}
+
+
+# --- question cleanliness (M13C.2B) ----------------------------------------------
+
+CLEAN_QUESTIONS = [
+    "Why did you put user_id on the matches table?",
+    "Explain how your current implementation handles user ownership.",
+    "Walk me through what happens when two organizers call create_match() at once.",
+    "You said sessions live in your `user_sessions` table. Walk me through why you "
+    "stored them there rather than in a JWT, and what that means for your app.",
+    # Legitimate turn-2 acknowledgement phrasing from gate_turn_2.md — must survive.
+    "Good — you covered the happy path. Now explain what happens in the edge case "
+    "where two writers hit the same row.",
+    # A question that legitimately references the anchor and ends with "?".
+    "The `create_match` handler you named — what breaks if two requests race?",
+]
+
+
+@pytest.mark.parametrize("q", CLEAN_QUESTIONS)
+def test_clean_questions_pass_through_unchanged(q):
+    assert sanitize_gate_question(q) == q
+    assert clean_gate_question(q) == q
+
+
+@pytest.mark.parametrize("raw,expected", [
+    # The exact leak seen in the M13C.2 smoke: validity note + inline hand-off.
+    (
+        "The student's reply is a valid anchor. Here is the Turn 1 question: "
+        "Why did you put user_id on the matches table?",
+        "Why did you put user_id on the matches table?",
+    ),
+    # Hand-off with no space after the colon still recovers the question.
+    (
+        "Here is the Turn 1 question:Why did you put user_id on the matches table?",
+        "Why did you put user_id on the matches table?",
+    ),
+    # "valid anchor" style leakage as a leading sentence.
+    (
+        "Valid anchor detected. What would break if create_match() ran twice?",
+        "What would break if create_match() ran twice?",
+    ),
+    # Rubric / evaluator language must not reach the student.
+    (
+        "According to the rubric, specificity is weakest. Tell me exactly how your "
+        "matches table enforces ownership.",
+        "Tell me exactly how your matches table enforces ownership.",
+    ),
+    # Internal step/instruction fragments.
+    (
+        "Step 2 — the Turn 1 question. Explain why you stored user_id on the row.",
+        "Explain why you stored user_id on the row.",
+    ),
+    (
+        "I will now ask the question. Why does the policy come before the frontend?",
+        "Why does the policy come before the frontend?",
+    ),
+    # Code-fence / quote wrapping is unwrapped.
+    (
+        '"Why did you put user_id on the matches table?"',
+        "Why did you put user_id on the matches table?",
+    ),
+    (
+        "```\nWhy did you put user_id on the matches table?\n```",
+        "Why did you put user_id on the matches table?",
+    ),
+])
+def test_meta_preamble_is_stripped(raw, expected):
+    assert sanitize_gate_question(raw) == expected
+    assert clean_gate_question(raw) == expected
+
+
+@pytest.mark.parametrize("raw", [
+    "",
+    "   ",
+    "The student must demonstrate ownership understanding.",
+    "According to the evaluator criteria, this should test specificity.",
+    "Here is a question that satisfies the rubric requirements.",
+])
+def test_all_meta_output_is_rejected_and_retryable(raw):
+    with pytest.raises(GateGenerationError):
+        clean_gate_question(raw)
+
+
+def test_leaked_turn1_question_is_cleaned_before_storage():
+    repo, gates, _ = make_repos()
+    sid = run(start_gate(repo, gates, USER))["gate_session_id"]
+    llm = ScriptedLLM([
+        "The student's reply is a valid anchor. Here is the Turn 1 question: "
+        "Why did you put user_id on the matches table?"
+    ])
+    out = run(submit_anchor(repo, gates, llm, USER, sid, ANCHOR))
+    assert out["question"] == "Why did you put user_id on the matches table?"
+    assert "valid anchor" not in out["question"].lower()
+    stored = run(gates.get_session(USER, sid))["turns"][0]["question"]
+    assert stored == "Why did you put user_id on the matches table?"
+
+
+def test_leaked_followup_question_is_cleaned_before_storage():
+    repo, gates, _ = make_repos()
+    sid = run(start_gate(repo, gates, USER))["gate_session_id"]
+    llm = ScriptedLLM([
+        "Why did you put user_id on matches?",
+        "According to the rubric, specificity is weakest. Tell me exactly what "
+        "happens when create_match() is called without a user_id.",
+    ])
+    run(submit_anchor(repo, gates, llm, USER, sid, ANCHOR))
+    out = run(generate_followup(repo, gates, llm, USER, sid, 2, "Because ownership lives on the row."))
+    assert out["question"].startswith("Tell me exactly what happens")
+    assert "rubric" not in out["question"].lower()
+
+
+def test_all_meta_turn1_output_stores_nothing_and_is_retryable():
+    repo, gates, _ = make_repos()
+    sid = run(start_gate(repo, gates, USER))["gate_session_id"]
+    llm = ScriptedLLM([
+        "The student must demonstrate ownership understanding of the schema.",
+        "Why did you put user_id on the matches table?",
+    ])
+    with pytest.raises(GateGenerationError):
+        run(submit_anchor(repo, gates, llm, USER, sid, ANCHOR))
+    session = run(gates.get_session(USER, sid))
+    assert session["anchor_statement"] is None and session["turns"] == []
+    # Retry with a clean question succeeds and stores it.
+    out = run(submit_anchor(repo, gates, llm, USER, sid, ANCHOR))
+    assert out["question"] == "Why did you put user_id on the matches table?"
+
+
+def test_sanitizer_does_not_touch_the_evaluator_verdict():
+    # The evaluator output is JSON parsed by parse_evaluation, never routed
+    # through the question sanitizer — a PASS/FAIL still round-trips intact.
+    repo, gates, _ = make_repos()
+    _, result, _ = run_full_gate(repo, gates, verdict=PASS_VERDICT)
+    assert result["verdict"] == "PASS"
+    assert result["reason"] == "All three conditions satisfied."
 
 
 # --- ownership -------------------------------------------------------------------

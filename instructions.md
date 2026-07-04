@@ -1,29 +1,24 @@
-# Codize M13C.2 — Gate UI + Project Defense Report + Pilot Polish
+# Codize M13C.2B — Gate Question Cleanliness Hotfix
 
-Implement the next frontend milestone for Codize’s v3 AI Workflow Workspace MVP.
+Fix the user-facing gate-question cleanliness issue found during the M13C.2 browser smoke test.
 
-This milestone should complete the user-facing loop after M13C.1:
-
-Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
-
-M13C.2 focuses on:
-
-1. Live Interrogation Gate UI using the existing M9 backend
-2. Full client-assembled Project Defense Report
-3. Pilot-readiness polish
-4. Small cosmetic fixes such as favicon if quick
+This is a narrow backend/UI-quality hotfix.
 
 Do not start M14.
 
-Do not implement evidence-aware gate prompts yet.
+Do not add new product features.
 
-Do not modify gate evaluator logic.
+Do not implement evidence-aware gate prompts.
+
+Do not change gate pass/fail logic.
 
 Do not weaken gate validation.
 
+Do not modify evaluator scoring.
+
 Do not create migrations.
 
-Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, analytics dashboard, hosted coding runtime, or complex gamification.
+Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, analytics dashboard, hosted coding runtime, or gamification.
 
 ## Current State
 
@@ -33,421 +28,140 @@ Relevant commits:
 - M13C.1 frontend foundation: `03e3c1f`
 - M13C.1 live smoke pass: `3cb6275`
 - M13C.1B roadmap reliability hotfix: `6eb7e57`
+- M13C.2 Gate UI + Project Defense Report: `8161dce`
 
-M13C.1 implemented the frontend foundation:
+M13C.2 implemented:
 
-- landing page
-- login/signup
-- protected app shell
-- intake
-- cockpit
-- phase board
-- prompt builder
-- review board
-- evidence panel
-- verification lab
-- gate placeholder
-- report placeholder
+- live `/app/gate` turn-by-turn Project Defense UI
+- full `/app/report` client-assembled Project Defense Report
+- Markdown copy/export
+- pilot polish
+- favicon
 
-M13C.1B fixed the roadmap-generation pilot blocker by adding deterministic template fallback.
+The M13C.2 browser smoke test found one known issue:
+
+Gemini `flash-lite` occasionally leaks a phrase like “valid anchor…” or similar meta-preamble into the Turn 1 question text. The frontend correctly renders what the backend returns, so this should be fixed at the gate-question generation/cleanliness layer.
+
+## Goal
+
+Ensure all user-facing gate questions are clean, direct, and free of internal/meta/prompt artifacts.
+
+The gate should still be strict.
+
+The evaluator should remain unchanged.
+
+The frontend should not hide backend bugs by blindly accepting unsafe text.
 
 ## Read First
 
 Read:
 
 - `CLAUDE.md`
-- `docs/context/context_authority.md`
-- `docs/context/codize_product_vision_v3.md`
-- `docs/context/m13_ai_workflow_workspace_plan.md`
-- `.claude/memory/product-vision-v3.md`
-- `.claude/memory/frontend-conventions.md`
-- `.claude/memory/workflow-artifact-conventions.md`
 - `.claude/memory/gate-conventions.md`
-- `.claude/memory/evaluation-conventions.md` if it exists
-- `.claude/memory/roadmap-llm-conventions.md`
-- frontend files from M13C.1
+- `.claude/memory/frontend-conventions.md`
+- `.claude/memory/product-vision-v3.md`
 - backend gate router/service/schemas
-- backend workflow router/service/schemas
-- backend evaluation route/service/schemas
+- backend gate prompt construction
+- backend gate tests
+- frontend `/app/gate` page only if needed
 
 Do not read `conversations.json` unless genuinely needed.
 
-## First Actions
+## Problem To Solve
 
-Inspect current state:
+Sometimes the generated Turn 1 question includes meta text or prompt-instruction leakage such as:
 
-```bash
-git status
-git log --oneline -5
-```
+- “valid anchor…”
+- “Here is a valid question…”
+- “The anchor is valid because…”
+- rubric/internal language
+- instruction-following preambles
+- anything that sounds like the model is explaining the prompt instead of asking the student a question
 
-Then inspect existing frontend routes:
+This hurts pilot readiness because the Project Defense flow should feel polished and serious.
 
-- `/app/gate`
-- `/app/report`
-- app shell/sidebar/nav
-- frontend API client
-- frontend auth/session handling
-- workflow artifact components
+## Allowed Fixes
 
-Do not duplicate existing pages.
+Choose the smallest safe fix after inspecting the backend.
 
-Extend the current frontend.
+Allowed options:
 
-## Goal
+1. Tighten the gate-question generation prompt so it requires question-only output.
+2. Add a small output-normalization/sanitization layer for user-facing gate questions.
+3. Add validation that rejects or retries obviously meta/preamble-style question text.
+4. Use an existing retry/fallback pattern if already present.
 
-Make Codize’s main MVP loop feel complete enough for a pilot user:
+Prefer a deterministic guard if possible.
 
-1. User builds/reviews/verifies a phase.
-2. User opens Gate.
-3. User completes a live defense flow.
-4. User opens Project Defense Report.
-5. User sees a useful report assembled from real collected data.
-6. User can copy/export the report text for portfolio/interview prep.
+Do not overbuild.
 
-## Part 1 — Live Interrogation Gate UI
+## Required Behavior
 
-Replace the current `/app/gate` placeholder with a real UI around the existing M9 gate backend.
+User-facing gate questions should:
 
-Use existing backend route shapes.
+- be direct questions
+- be implementation-specific
+- not include model preambles
+- not include rubric language
+- not include internal prompt text
+- not include evaluator reasoning
+- not include hidden score/threshold language
+- not expose system instructions
+- remain connected to the phase/gate target
 
-Do not invent route names if backend already has gate routes.
+Examples of acceptable question style:
 
-Inspect backend gate router/schemas before coding.
+- “Explain how your current implementation handles user ownership.”
+- “What would break if this route returned the wrong response shape?”
+- “Why does this phase require the database policy before the frontend depends on it?”
 
-The UI should support the existing M9 flow:
+Examples of unacceptable style:
 
-- show current gate status
-- show current phase
-- show readiness/cooldown state
-- start or resume gate session if backend supports it
-- display the anchor prompt/anchor step if backend uses one
-- collect user answers turn by turn
-- submit answers to backend
-- show the next question/turn from backend
-- show final pass/fail outcome
-- show cooldown if failed
-- avoid exposing raw scores, evaluator reasoning, hidden thresholds, or internal prompts
+- “Valid anchor: this answer should…”
+- “Here is a question that satisfies the rubric…”
+- “The student must demonstrate…”
+- “According to the evaluator criteria…”
+- “I will now ask…”
 
-If the backend route model differs from the above, follow the actual backend contract.
-
-## Gate UI Requirements
-
-The gate page should feel like:
-
-> Defend what you built.
-
-Not:
-
-> Take a random quiz.
-
-Use v3 language:
-
-- “Project Defense”
-- “Explain the implementation”
-- “Show you understand what changed”
-- “Be ready to defend this project”
-
-Do not shame the user.
-
-Do not say they are cheating or fake.
-
-The gate should clearly explain:
-
-- why the gate exists
-- what the user is defending
-- what happens if they pass
-- what happens if they fail
-- that the gate currently uses the existing M9 backend and is not yet evidence-aware
-
-## Gate Boundaries
+## Boundaries
 
 Do not make the gate evidence-aware.
 
-Do not send workflow artifacts into the evaluator unless the backend already does this.
+Do not send workflow artifacts into the evaluator.
 
-Do not alter evaluator prompts.
+Do not change pass/fail thresholds.
 
-Do not alter pass/fail logic.
+Do not expose raw scores.
 
-Do not expose hidden score.
+Do not expose evaluator private reasoning.
 
-Do not expose private evaluator reasoning.
+Do not alter cooldown behavior.
 
-Do not expose internal LLM prompt text.
+Do not alter phase advancement behavior.
 
-If workflow artifact context is shown on the side of the UI, make it read-only helper context for the student, not backend evaluator input.
+Do not alter unlock logic.
 
-## Gate UX Details
+Do not change the frontend report except if it has to display the cleaned gate text safely.
 
-Add practical UI states:
+## Tests Required
 
-- loading
-- not ready / no active project
-- ready to defend
-- active session
-- awaiting next answer
-- passed
-- failed with cooldown
-- backend error
-- retry-safe error message
+Add or update tests covering:
 
-If failed/cooldown:
+1. Clean gate question output remains unchanged.
+2. Preamble/meta text is removed or rejected/retried.
+3. “valid anchor” style leakage does not reach the user-facing response.
+4. Rubric/evaluator language does not reach the user-facing response.
+5. Internal prompt fragments do not reach the user-facing response.
+6. Gate pass/fail evaluator behavior remains unchanged.
+7. Existing gate tests still pass.
+8. Frontend gate UI still typechecks/builds if frontend types are touched.
 
-- show cooldown time if backend returns it
-- explain that the user should review their work before trying again
-- link back to Review / Evidence / Verification pages
+If the fix is prompt-only, still add a deterministic unit test around the output-cleanliness helper or response validator.
 
-If passed:
-
-- show next step
-- link to Project Defense Report
-- link back to cockpit/current phase
-
-## Part 2 — Project Defense Report
-
-Replace the `/app/report` placeholder with a full client-assembled report.
-
-The report should assemble from real sources:
-
-- intake/project purpose
-- current project/phase
-- phase tasks
-- workflow artifacts:
-  - prompt_builder
-  - review_board
-  - evidence
-  - verification
-- gate status/outcome
-- evaluation summary
-- unlocks if available
-- reconnection/evaluation next-action data if useful
-
-Use existing backend routes.
-
-Do not create a new backend report endpoint in this milestone.
-
-## Report Content Requirements
-
-The report should include sections like:
-
-1. Project Overview
-   - project name
-   - problem being solved
-   - who it helps
-   - archetype
-   - current phase
-
-2. AI Workflow Evidence
-   - generated prompt
-   - why the prompt is stronger
-   - what files changed
-   - what AI generated
-   - what user accepted/rejected/edited
-   - AI assumptions identified
-
-3. Verification Evidence
-   - checks completed
-   - test output or terminal output
-   - app/API/UI check notes
-   - security/auth/RLS checks where relevant
-   - what the verification proved
-
-4. Project Defense Status
-   - gate status/outcome
-   - no raw hidden score
-   - no evaluator private reasoning
-   - cooldown if relevant
-   - defense readiness label if already derivable safely
-
-5. Skills Demonstrated
-   - planning
-   - prompting
-   - reviewing
-   - verification
-   - explanation
-   - security awareness if relevant
-
-6. Weak Spots / Next Actions
-   - missing evidence
-   - incomplete verification
-   - gate not attempted
-   - failed gate/cooldown
-   - recommended next action
-
-7. Interview / Defense Questions
-   - derived client-side from the project/phase/artifacts
-   - no LLM required
-   - examples:
-     - “Walk me through your project’s data flow.”
-     - “What did AI generate that you had to verify?”
-     - “What would break if this route or table changed?”
-     - “How do you know this feature works?”
-     - “What assumption did AI make?”
-
-## Report Export / Copy
-
-Add at least one practical export method.
-
-Preferred for M13C.2:
-
-- copy report as Markdown to clipboard
-
-Optional if easy:
-
-- download `.md` file
-
-Do not implement PDF export unless it is trivial and does not derail the milestone.
-
-The copied report should be clean, readable Markdown.
-
-Do not include raw private backend data.
-
-Do not include hidden scores or evaluator reasoning.
-
-## Report Honesty Requirements
-
-The report must not overclaim.
-
-If evidence is missing, say missing.
-
-If gate has not been attempted, say not attempted.
-
-If verification is self-reported, say it is self-reported.
-
-Do not call the report cryptographic proof.
-
-Do not say Codize guarantees the project works.
-
-Use language like:
-
-- “Submitted evidence”
-- “Self-reported verification”
-- “Defense status”
-- “Ready to review”
-- “Needs more evidence”
-
-## Part 3 — Pilot Polish
-
-Make the app ready for a small pilot with real testers.
-
-Allowed pilot polish:
-
-- fix favicon if quick
-- improve obvious empty states
-- improve obvious error copy
-- make CTA paths clearer
-- make cockpit next action clearer
-- make sidebar/nav flow clearer
-- make save confirmations clear
-- add a simple “copied” state for report export
-- add small links from report missing sections back to the relevant workspace pages
-
-Do not redesign the whole frontend.
-
-Do not add major new screens.
-
-Do not add analytics dashboard.
-
-Do not add AI news/tool recommendations.
-
-## Optional Roadmap Fallback Note
-
-M13C.1B made fallback silent server-side.
-
-If it is easy and supported by backend data, the frontend may show a gentle note when a roadmap is template-backed.
-
-If backend does not expose fallback metadata, do not add this.
-
-Do not invent fake fallback status.
-
-## Security Requirements
-
-Do not expose:
-
-- service-role keys
-- provider keys
-- raw gate scores
-- hidden unlock thresholds
-- evaluator private reasoning
-- internal prompts
-- `.env` content
-
-Do not render raw untrusted HTML.
-
-Treat all user-submitted workflow artifacts as plain text.
-
-Keep frontend auth through Supabase publishable key only.
-
-Backend remains source of truth for project ownership and protected data.
-
-## Testing / Verification
+## Verification Commands
 
 Run:
 
 ```bash
-cd frontend
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
-
-If backend code changes, run:
-
-```bash
 cd backend
 pytest
-```
-
-If backend code does not change, backend tests are optional, but say whether they were run.
-
-Run a focused browser smoke test if possible:
-
-1. login
-2. reach app
-3. open phase
-4. confirm artifacts still load
-5. open gate
-6. start/continue gate flow as far as test state allows
-7. open report
-8. verify report shows real collected data
-9. copy/export report
-10. logout
-
-Run a secret scan before commit.
-
-Do not claim tests passed unless they actually ran.
-
-## Documentation Updates
-
-Update as needed:
-
-- `frontend/README.md`
-- `CLAUDE.md`
-- `.claude/memory/frontend-conventions.md`
-- `docs/context/m13_ai_workflow_workspace_plan.md` only if implementation materially changes the plan
-
-Do not rewrite the whole product vision.
-
-## End Requirements
-
-At the end, output:
-
-- files changed
-- routes/screens implemented
-- gate backend routes consumed
-- report data sources consumed
-- export/copy behavior implemented
-- pilot polish completed
-- commands run
-- test/build results
-- browser smoke result if run
-- secret scan result
-- known issues
-- git commit hash
-- next step: pilot test prep / M13C.3 if needed
-
-Commit completed M13C.2 changes.
-
-Stop after commit.
