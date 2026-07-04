@@ -18,6 +18,7 @@ from app.routers import (
     reconnection,
     roadmap,
     unlocks,
+    workflow,
 )
 from app.services import template_service
 
@@ -34,7 +35,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,  # explicit origins only, never "*"
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )
     register_error_handlers(app)
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(unlocks.router)
     app.include_router(reconnection.router)
     app.include_router(evaluation.router)
+    app.include_router(workflow.router)
     return app
 
 

@@ -35,6 +35,7 @@ class InMemoryProjectRepository:
             "roadmap": None,
             "current_phase": 1,
             "task_progress": {},
+            "workflow_artifacts": {},
             "gate_history_summary": None,
             "status": "intake",
             "created_at": next(self._seq),

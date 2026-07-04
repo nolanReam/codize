@@ -133,6 +133,13 @@ async def get_phase(repo: ProjectRepository, user_id: str, phase_number: int) ->
     return _phase_view(project, _find_phase(project, phase_number))
 
 
+def require_phase(project: dict, phase_number: int) -> dict:
+    """Validate a phase number against an already-loaded project's roadmap
+    (PhaseNotFoundError if absent) — shared with the workflow artifact store
+    (M13B), which scopes artifacts to real roadmap phases."""
+    return _find_phase(project, phase_number)
+
+
 def current_phase_view(project: dict) -> dict:
     """Full view of an already-loaded active project's current phase — shared
     with the reconnection (M11) and evaluation (M12) services, which load the

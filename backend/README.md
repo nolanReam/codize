@@ -22,7 +22,8 @@ app/
 │                  gate — auth-required Interrogation Gate, M9;
 │                  unlocks — auth-required earned-unlock listing, M10;
 │                  reconnection — auth-required 72h reconnection state, M11;
-│                  evaluation — auth-required progress evaluation, M12)
+│                  evaluation — auth-required progress evaluation, M12;
+│                  workflow — auth-required workflow artifact store, M13B)
 ├── services/      product logic (template_service.py: archetype template engine, M5;
 │                  intake_service.py + project_repository.py: intake engine, M6
 │                  — project_repository.py also holds the gate_sessions
@@ -33,8 +34,9 @@ app/
 │                  gate_service.py: 3-turn Interrogation Gate + evaluator, M9;
 │                  unlock_service.py: hidden-threshold functional unlocks, M10;
 │                  reconnection_service.py: Yeager reconnection engine, M11;
-│                  evaluation_service.py: deterministic progress evaluation, M12)
-├── schemas/       request/response models (intake.py, phases.py, gate.py)
+│                  evaluation_service.py: deterministic progress evaluation, M12;
+│                  workflow_service.py: workflow artifact store, M13B)
+├── schemas/       request/response models (intake.py, phases.py, gate.py, workflow.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
 tests/             pytest suite
@@ -165,6 +167,27 @@ state reuses the gate's own derivation (`gate_service.cooldown_remaining`).
 Evaluation is a pure read — it never mutates the roadmap, task progress,
 gates, or unlocks, never advances phases, and never touches reconnection's
 `last_login_at`.
+
+## Workflow artifacts (M13B)
+
+`services/workflow_service.py` stores the four student-authored v3 Build Loop
+sections — `prompt_builder`, `review_board`, `evidence`, `verification` —
+phase-scoped, in the `projects.workflow_artifacts` JSONB column
+(task_progress precedent: outside the roadmap jsonb, so storing artifacts can
+never mutate the fixed structure). Storage only: no LLM call, no gate
+involvement, no report generation — the Interrogation Gate does not read
+these artifacts (wiring them into gate prompts is a future,
+spec-guardian-reviewed change), and the M13C frontend assembles the Project
+Defense Report client-side from this route plus the existing ones. Routes:
+`GET /workflow/{phase}` (all four sections, `null` when unset) and
+`PUT /workflow/{phase}/{section}` (idempotent full-section replace; payloads
+validated fail-closed by `schemas/workflow.py` — extra fields forbidden,
+strings/lists capped, URL and commit-hash evidence format-checked, free text
+that looks like an API key rejected, 30 KB total-size cap; the server stamps
+`saved_at`). Eligibility mirrors the phase workspace (active project +
+roadmap; unknown phase/section → 404, workspace not ready → 409, invalid
+payload → 422). A write touches exactly one column; unknown keys in stored
+data are dropped on read.
 
 ## Tests
 

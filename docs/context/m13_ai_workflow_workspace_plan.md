@@ -10,6 +10,15 @@ sessions that follow it.
 
 ## Bottom line
 
+> **Status (2026-07-03): M13B is IMPLEMENTED as specified below** — migration
+> `20260703130000_add_workflow_artifacts_to_projects.sql`, `workflow_service.py`,
+> `schemas/workflow.py`, `routers/workflow.py` (`GET /workflow/{phase}`,
+> `PUT /workflow/{phase}/{section}`), live-verified 11/11. Section names were
+> pinned by the M13B instructions to `prompt_builder` / `review_board` /
+> `evidence` / `verification` (plan inputs live inside `prompt_builder.inputs`;
+> no separate plan/reflection sections in v0.1). See
+> `.claude/memory/workflow-artifact-conventions.md`. **Next: M13C.**
+
 **M13 needs a small backend mini-milestone first.** Recommended split:
 
 - **M13B — Workflow Artifact Store (backend mini-milestone):** one JSONB

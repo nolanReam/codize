@@ -105,7 +105,10 @@ RESOLVED by the M13A planning session (2026-07-03,
 plan): M13 splits into **M13B** (backend mini-milestone: `workflow_artifacts`
 JSONB column on `projects` following the `task_progress` precedent, plus
 `GET /workflow/{phase}` + `PUT /workflow/{phase}/{section}` — no LLM, no new
-table, no new RLS) and **M13C** (Next.js workspace frontend). Prompt Builder
+table, no new RLS) and **M13C** (Next.js workspace frontend).
+**M13B is IMPLEMENTED** (2026-07-03, live-verified 11/11 — see
+[[workflow-artifact-conventions]]); the artifact-persistence backend gap is
+closed and only M13C remains. Prompt Builder
 generation is deterministic client-side (no LLM); the Defense Report is
 assembled client-side from existing GETs + the workflow routes (no report
 endpoint); the gate stays the M9 gate as-is (evidence-aware prompts

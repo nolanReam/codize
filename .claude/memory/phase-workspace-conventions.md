@@ -27,7 +27,9 @@ Since M11, `current_phase_view(project)` is public — the reconnection service
 builds its summary from it after loading the project once itself. Since M12,
 `incomplete_tasks(phase_view)` is also public here (moved from reconnection's
 private helper) — shared by the reconnection and evaluation services (see
-[[evaluation-conventions]]).
+[[evaluation-conventions]]). Since M13B, `require_phase(project, n)` is public
+too — the workflow artifact store scopes artifacts to real roadmap phases
+with it (see [[workflow-artifact-conventions]]).
 
 No LLM call in the workspace: the stored roadmap already carries the
 personalized phase content, so `phase_explanation.md` prose generation is

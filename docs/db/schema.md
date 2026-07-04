@@ -66,6 +66,7 @@ from `auth.users`).
 | `roadmap` | jsonb | personalized roadmap (template structure, LLM wording) |
 | `current_phase` | smallint 1–7 | advanced by gate passes (M9), never by task completion |
 | `task_progress` | jsonb, default `{}` | M8 phase workspace: `{"<phase>": ["ai-1", "human-2", …]}` — completed task ids per phase, backend-written only |
+| `workflow_artifacts` | jsonb, default `{}` | M13B workflow store: `{"<phase>": {"prompt_builder": {…}, "review_board": {…}, "evidence": {…}, "verification": {…}}}` — student-authored Build Loop artifacts, validated + size-capped by the backend |
 | `gate_history_summary` | text | summarized transcripts; calibrates future gates |
 | `status` | 'intake' \| 'active' \| 'completed' | |
 
@@ -164,3 +165,20 @@ score/threshold strings; a before/after project-row comparison confirmed the
 evaluation is a pure read; user B saw only their own state.
 `scripts/verify_auth.py` re-run: 11/11 PASS. Security advisors: clean. Test
 users deleted; cascade left zero rows in all four tables.
+
+## Verification record (M13B session, 2026-07-03)
+
+- Migration `20260703130000_add_workflow_artifacts_to_projects.sql` applied via
+  MCP: `projects.workflow_artifacts jsonb not null default '{}'::jsonb`
+  (task_progress precedent — table-level grants, existing owner RLS policies
+  cover the column; no new policies needed).
+- Live smoke 11/11 against the real project: pre-existing row picked up the
+  `{}` default; all four sections round-trip through the real
+  `SupabaseProjectRepository`; full-section replace + phase isolation;
+  oversized/secret-marker/unknown-phase payloads rejected with nothing stored;
+  live row diff after writes touched only `workflow_artifacts`; owner read the
+  column through PostgREST with a real JWT; user A saw zero of user B's rows
+  and vice versa; client payload leak-free.
+- `verify_auth.py` 11/11 PASS (SETUP/CLEANUP via MCP; cleanup left zero rows
+  in all four tables and zero test users).
+- Security advisors after the migration: clean (`{"lints": []}`).
