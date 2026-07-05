@@ -24,7 +24,8 @@ Supabase data tables or LLM providers directly.
 
 ```
 app/
-  page.tsx              Landing page (the 80% Trap) — static, no auth
+  page.tsx              Landing page (the 80% Trap) — static, no auth;
+                        signature patch-loop terminal hero + Build Loop pipeline
   login/page.tsx        Supabase email/password sign-up + sign-in
   app/
     layout.tsx          Protected app shell: session guard, sidebar nav,
@@ -42,7 +43,8 @@ app/
     report/page.tsx     Project Defense Report — full client-assembled report
                         with Markdown copy/download
   icon.svg              App favicon (served by Next as the tab icon)
-components/             Async, NotReady, SaveBar, WorkflowSteps, ReconnectionModal
+components/             Async, NotReady, SaveBar, WorkflowSteps, ReconnectionModal,
+                        TrapTerminal + Reveal (landing-only, scripted, no AI calls)
 lib/                    api client, supabase client, types, prompt builder + test,
                         report builder + test, useWorkflowSection hook
 ```

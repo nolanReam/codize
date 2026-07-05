@@ -1,146 +1,285 @@
-# Codize M13D.1 — Local Pre-Pilot Smoke
+# Codize M13D.2 — Landing Page Signature Redesign
 
-Run the final local pre-pilot smoke test before inviting real testers.
+Upgrade Codize’s landing page from “flat MVP page” to a distinctive, premium, product-specific landing experience.
 
-This is a verification and blocker-fix pass only.
+This is a focused frontend visual/product-polish milestone.
 
 Do not start M14.
 
-Do not add new product features.
-
-Do not redesign the frontend.
+Do not change backend behavior.
 
 Do not modify gate evaluator logic.
 
 Do not make the gate evidence-aware.
 
-Do not create migrations unless a true smoke-blocking issue requires it, and explain first.
+Do not create migrations.
 
-Do not invent pilot results.
+Do not add new product features.
 
-Do not run the real pilot yet.
+Do not add analytics.
+
+Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, hosted coding runtime, or gamification.
+
+Do not redesign the protected app unless tiny shared style fixes are necessary.
 
 ## Current State
 
-Relevant commits:
+Codize is locally pre-pilot verified.
+
+Relevant recent commits:
 
 - M13C.2 Gate UI + Project Defense Report: `8161dce`
 - M13C.2B Gate Question Cleanliness Hotfix: `c0320f5`
 - Pilot prep docs: `5fd7d9b`
 - Pre-pilot deployment/demo prep: `a33b5a9`
+- Local pre-pilot smoke pass: `acf5687`
 
-Codize is now documented as ready for a local facilitator-hosted pilot.
-
-This milestone should confirm that readiness with one final local smoke.
+The current landing page works, but visually feels too flat: mostly text on dark background, not enough depth, motion, or memorable Codize-specific product moment.
 
 ## Goal
 
-Verify the full local pilot flow works on this machine using the deployment docs.
+Make the public landing page feel like Codize has a strong product point of view.
 
-Fix only true blockers.
+The page should communicate:
 
-At the end, I should know whether Codize is ready to show to 3 testers.
+> AI can get students to the first 80% fast. Codize helps them stay the engineer when the project starts breaking.
 
-## Read First
+The landing page should feel:
 
-Read:
+- premium
+- serious
+- developer-focused
+- cinematic but usable
+- closer to Linear / Vercel / GitHub / high-end devtool pages than school LMS
+- not generic SaaS
+- not childish
+- not purple-gradient AI slop
 
-- `docs/deployment/pre_pilot_smoke_checklist.md`
-- `docs/deployment/local_demo_runbook.md`
-- `docs/deployment/deployment_readiness_audit.md`
-- `docs/pilot/demo_checklist.md`
-- `frontend/README.md`
-- `backend/README.md`
-- `CLAUDE.md`
-- `.claude/memory/frontend-conventions.md`
-- `.claude/memory/gate-conventions.md`
-- `.claude/memory/roadmap-llm-conventions.md`
+## Important Design Direction
 
-Do not read `conversations.json` unless genuinely needed.
+The page needs one signature visual moment:
 
-## First Actions
+> The 80% Trap should be demonstrated, not just explained.
 
-Inspect current state:
+Build a hero experience where the user immediately sees the AI patch-loop problem.
 
-```bash
-git status
-git log --oneline -8
-```
+Preferred concept:
 
-Confirm working tree is clean before starting.
+- a fake terminal / IDE / AI coding panel in the hero
+- vague prompt appears
+- AI patch appears
+- error appears
+- user pastes error back
+- warnings/diff noise increase
+- Codize interrupts with a “REVIEW REQUIRED” / “DEFENSE WORKFLOW NEEDED” style overlay
+- the visual should feel like a controlled simulation, not a real coding environment
 
-## Run Local App
+This can be implemented with simple React state, CSS, and Framer Motion if appropriate.
 
-Start the backend according to the current docs.
+Do not use real AI calls.
 
-Start the frontend according to the current docs.
+Do not use real code execution.
 
-Confirm required env vars exist without printing their values.
+Do not make it technically heavy.
 
-Do not expose `.env` contents.
+## Library / Dependency Guidance
 
-Do not print secret values.
+Do not add `react-three-fiber` in this milestone.
 
-## Smoke Flow
+Do not add `three`.
 
-Run the full pre-pilot smoke from the checklist:
+Do not add `liquid-glass-js`.
 
-1. Landing page loads.
-2. Login/signup page loads.
-3. Test account can authenticate.
-4. Protected `/app` route works.
-5. Intake starts.
-6. First intake question is exactly:
+Do not add WebGL effects.
 
-   What problem do you want to solve, and who does solving it help?
+Do not add a heavy animation stack.
 
-7. Intake completes.
-8. Roadmap generation reaches an active project without manual seeding.
-9. Cockpit loads.
-10. Phase board loads.
-11. Prompt Builder saves and reloads.
-12. Review Board saves and reloads.
-13. Evidence Panel saves and reloads.
-14. Verification Lab saves and reloads.
-15. Gate starts.
-16. Gate question text is clean, direct, and free of meta-preamble.
-17. Gate can complete or safely reach the furthest valid test state.
-18. Project Defense Report loads real collected data.
-19. Markdown copy/export works.
-20. Logout works.
-21. Test data cleanup is completed if test data was created.
+Allowed dependencies only if they fit the existing frontend:
 
-## Fix Scope
+- `framer-motion` for tasteful animation
+- `lucide-react` only if already installed or genuinely useful
+- small shadcn-style primitives only if the project already uses that structure
 
-Allowed fixes:
+Before installing anything, inspect the existing frontend dependencies.
 
-- broken local setup docs
-- incorrect command in docs
-- missing env example
-- CORS config/doc mismatch
-- broken route
-- frontend cannot call backend
-- auth/session bug
-- artifact save/load blocker
-- gate page blocker
-- report export blocker
-- obvious typo/error that would confuse testers
+If Framer Motion is already installed, use it.
 
-Not allowed:
+If not installed, install only if it clearly improves the landing page and does not bloat the app unnecessarily.
 
-- new feature work
-- UI redesign
-- analytics
-- hosted deployment
-- M14
-- evidence-aware gate changes
-- evaluator prompt/scoring changes
+Prefer CSS transitions/keyframes where they are enough.
 
-If no blockers are found, do not change product code.
+Respect `prefers-reduced-motion`.
 
-## Verification Commands
+## 21stdev Component Guidance
 
-Run frontend checks:
+A 21stdev component prompt was provided for a container scroll animation and hero section.
+
+Use it as inspiration only.
+
+Do not blindly copy generic SaaS sections.
+
+Do not use generic customer logo grids.
+
+Do not use external stock screenshots.
+
+Do not use “Modern Solutions for Customer Engagement” or any unrelated copy.
+
+Do not create fake customer logos.
+
+Do not add images from random external URLs.
+
+If a container-scroll style interaction is useful, adapt the concept into a Codize-native visual:
+
+- Codize terminal panel
+- Build Loop pipeline
+- Project Defense workflow
+- report preview
+- cockpit preview
+
+The result should look custom-built for Codize.
+
+## Required Landing Page Improvements
+
+Implement these landing-page upgrades:
+
+### 1. Signature Hero
+
+Replace or substantially upgrade the current hero with:
+
+- strong headline around the 80% Trap
+- mono eyebrow line, e.g. `// the 80% trap`
+- highlighted `80%` or `stay the engineer`
+- primary CTA: “Stop Debugging Blindly”
+- secondary CTA: “View Project Defense Workflow” or similar
+- animated terminal/IDE simulation showing the patch-loop problem
+- Codize overlay/intervention that makes the product point clear
+
+Keep the existing core positioning, but make it feel sharper.
+
+### 2. Build Loop Pipeline
+
+Create a strong visual for:
+
+Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect
+
+Do not render it as a plain text string only.
+
+Render it like a CI/CD pipeline or engineering workflow rail:
+
+- connected nodes
+- status dots
+- hover/focus states
+- Review / Verify / Explain emphasized as Codize’s added value
+- short one-liner per stage
+
+It should be responsive and accessible.
+
+### 3. 80% Trap Transcript
+
+Turn the “80% Trap” explanation into a terminal/git-log style transcript.
+
+Example tone:
+
+- `feat: generate first version`
+- `fix: paste error back into AI`
+- `fix: patch the patch`
+- `fix: why is auth broken now`
+- `warning: no clear mental model`
+- `Codize: review required`
+
+Make it visually memorable.
+
+Do not make it too jokey.
+
+It should feel painfully familiar to student builders who use AI coding tools.
+
+### 4. Background Atmosphere
+
+Add subtle depth:
+
+- faint blueprint/dot grid
+- soft violet or blue glow
+- top-edge gradient
+- card shadows/borders
+- careful layering
+
+No heavy images required.
+
+Do not reduce readability.
+
+### 5. CTA Polish
+
+Make the main CTA feel like the obvious action:
+
+- stronger button treatment
+- hover lift
+- subtle glow
+- keyboard focus state
+- no inaccessible contrast
+
+### 6. Closing Section
+
+Promote the idea:
+
+> Your workflow is incomplete. Codize helps you fix it.
+
+Make it a real closing section, not a muted footer whisper.
+
+Include CTA back to login/signup.
+
+## App-Wide Tiny Polish Allowed
+
+Only if easy and safe:
+
+- global card hover transitions
+- button hover polish
+- focus-ring consistency
+- minor copy cleanup on app shell if obviously inconsistent
+
+Do not redesign the app interior in this milestone.
+
+## Accessibility / Performance Requirements
+
+Must support:
+
+- mobile layout
+- keyboard navigation
+- visible focus states
+- good color contrast
+- no raw HTML rendering
+- no layout-breaking animation
+- `prefers-reduced-motion`
+
+Animations should be decorative and not block usage.
+
+The page should still work if motion is reduced.
+
+## Copy Requirements
+
+Use Codize-specific language.
+
+Use phrases like:
+
+- “AI built your first 80%. Now you’re stuck fixing the rest.”
+- “Stop debugging blindly.”
+- “Review AI like a teammate, not a magic box.”
+- “Be ready to defend what you shipped.”
+- “Plan. Prompt. Review. Verify. Explain.”
+- “Codize helps students stay the engineer.”
+
+Avoid:
+
+- “revolutionary”
+- “unlock your potential”
+- “modern customer engagement”
+- fake enterprise claims
+- fake customers
+- fake testimonials
+- overclaiming learning outcomes
+
+## Testing / Verification
+
+Run:
 
 ```bash
 cd frontend
@@ -150,33 +289,50 @@ npm test
 npm run build
 ```
 
-Run backend tests only if backend code changed:
+If backend code changes accidentally, stop and explain.
 
-```bash
-cd backend
-pytest
-```
+Run a quick visual/local smoke if possible:
+
+1. landing page loads
+2. CTA goes to login
+3. page works on desktop width
+4. page works on mobile width
+5. no obvious console errors
+6. reduced-motion behavior is safe if implemented
 
 Run a secret scan before commit.
 
 Do not claim tests passed unless they actually ran.
 
+## Documentation Updates
+
+Update if needed:
+
+- `frontend/README.md`
+- `.claude/memory/frontend-conventions.md`
+- `CLAUDE.md`
+
+Only update docs if new landing-page conventions or dependencies should be remembered.
+
+Do not rewrite product vision docs.
+
 ## End Requirements
 
 At the end, output:
 
-- smoke flow result
-- whether Codize is ready for 3 pilot testers
-- blockers found
-- fixes made, if any
+- design direction implemented
 - files changed
+- dependencies added/removed
+- landing sections changed
+- accessibility/performance notes
 - commands run
 - test/build results
+- visual smoke result if run
 - secret scan result
-- test data cleanup result
-- git commit hash if changes were committed
-- next step: invite 3 testers using docs/pilot
+- known issues
+- git commit hash
+- next step: run local visual review, then pilot testers
 
-If fixes are needed, commit them.
+Commit completed landing-page redesign.
 
-If no fixes are needed, do not make a fake code commit. Report a no-code smoke pass and stop.
+Stop after commit.

@@ -98,6 +98,28 @@ publishable key + `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`). Email
 confirmations are ON, so create a login-capable test user directly via SQL (the
 [[gotrue-sql-test-users]] pattern), and clean it up after.
 
+**M13D.2 (2026-07-05) — landing page signature redesign.** The public landing
+page (`app/page.tsx`) is now the "cinematic devtool" version: hero patch-loop
+terminal simulation (`components/TrapTerminal.tsx` — scripted React state
+machine + CSS keyframes, NO real AI calls, loops until a Codize
+"Review required" overlay stamps in), git-log-style 80% Trap transcript with
+scroll reveal (`components/Reveal.tsx` — IO-based, visible-by-default so SSR/
+no-JS/reduced-motion never hide content), and the Build Loop as a CI-style
+pipeline rail (`.pipeline`, horizontal ≥900px / vertical timeline below;
+Review/Verify/Explain marked as Codize's value, Generate tagged "your AI
+tool"). **Zero new dependencies** — framer-motion was considered and skipped;
+CSS was enough. Fonts are now actually loaded via built-in `next/font/google`
+(DM Sans, IBM Plex Mono, Space Grotesk display for h1/h2) exposed as
+`--font-sans/--font-mono/--font-display` on `<html>` — before this the CSS
+only *named* the families and users saw Segoe UI. Reduced-motion contract:
+components check `matchMedia` and render the finished static frame (full
+transcript + overlay), and globals.css has a global animation/transition kill
+switch. `.trap-steps` CSS is still shared by the gate + report pages — the
+landing no longer uses it but do not delete it. Landing container widened to
+1020px; app shell untouched. Windows dev gotcha hit during smoke: a stale
+`next dev` on port 3000 while `next build` runs corrupts `.next` (webpack
+module-not-found 500s) — kill the server, delete `.next`, rebuild.
+
 Two live observations (NOT M13C.1 bugs, left as-is): (1) roadmap generation
 drifted and returned 502 three times in a row with `GEMINI_MODEL=
 gemini-2.5-flash-lite` at temp 0.7 — the fail-closed validator + the intake
