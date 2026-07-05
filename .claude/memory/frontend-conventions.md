@@ -120,6 +120,34 @@ landing no longer uses it but do not delete it. Landing container widened to
 `next dev` on port 3000 while `next build` runs corrupts `.next` (webpack
 module-not-found 500s) — kill the server, delete `.next`, rebuild.
 
+**M13D.3 (2026-07-05) — landing spatial + scroll experience pass.** The landing
+is now six full-screen scenes (hero → patch loop → build loop → defense →
+report → closing), each `min-height: 100svh` desktop with one dominant visual
+and minimal copy. New landing-only components: `PatchLoopScene.tsx` (the 80%
+Trap as a 300vh scroll track with a sticky glass git-log panel — lines surface
+by scroll progress, a "control" meter drains green→amber→red, Codize
+interrupts at the end; static all-visible block under reduced motion / no-JS)
+and `BuildLoopPanel.tsx` (expanding cards: activeIndex via
+hover/focus/click, desktop flex-grow 1→4.2 horizontal rail with vertical-rl
+compressed titles, <900px vertical accordion via max-height; each card is a
+system panel with mono sample lines; Review/Verify/Explain = CODIZE badge,
+Generate = "your AI tool"). **Liquid glass is CSS-simulated** (`.glass`:
+translucent gradient + backdrop-blur + top-edge border highlight + radial
+sheen) — no liquid-glass-js, no three/R3F, still zero runtime deps. Editorial
+type: Cormorant Garamond via next/font as `--font-editorial` → `--editorial`,
+used ONLY for big landing headlines (h1/scene h2/closing, with italic `em`
+accents); app interior keeps Space Grotesk/DM Sans. **Two hard-won gotchas:**
+(1) adding a next/font variable is not enough — the `--editorial` token must
+also be defined in `:root`, or `font-family: var(--editorial)` is invalid at
+computed-value time and silently inherits the body sans (all headlines
+rendered DM Sans until fixed; verify with `getComputedStyle(...).fontFamily`,
+not by eyeballing screenshots); (2) content appearing inside a sticky panel
+triggers browser scroll anchoring → self-scrolling feedback loop — fix is
+`overflow-anchor: none` on the track subtree PLUS a fixed `min-height` on the
+line container so the panel never resizes. Old `.pipeline`/`.trap-log` CSS is
+gone; `Reveal` now staggers direct children via inline `--i`; `.trap-steps` is
+still shared by gate/report pages — do not delete.
+
 Two live observations (NOT M13C.1 bugs, left as-is): (1) roadmap generation
 drifted and returned 502 three times in a row with `GEMINI_MODEL=
 gemini-2.5-flash-lite` at temp 0.7 — the fail-closed validator + the intake

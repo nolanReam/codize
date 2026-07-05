@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { Cormorant_Garamond, DM_Sans, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 
 import "./globals.css";
 
@@ -11,6 +11,14 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", display: "swap" });
+// Editorial display face for the big landing headlines (open-source Garamond).
+const editorial = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-editorial",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Codize — Stop debugging blindly",
@@ -20,7 +28,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} ${display.variable}`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable} ${display.variable} ${editorial.variable}`}
+    >
       <body>{children}</body>
     </html>
   );

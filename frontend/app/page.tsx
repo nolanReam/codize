@@ -1,34 +1,12 @@
 import Link from "next/link";
 
+import BuildLoopPanel from "@/components/BuildLoopPanel";
+import PatchLoopScene from "@/components/PatchLoopScene";
 import Reveal from "@/components/Reveal";
 import TrapTerminal from "@/components/TrapTerminal";
 
-// Landing page — the 80% Trap. Static, no backend calls, no session needed.
-
-const TRAP_LOG: { hash: string; kind: "feat" | "fix" | "warn" | "codize"; text: string }[] = [
-  { hash: "a3f9c21", kind: "feat", text: "feat: generate the whole app from one prompt" },
-  { hash: "b7e2d10", kind: "feat", text: "feat: ask for one more feature" },
-  { hash: "c1d8e92", kind: "fix", text: "fix: paste the error back into the AI" },
-  { hash: "d4a1f77", kind: "fix", text: "fix: patch the patch" },
-  { hash: "e9c3b04", kind: "fix", text: "fix: why is auth broken now" },
-  { hash: "f2e7a19", kind: "fix", text: "fix: pls work" },
-  { hash: "warning", kind: "warn", text: "6 rewrites accepted without reading the diff" },
-  {
-    hash: "codize",
-    kind: "codize",
-    text: "review required — you're negotiating with a codebase you never learned",
-  },
-];
-
-const STAGES: { n: string; name: string; tag?: "codize" | "your-ai"; blurb: string }[] = [
-  { n: "01", name: "Plan", blurb: "Decide the architecture before the AI writes a line." },
-  { n: "02", name: "Prompt", blurb: "Scoped, constraint-driven asks — not “make it work.”" },
-  { n: "03", name: "Generate", tag: "your-ai", blurb: "Your AI tool does this part. It always did." },
-  { n: "04", name: "Review", tag: "codize", blurb: "Read the diff. Accept or reject with reasons." },
-  { n: "05", name: "Verify", tag: "codize", blurb: "Prove it behaves — evidence, not vibes." },
-  { n: "06", name: "Explain", tag: "codize", blurb: "Defend your implementation in a live gate." },
-  { n: "07", name: "Commit / Reflect", blurb: "Ship it with a Defense Report behind it." },
-];
+// Landing page — the 80% Trap, told as a sequence of scenes.
+// Static, no backend calls, no session needed.
 
 export default function LandingPage() {
   return (
@@ -44,107 +22,134 @@ export default function LandingPage() {
         </nav>
       </header>
 
+      {/* Scene 1 — opening: the 80% trap, demonstrated */}
       <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">{"// the 80% trap"}</p>
           <h1>
-            AI built your first <span className="hl">80%</span>. Now you&rsquo;re stuck fixing the
-            rest.
+            AI built your first <span className="hl">80%</span>.
+            <br />
+            Now you&rsquo;re stuck <em>fixing the rest</em>.
           </h1>
           <p className="sub">
-            Generating code is easy. Understanding why it broke is the hard part. Codize helps
-            student builders plan, prompt, review, verify, and defend AI-generated code — so you
-            stay the engineer when the project starts breaking.
+            Codize trains student builders to plan, prompt, review, verify, and defend
+            AI-generated code — so you stay the engineer when the project starts breaking.
           </p>
           <div className="ctas">
             <Link href="/login" className="btn primary">
               Stop Debugging Blindly
             </Link>
             <a href="#workflow" className="btn">
-              View the Project Defense Workflow
+              See the workflow
             </a>
           </div>
         </div>
-        <TrapTerminal />
-      </section>
-
-      <section className="section">
-        <p className="eyebrow">{"// git log --oneline"}</p>
-        <h2>The 80% Trap</h2>
-        <p className="lead">
-          You know this history. Everyone building with AI knows this history.
-        </p>
-        <Reveal className="trap-log">
-          {TRAP_LOG.map((line, i) => (
-            <div
-              key={line.hash}
-              className={`log-line ${line.kind}`}
-              style={{ "--i": i } as React.CSSProperties}
-            >
-              <span className="log-hash">{line.hash}</span>
-              <span className="log-msg">{line.text}</span>
-            </div>
-          ))}
-        </Reveal>
-      </section>
-
-      <section className="section" id="workflow">
-        <p className="eyebrow">{"// the codize build loop"}</p>
-        <h2>Review AI like a teammate, not a magic box.</h2>
-        <p className="lead">
-          Codize doesn&rsquo;t generate your code — your AI tool already does that. Codize trains
-          the workflow around it, one phase at a time:
-        </p>
-        <ol className="pipeline">
-          {STAGES.map((stage) => (
-            <li key={stage.n} className={stage.tag === "codize" ? "codize" : stage.tag === "your-ai" ? "your-ai" : ""}>
-              <span className="node-dot" aria-hidden="true" />
-              <span className="node-n">{stage.n}</span>
-              <span className="node-name">{stage.name}</span>
-              {stage.tag && (
-                <span className="node-tag">{stage.tag === "codize" ? "codize" : "your AI tool"}</span>
-              )}
-              <span className="node-blurb">{stage.blurb}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="section">
-        <p className="eyebrow">{"// project defense"}</p>
-        <h2>Be ready to defend what you shipped.</h2>
-        <p className="lead">
-          Every phase ends at the Project Defense gate — and every project leaves with a report
-          you can stand behind in the demo, the interview, or the judging room.
-        </p>
-        <div className="card-grid" style={{ marginTop: 24 }}>
-          <div className="card">
-            <h3>The Defense Gate</h3>
-            <p>
-              Three live questions about <em>your</em> implementation — anchored to what you
-              actually built, not textbook trivia. Pass it, and the next phase unlocks.
-            </p>
-          </div>
-          <div className="card">
-            <h3>The Defense Report</h3>
-            <p>
-              A Markdown record of what you planned, prompted, reviewed, and verified — with the
-              evidence attached. Export it and take it anywhere.
-            </p>
-          </div>
+        <div className="hero-stage">
+          <TrapTerminal />
         </div>
       </section>
 
+      {/* Scene 2 — descending into the patch loop (scroll-driven) */}
+      <PatchLoopScene />
+
+      {/* Scene 3 — the Build Loop instrument panel */}
+      <section className="scene" id="workflow">
+        <div className="scene-head">
+          <p className="eyebrow">{"// the codize build loop"}</p>
+          <h2>
+            Review AI like a <em>teammate</em>, not a magic box.
+          </h2>
+          <p className="lead">
+            Your AI tool generates. Codize trains everything around it.
+          </p>
+        </div>
+        <BuildLoopPanel />
+      </section>
+
+      {/* Scene 4 — Project Defense */}
+      <section className="scene">
+        <div className="scene-head">
+          <p className="eyebrow">{"// project defense"}</p>
+          <h2>
+            Every phase ends at <em>the gate</em>.
+          </h2>
+          <p className="lead">
+            Three live questions about what you actually built. No textbook answers.
+          </p>
+        </div>
+        <Reveal className="defense-grid">
+          <div className="glass panel" style={{ "--i": 0 } as React.CSSProperties}>
+            <div className="panel-bar">
+              <span className="panel-path">gate/current</span>
+              <span className="pill accent">live</span>
+            </div>
+            <div className="panel-body mono">
+              <p className="pl dim">anchor: &ldquo;JWT checks live in core/security.py&rdquo;</p>
+              <p className="pl">turn_01 ▸ why JWKS instead of a shared secret?</p>
+              <p className="pl">turn_02 ▸ what breaks if the key rotates?</p>
+              <p className="pl">turn_03 ▸ suppose logins fail at midnight&hellip;</p>
+              <p className="pl dim">format: implementation-specific · no retry spam</p>
+            </div>
+          </div>
+          <div className="glass panel" style={{ "--i": 1 } as React.CSSProperties}>
+            <div className="panel-bar">
+              <span className="panel-path">defense_status</span>
+              <span className="pill ok">ready</span>
+            </div>
+            <div className="panel-body mono">
+              <p className="pl">phase: 3 / 7</p>
+              <p className="pl">artifacts: 4 / 4 submitted</p>
+              <p className="pl">verification: self-reported ✓</p>
+              <p className="pl dim">evidence: 2 links · 1 commit</p>
+              <p className="pl ok">ready to defend</p>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* Scene 5 — the payoff: the Defense Report */}
+      <section className="scene">
+        <div className="scene-head">
+          <p className="eyebrow">{"// the payoff"}</p>
+          <h2>
+            Leave with <em>proof of process</em>.
+          </h2>
+          <p className="lead">
+            Planned. Prompted. Reviewed. Verified. Defended. Exportable.
+          </p>
+        </div>
+        <Reveal className="report-stage">
+          <div className="glass report-doc" style={{ "--i": 0 } as React.CSSProperties}>
+            <div className="panel-bar">
+              <span className="panel-path">defense_report.md</span>
+              <span className="pill">markdown</span>
+            </div>
+            <div className="report-body mono">
+              <p className="rl h"># Project Defense Report</p>
+              <p className="rl dim">study planner · phase 3 · full-stack web app</p>
+              <p className="rl">## What I planned <span className="ok">✓</span></p>
+              <p className="rl">## What I prompted <span className="ok">✓</span> <span className="dim">2 scoped prompts</span></p>
+              <p className="rl">## What I reviewed <span className="ok">✓</span> <span className="dim">accepted 5 · rejected 1</span></p>
+              <p className="rl">## Submitted evidence <span className="dim">self-reported verification</span></p>
+              <p className="rl">## Defense <span className="ok">PASS</span> <span className="dim">defended in 3 turns</span></p>
+            </div>
+          </div>
+          <p className="report-note muted" style={{ "--i": 1 } as React.CSSProperties}>
+            Built from your own workflow record — take it to the demo, the interview, the judging
+            room.
+          </p>
+        </Reveal>
+      </section>
+
+      {/* Scene 6 — closing */}
       <section className="closing">
         <h2>
-          Your workflow is incomplete.
+          Your workflow is <em>incomplete</em>.
           <br />
           <span className="hl">Codize helps you fix it.</span>
         </h2>
-        <p className="lead">
-          AI can get you to the first 80% fast. Codize is how you stay in control of the rest.
-        </p>
-        <div className="ctas" style={{ justifyContent: "center", marginTop: 28 }}>
+        <p className="lead">AI gets you to 80% fast. Stay in control of the rest.</p>
+        <div className="ctas" style={{ justifyContent: "center", marginTop: 32 }}>
           <Link href="/login" className="btn primary">
             Stop Debugging Blindly
           </Link>
