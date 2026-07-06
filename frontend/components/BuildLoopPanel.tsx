@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-// The Codize Build Loop as an interactive instrument panel: one stage expands
-// at a time (hover / focus / click), the rest compress. Desktop is a
-// horizontal expanding rail; under 900px it becomes a vertical accordion.
-// Pure CSS transitions — reduced motion makes the expansion instant.
+// The Codize Build Loop as a scroll-driven instrument panel: the section is a
+// tall track with a sticky viewport-height panel inside; scroll progress
+// through the track selects the active stage one by one. Click and keyboard
+// focus still activate a card directly (secondary control); hover activation
+// only exists in static mode, where cards don't move under the cursor.
+// Reduced motion / narrow screens get a static section: desktop reduced-motion
+// keeps hover/click activation, mobile is a tap accordion.
 
 interface WorkflowStage {
   id: string;
@@ -116,44 +119,112 @@ const ROLE_LABEL: Record<WorkflowStage["role"], string> = {
 };
 
 export default function BuildLoopPanel() {
-  const [active, setActive] = useState(3); // open on Review — Codize's value
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const bucketRef = useRef(-1); // last scroll-derived stage, so clicks/focus stick
+  const [mode, setMode] = useState<"static" | "scroll">("static");
+  const [active, setActive] = useState(3); // static default: Review — Codize's value
+
+  // Pick the mode: scroll-driven only on wide screens with motion allowed,
+  // and drop back to static if the viewport narrows mid-session.
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const mq = window.matchMedia("(max-width: 900px)");
+    const apply = () => setMode(mq.matches ? "static" : "scroll");
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "scroll") return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const el = trackRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const total = rect.height - window.innerHeight;
+        const p = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
+        const next = Math.min(STAGES.length - 1, Math.floor(p * STAGES.length));
+        // only re-assert on a real bucket change, so a direct click/focus
+        // selection survives incidental scroll events
+        if (bucketRef.current !== next) {
+          bucketRef.current = next;
+          setActive(next);
+        }
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [mode]);
+
+  const isScroll = mode === "scroll";
 
   return (
-    <div className="bl">
-      {STAGES.map((stage, i) => {
-        const isActive = i === active;
-        return (
-          <button
-            key={stage.id}
-            type="button"
-            className={`bl-card ${stage.role}${isActive ? " active" : ""}`}
-            aria-expanded={isActive}
-            onMouseEnter={() => setActive(i)}
-            onFocus={() => setActive(i)}
-            onClick={() => setActive(i)}
-          >
-            <span className="bl-top">
-              <span className="bl-n">{stage.number}</span>
-              <span className={`bl-role ${stage.role}`}>{ROLE_LABEL[stage.role]}</span>
-            </span>
-            <span className="bl-title">{stage.title}</span>
-            <span className="bl-title-side" aria-hidden="true">
-              {stage.title}
-            </span>
-            <span className="bl-detail">
-              <span className="bl-desc">{stage.description}</span>
-              <span className="bl-sample">
-                <span className="bl-artifact">{stage.artifact}</span>
-                {stage.sample.map((s) => (
-                  <span key={s.text} className={`bl-line ${s.kind}`}>
-                    {s.text}
+    <section
+      ref={trackRef}
+      id="workflow"
+      className={isScroll ? "bl-track" : "bl-track bl-track-static"}
+      aria-label="The Codize Build Loop"
+    >
+      <div className="bl-sticky">
+        <div className="scene-head">
+          <p className="eyebrow">{"// the codize build loop"}</p>
+          <h2>
+            Review AI like a <em>teammate</em>, not a magic box.
+          </h2>
+          <p className="lead">Your AI tool generates. Codize trains everything around it.</p>
+        </div>
+        <div className="bl">
+          {STAGES.map((stage, i) => {
+            const isActive = i === active;
+            return (
+              <button
+                key={stage.id}
+                type="button"
+                className={`bl-card ${stage.role}${isActive ? " active" : ""}`}
+                aria-expanded={isActive}
+                onMouseEnter={isScroll ? undefined : () => setActive(i)}
+                onFocus={() => setActive(i)}
+                onClick={() => setActive(i)}
+              >
+                <span className="bl-top">
+                  <span className="bl-n">{stage.number}</span>
+                  <span className={`bl-role ${stage.role}`}>{ROLE_LABEL[stage.role]}</span>
+                </span>
+                <span className="bl-title">{stage.title}</span>
+                <span className="bl-title-side" aria-hidden="true">
+                  {stage.title}
+                </span>
+                <span className="bl-detail">
+                  <span className="bl-desc">{stage.description}</span>
+                  <span className="bl-sample">
+                    <span className="bl-artifact">{stage.artifact}</span>
+                    {stage.sample.map((s) => (
+                      <span key={s.text} className={`bl-line ${s.kind}`}>
+                        {s.text}
+                      </span>
+                    ))}
                   </span>
-                ))}
-              </span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {isScroll && (
+          <p className="bl-hint" aria-hidden="true">
+            stage {STAGES[active].number} / 07 · scroll to advance
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

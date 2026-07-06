@@ -3,9 +3,10 @@ import Link from "next/link";
 import BuildLoopPanel from "@/components/BuildLoopPanel";
 import PatchLoopScene from "@/components/PatchLoopScene";
 import Reveal from "@/components/Reveal";
+import TiltCard from "@/components/TiltCard";
 import TrapTerminal from "@/components/TrapTerminal";
 
-// Landing page — the 80% Trap, told as a sequence of scenes.
+// Landing page — the 80% Trap, told as a sequence of centered scenes.
 // Static, no backend calls, no session needed.
 
 export default function LandingPage() {
@@ -45,38 +46,31 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="hero-stage">
-          <TrapTerminal />
+          <TiltCard>
+            <TrapTerminal />
+          </TiltCard>
         </div>
       </section>
 
       {/* Scene 2 — descending into the patch loop (scroll-driven) */}
       <PatchLoopScene />
 
-      {/* Scene 3 — the Build Loop instrument panel */}
-      <section className="scene" id="workflow">
-        <div className="scene-head">
-          <p className="eyebrow">{"// the codize build loop"}</p>
-          <h2>
-            Review AI like a <em>teammate</em>, not a magic box.
-          </h2>
-          <p className="lead">
-            Your AI tool generates. Codize trains everything around it.
-          </p>
-        </div>
-        <BuildLoopPanel />
-      </section>
+      {/* Scene 3 — the Build Loop instrument panel (scroll-driven) */}
+      <BuildLoopPanel />
 
       {/* Scene 4 — Project Defense */}
       <section className="scene">
-        <div className="scene-head">
-          <p className="eyebrow">{"// project defense"}</p>
-          <h2>
+        <Reveal className="scene-head">
+          <p className="eyebrow" style={{ "--i": 0 } as React.CSSProperties}>
+            {"// project defense"}
+          </p>
+          <h2 style={{ "--i": 1 } as React.CSSProperties}>
             Every phase ends at <em>the gate</em>.
           </h2>
-          <p className="lead">
+          <p className="lead" style={{ "--i": 2 } as React.CSSProperties}>
             Three live questions about what you actually built. No textbook answers.
           </p>
-        </div>
+        </Reveal>
         <Reveal className="defense-grid">
           <div className="glass panel" style={{ "--i": 0 } as React.CSSProperties}>
             <div className="panel-bar">
@@ -109,15 +103,17 @@ export default function LandingPage() {
 
       {/* Scene 5 — the payoff: the Defense Report */}
       <section className="scene">
-        <div className="scene-head">
-          <p className="eyebrow">{"// the payoff"}</p>
-          <h2>
+        <Reveal className="scene-head">
+          <p className="eyebrow" style={{ "--i": 0 } as React.CSSProperties}>
+            {"// the payoff"}
+          </p>
+          <h2 style={{ "--i": 1 } as React.CSSProperties}>
             Leave with <em>proof of process</em>.
           </h2>
-          <p className="lead">
+          <p className="lead" style={{ "--i": 2 } as React.CSSProperties}>
             Planned. Prompted. Reviewed. Verified. Defended. Exportable.
           </p>
-        </div>
+        </Reveal>
         <Reveal className="report-stage">
           <div className="glass report-doc" style={{ "--i": 0 } as React.CSSProperties}>
             <div className="panel-bar">
@@ -143,17 +139,21 @@ export default function LandingPage() {
 
       {/* Scene 6 — closing */}
       <section className="closing">
-        <h2>
-          Your workflow is <em>incomplete</em>.
-          <br />
-          <span className="hl">Codize helps you fix it.</span>
-        </h2>
-        <p className="lead">AI gets you to 80% fast. Stay in control of the rest.</p>
-        <div className="ctas" style={{ justifyContent: "center", marginTop: 32 }}>
-          <Link href="/login" className="btn primary">
-            Stop Debugging Blindly
-          </Link>
-        </div>
+        <Reveal className="closing-inner">
+          <h2 style={{ "--i": 0 } as React.CSSProperties}>
+            Your workflow is <em>incomplete</em>.
+            <br />
+            <span className="hl">Codize helps you fix it.</span>
+          </h2>
+          <p className="lead" style={{ "--i": 1 } as React.CSSProperties}>
+            AI gets you to 80% fast. Stay in control of the rest.
+          </p>
+          <div className="ctas" style={{ "--i": 2, marginTop: 32 } as React.CSSProperties}>
+            <Link href="/login" className="btn primary">
+              Stop Debugging Blindly
+            </Link>
+          </div>
+        </Reveal>
       </section>
 
       <footer className="landing-footer muted">

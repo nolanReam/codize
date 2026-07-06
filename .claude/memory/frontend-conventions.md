@@ -148,6 +148,41 @@ line container so the panel never resizes. Old `.pipeline`/`.trap-log` CSS is
 gone; `Reveal` now staggers direct children via inline `--i`; `.trap-steps` is
 still shared by gate/report pages — do not delete.
 
+**M13D.4 (2026-07-05) — landing fix pass (user visual review of D.3).** Four
+user-driven corrections: (1) **Cormorant Garamond is gone** — the editorial
+serif was not wanted; landing headlines are Space Grotesk (`--display`, same
+direction as the UI type), sized down (hero clamp→50px, scenes→46px,
+closing→58px), with `em` emphasis rendered as violet (`--accent`), NOT italic
+(Space Grotesk has no real italic). The `--editorial` token and the next/font
+Cormorant import were both removed. Hero h1 uses `text-wrap: balance`.
+(2) **Every scene is centered** (hero is a stacked centered column with the
+terminal below the copy; scene-heads, trap panel, defense grid, report, footer
+all centered). (3) **The Build Loop is scroll-driven**: `BuildLoopPanel` now
+owns its whole scene — a 320vh `.bl-track` with a sticky 100svh panel, same
+pattern + `overflow-anchor: none` fix as the patch loop; scroll progress
+selects the active card (`floor(p * 7)`); click/focus still activate a card
+directly and **stick until the scroll bucket actually changes** (`bucketRef` —
+only re-assert active on a bucket *change*, or incidental scroll events from
+click/focus instantly snap the selection back). Hover activation exists only
+in static mode (cards move under a stationary cursor while scrolling →
+oscillation). Static mode = reduced motion (desktop, hover/click) or ≤900px
+(tap accordion); a matchMedia change listener drops scroll mode if the
+viewport narrows. Cards are ~264px (hidden detail is `position: absolute` on
+desktop so compressed cards stay short). (4) **Hero terminal is a premium
+tilt card**: `TiltCard.tsx` wraps `TrapTerminal` — pointer tilt via CSS vars
+(`--rx/--ry`, max 6°, rAF-throttled, return-to-neutral on leave), traveling
+edge beams (`.tcard-edge::before/::after`), breathing glow, pointer-following
+sheen (`--mx/--my`). Behavior adapted from the user's 21stdev sign-in card
+reference (`sign_in_prompt.txt`, NOT committed) — inspiration only, no
+framer-motion/lucide added, `/login` untouched. **Gotcha:** decorative
+`::before` glows with negative horizontal insets cause real horizontal
+overflow on mobile (pseudo-elements don't show up in element-scan debugging —
+found via `document.documentElement.scrollWidth`); clamp them in the narrow
+media query. **Gotcha:** an occluded/backgrounded automation browser throttles
+rAF + paint (2 frames in 1.8s), making transitions/computed styles look broken
+— verify with direct DOM `.click()` + forced `getComputedStyle`, not timed
+screenshots.
+
 Two live observations (NOT M13C.1 bugs, left as-is): (1) roadmap generation
 drifted and returned 502 three times in a row with `GEMINI_MODEL=
 gemini-2.5-flash-lite` at temp 0.7 — the fail-closed validator + the intake

@@ -25,8 +25,9 @@ Supabase data tables or LLM providers directly.
 ```
 app/
   page.tsx              Landing page (the 80% Trap) — static, no auth; six
-                        full-screen scenes: patch-loop terminal hero, scroll-
-                        driven trap transcript, expanding Build Loop panel
+                        centered full-screen scenes: tilt-card patch-loop
+                        terminal hero, scroll-driven trap transcript, scroll-
+                        driven expanding Build Loop panel
   login/page.tsx        Supabase email/password sign-up + sign-in
   app/
     layout.tsx          Protected app shell: session guard, sidebar nav,
@@ -45,8 +46,8 @@ app/
                         with Markdown copy/download
   icon.svg              App favicon (served by Next as the tab icon)
 components/             Async, NotReady, SaveBar, WorkflowSteps, ReconnectionModal,
-                        TrapTerminal + PatchLoopScene + BuildLoopPanel + Reveal
-                        (landing-only, scripted, no AI calls)
+                        TrapTerminal + TiltCard + PatchLoopScene + BuildLoopPanel
+                        + Reveal (landing-only, scripted, no AI calls)
 lib/                    api client, supabase client, types, prompt builder + test,
                         report builder + test, useWorkflowSection hook
 ```
