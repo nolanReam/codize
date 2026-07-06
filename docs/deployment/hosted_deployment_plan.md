@@ -1,5 +1,12 @@
 # Codize — Hosted Deployment Plan (first pilot)
 
+> **Superseded (M13F.1):** the current canonical guide is
+> `friend_pilot_deployment.md` (+ `env_var_matrix.md` and
+> `hosted_smoke_checklist.md`). This file is kept as the original M13D
+> outline; where they differ, the M13F.1 docs win (e.g. `backend/Procfile`
+> and `backend/.python-version` are now committed, `CORS_ORIGINS` default
+> includes localhost:3001, and signup sets an explicit `emailRedirectTo`).
+
 The simplest hosted path for a small pilot, so testers can use Codize without the
 facilitator running it locally. **Nothing here is executed automatically** — no
 external accounts are created and **no deploy happens without your explicit

@@ -31,7 +31,14 @@ export default function LoginPage() {
     try {
       const supabase = getSupabase();
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // The confirmation email must link back to the origin the user signed
+        // up from (localhost in dev, the Vercel URL when hosted). The origin
+        // must be listed in Supabase Auth → URL Configuration → Redirect URLs.
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/login` },
+        });
         if (error) throw error;
         if (!data.session) {
           // Email confirmations are on for this Supabase project.

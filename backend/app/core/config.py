@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     # Comma-separated explicit origins — never "*" (credentials + wildcard is
     # invalid CORS anyway, and wildcard is forbidden by the milestone spec).
-    cors_origins: str = "http://localhost:3000"
+    # Default covers local dev only; hosted deploys set CORS_ORIGINS to the
+    # exact deployed frontend origin(s).
+    cors_origins: str = "http://localhost:3000,http://localhost:3001"
 
     # --- LLM provider config (M7). Provider order: Gemini primary, OpenRouter
     # fallback, deterministic stub when no key is configured. Anthropic is

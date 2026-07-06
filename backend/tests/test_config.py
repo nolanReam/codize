@@ -15,7 +15,7 @@ def test_settings_load_without_env(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     s = Settings(_env_file=None)
     assert s.app_env == "development"
-    assert s.cors_origin_list == ["http://localhost:3000"]
+    assert s.cors_origin_list == ["http://localhost:3000", "http://localhost:3001"]
     # LLM defaults fixed by the M7 instructions.
     assert s.llm_provider == "gemini"
     assert s.gemini_model == "gemini-2.5-flash-lite"

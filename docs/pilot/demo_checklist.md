@@ -3,8 +3,9 @@
 > For full setup/run/deploy detail see `docs/deployment/` —
 > `local_demo_runbook.md` (step-by-step local run + troubleshooting),
 > `pre_pilot_smoke_checklist.md` (the deploy/build smoke gate), and
-> `hosted_deployment_plan.md` (Vercel + FastAPI host). This file is the quick
-> per-session pre-flight.
+> `friend_pilot_deployment.md` (Vercel + Railway hosted deploy, with
+> `env_var_matrix.md` and `hosted_smoke_checklist.md`). This file is the
+> quick per-session pre-flight.
 
 Run this on the **exact machine** you'll use, **before** the first tester (and a
 quick re-check before each session). It prevents the two most common pilot

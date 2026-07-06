@@ -86,6 +86,11 @@ Copy `.env.example` to `.env.local` and fill in:
 **Never** put service-role keys or LLM provider keys here — every `NEXT_PUBLIC_*`
 value is bundled into the client JS.
 
+Hosted deploys (Vercel) set the same three variables in the project settings —
+see `docs/deployment/friend_pilot_deployment.md` and
+`docs/deployment/env_var_matrix.md`. `NEXT_PUBLIC_API_BASE_URL` is read at
+**build time**: changing it on Vercel requires a redeploy.
+
 ## Commands
 
 ```bash
