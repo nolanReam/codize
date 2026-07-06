@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import BuildLoopPanel from "@/components/BuildLoopPanel";
+import GateScene from "@/components/GateScene";
 import PatchLoopScene from "@/components/PatchLoopScene";
 import Reveal from "@/components/Reveal";
 import TiltCard from "@/components/TiltCard";
@@ -13,14 +14,16 @@ export default function LandingPage() {
   return (
     <div className="landing">
       <header>
-        <div className="brand">
-          CODIZE<span>_</span>
+        <div className="header-inner">
+          <div className="brand">
+            CODIZE<span>_</span>
+          </div>
+          <nav className="row">
+            <Link href="/login" className="btn small">
+              Sign in
+            </Link>
+          </nav>
         </div>
-        <nav className="row">
-          <Link href="/login" className="btn small">
-            Sign in
-          </Link>
-        </nav>
       </header>
 
       {/* Scene 1 — opening: the 80% trap, demonstrated */}
@@ -55,51 +58,36 @@ export default function LandingPage() {
       {/* Scene 2 — descending into the patch loop (scroll-driven) */}
       <PatchLoopScene />
 
+      {/* Credibility band — the trap is a named pattern, backed by research */}
+      <section className="proof" aria-label="Why the 80% Trap matters">
+        <div className="glass proof-card">
+          <p className="eyebrow">{"// why this matters"}</p>
+          <p>
+            The <strong>80% Trap</strong> is Codize&rsquo;s name for a real pattern — not a
+            measured statistic. AI tools generate plausible code fast, but research has found
+            that AI-assisted code can carry security weaknesses, and that builders using
+            assistants often believe their code is more secure than it is. The missing workflow
+            comes after generation: <strong>review, verify, explain</strong>. That&rsquo;s the
+            part Codize trains.
+          </p>
+          <div className="proof-cites">
+            <a href="https://arxiv.org/abs/2211.03622" target="_blank" rel="noreferrer">
+              Perry et al. — &ldquo;Do Users Write More Insecure Code with AI
+              Assistants?&rdquo; (CCS 2023)
+            </a>
+            <a href="https://arxiv.org/abs/2310.02059" target="_blank" rel="noreferrer">
+              Fu et al. — &ldquo;Security Weaknesses of Copilot-Generated Code in GitHub
+              Projects&rdquo; (2023)
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Scene 3 — the Build Loop instrument panel (scroll-driven) */}
       <BuildLoopPanel />
 
-      {/* Scene 4 — Project Defense */}
-      <section className="scene">
-        <Reveal className="scene-head">
-          <p className="eyebrow" style={{ "--i": 0 } as React.CSSProperties}>
-            {"// project defense"}
-          </p>
-          <h2 style={{ "--i": 1 } as React.CSSProperties}>
-            Every phase ends at <em>the gate</em>.
-          </h2>
-          <p className="lead" style={{ "--i": 2 } as React.CSSProperties}>
-            Three live questions about what you actually built. No textbook answers.
-          </p>
-        </Reveal>
-        <Reveal className="defense-grid">
-          <div className="glass panel" style={{ "--i": 0 } as React.CSSProperties}>
-            <div className="panel-bar">
-              <span className="panel-path">gate/current</span>
-              <span className="pill accent">live</span>
-            </div>
-            <div className="panel-body mono">
-              <p className="pl dim">anchor: &ldquo;JWT checks live in core/security.py&rdquo;</p>
-              <p className="pl">turn_01 ▸ why JWKS instead of a shared secret?</p>
-              <p className="pl">turn_02 ▸ what breaks if the key rotates?</p>
-              <p className="pl">turn_03 ▸ suppose logins fail at midnight&hellip;</p>
-              <p className="pl dim">format: implementation-specific · no retry spam</p>
-            </div>
-          </div>
-          <div className="glass panel" style={{ "--i": 1 } as React.CSSProperties}>
-            <div className="panel-bar">
-              <span className="panel-path">defense_status</span>
-              <span className="pill ok">ready</span>
-            </div>
-            <div className="panel-body mono">
-              <p className="pl">phase: 3 / 7</p>
-              <p className="pl">artifacts: 4 / 4 submitted</p>
-              <p className="pl">verification: self-reported ✓</p>
-              <p className="pl dim">evidence: 2 links · 1 commit</p>
-              <p className="pl ok">ready to defend</p>
-            </div>
-          </div>
-        </Reveal>
-      </section>
+      {/* Scene 4 — Project Defense, simulated turn by turn (scroll-driven) */}
+      <GateScene />
 
       {/* Scene 5 — the payoff: the Defense Report */}
       <section className="scene">

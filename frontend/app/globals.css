@@ -292,7 +292,19 @@ pre.output {
 
 /* ---- landing -------------------------------------------------------------- */
 
-.landing { position: relative; max-width: 1080px; margin: 0 auto; padding: 0 28px 60px; }
+/* the landing is full-bleed — the page background, header, and footer span the
+   viewport; individual scenes carry a shared content gutter instead */
+.landing { position: relative; }
+.landing .hero,
+.landing .scene,
+.landing .closing,
+.landing .proof,
+.landing .trap-sticky,
+.landing .bl-sticky,
+.landing .gate-sticky {
+  padding-left: clamp(20px, 4vw, 52px);
+  padding-right: clamp(20px, 4vw, 52px);
+}
 
 /* atmosphere: faint blueprint dot grid fading out below the hero */
 .landing::before {
@@ -312,27 +324,31 @@ pre.output {
   position: sticky;
   top: 0;
   z-index: 20;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 28px;
-  margin: 0 -28px;
   background: rgba(13, 13, 18, 0.78);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
+.landing header .header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px clamp(20px, 4vw, 52px);
+}
 .landing header .brand { font-family: var(--mono); font-weight: 600; letter-spacing: 0.12em; }
 .landing header .brand span { color: var(--accent); }
 
-/* big scene headlines: same direction as the UI type (Space Grotesk), just
-   larger and tighter — emphasis is violet, not italic (no editorial serif) */
+/* one type family on the landing: headlines are the body face (DM Sans) at
+   larger sizes and heavier weight — never a stylistically separate family.
+   Overriding --display keeps every landing display-usage (terminal overlay,
+   build-loop titles) in the same system; the app interior keeps Space Grotesk. */
+.landing { --display: var(--sans); }
 .landing h1,
 .landing .scene-head h2,
 .landing .closing h2 {
-  font-family: var(--display);
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-family: var(--sans);
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
 .landing h1 em,
 .landing .scene-head h2 em,
@@ -365,12 +381,12 @@ pre.output {
   background: radial-gradient(ellipse at center, rgba(139, 107, 250, 0.14), transparent 65%);
   pointer-events: none;
 }
-.hero-copy { max-width: 900px; }
-.hero h1 { font-size: clamp(34px, 4.6vw, 50px); line-height: 1.08; text-wrap: balance; }
+.hero-copy { max-width: 1060px; }
+.hero h1 { font-size: clamp(38px, 5.2vw, 64px); line-height: 1.06; text-wrap: balance; }
 .hero .hl, .closing .hl { color: var(--accent); text-shadow: 0 0 28px var(--glow); }
-.hero .sub { color: var(--ink-2); font-size: 17px; line-height: 1.65; max-width: 52ch; margin: 20px auto 30px; }
+.hero .sub { color: var(--ink-2); font-size: 18px; line-height: 1.65; max-width: 56ch; margin: 22px auto 32px; }
 .ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-.hero-stage { position: relative; width: 100%; max-width: 660px; }
+.hero-stage { position: relative; width: 100%; max-width: 700px; }
 /* radial atmosphere directly behind the terminal card */
 .hero-stage::before {
   content: "";
@@ -463,8 +479,8 @@ pre.output {
   min-height: 100svh;
   padding: 96px 0;
 }
-.scene-head { max-width: 720px; margin: 0 auto 20px; text-align: center; }
-.scene-head h2 { font-size: clamp(30px, 4vw, 46px); line-height: 1.08; margin-bottom: 14px; }
+.scene-head { max-width: 780px; margin: 0 auto 20px; text-align: center; }
+.scene-head h2 { font-size: clamp(32px, 4.2vw, 52px); line-height: 1.08; margin-bottom: 14px; }
 .scene-head .lead, .closing .lead { color: var(--ink-2); font-size: 17px; max-width: 54ch; margin: 0 auto; }
 @media (max-width: 920px) {
   .scene { min-height: auto; padding: 88px 0; }
@@ -490,6 +506,8 @@ pre.output {
 
 .tt {
   position: relative;
+  /* the hero is text-align: center — a real terminal is not */
+  text-align: left;
   background: linear-gradient(180deg, #0c0b12, #08080d);
   border: 1px solid var(--border-strong);
   border-top-color: rgba(232, 230, 240, 0.16);
@@ -676,7 +694,8 @@ pre.output {
 
 /* scroll track + sticky panel, same pattern (and same scroll-anchoring fix)
    as the patch-loop scene; static mode renders as a normal centered scene */
-.bl-track { height: 320vh; }
+/* long track so each of the 7 stages holds ~50vh of scroll — enough to read */
+.bl-track { height: 460vh; }
 .bl-track, .bl-track * { overflow-anchor: none; }
 .bl-track-static {
   height: auto;
@@ -695,7 +714,7 @@ pre.output {
   justify-content: center;
   padding: 72px 0;
 }
-.bl-track-static .bl-sticky { position: static; min-height: 0; padding: 0; }
+.bl-track-static .bl-sticky { position: static; min-height: 0; padding-top: 0; padding-bottom: 0; }
 .bl-hint {
   margin-top: 18px;
   text-align: center;
@@ -707,15 +726,16 @@ pre.output {
 }
 @media (max-width: 900px) {
   .bl-track, .bl-track-static { height: auto; min-height: 0; padding: 88px 0; display: block; }
-  .bl-sticky { position: static; min-height: 0; padding: 0; }
+  .bl-sticky { position: static; min-height: 0; padding-top: 0; padding-bottom: 0; }
 }
 
-.bl { display: flex; gap: 10px; margin-top: 36px; width: 100%; }
+/* fixed row height: cards trade width, never height, so opening a card can
+   never make the row jump taller and settle back (the M13D.4 jank) */
+.bl { display: flex; gap: 10px; height: 276px; width: 100%; max-width: 1280px; margin: 36px auto 0; }
 .bl-card {
   position: relative;
   flex: 1;
   min-width: 0;
-  min-height: 264px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -814,7 +834,7 @@ pre.output {
 .bl-line.dim { color: var(--ink-3); }
 .bl-line.plain { color: var(--ink-2); }
 @media (max-width: 900px) {
-  .bl { flex-direction: column; gap: 8px; }
+  .bl { flex-direction: column; gap: 8px; height: auto; }
   .bl-card { min-height: 0; padding: 16px 18px; }
   .bl-card.active { flex-grow: 1; }
   .bl-title-side { writing-mode: horizontal-tb; }
@@ -835,16 +855,101 @@ pre.output {
   .bl-role { opacity: 1; margin-left: auto; }
 }
 
-/* ---- landing: defense + report scenes ---------------------------------------- */
+/* ---- landing: credibility band (the 80% trap, backed up) --------------------- */
 
-.defense-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
-  width: 100%;
-  max-width: 880px;
-  margin: 36px auto 0;
+.proof { display: flex; flex-direction: column; align-items: center; padding-bottom: 110px; }
+.proof-card { max-width: 800px; padding: 26px 30px 22px; text-align: left; }
+.proof-card .eyebrow { margin-bottom: 12px; }
+.proof-card p { color: var(--ink-2); font-size: 15px; line-height: 1.7; }
+.proof-card strong { color: var(--ink); font-weight: 600; }
+.proof-cites {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11.5px;
 }
+.proof-cites a { color: var(--ink-3); }
+.proof-cites a:hover { color: var(--accent); }
+
+/* ---- landing: gate simulation scene (scroll-driven) --------------------------- */
+
+/* same track/sticky pattern (and scroll-anchoring fix) as the patch loop */
+.gate-track { height: 340vh; }
+.gate-track, .gate-track * { overflow-anchor: none; }
+.gate-track-static { height: auto; }
+.gate-sticky {
+  position: sticky;
+  top: 0;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+.gate-track-static .gate-sticky { position: static; }
+.gate-panel { width: 100%; max-width: 780px; }
+/* reserved height so the panel never resizes as messages surface; messages
+   fill top-down so already-read messages never move */
+.gate-body {
+  min-height: 524px; /* full six-message height at the 780px panel width */
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gm { max-width: 86%; animation: gm-in 0.4s ease both; }
+.gate-track-static .gm { animation: none; }
+@keyframes gm-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.gm-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 5px;
+}
+.gm-bubble {
+  display: inline-block; /* span default is inline — borders would fragment per line */
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 11px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: left;
+}
+.gm.gate { align-self: flex-start; }
+.gm.gate .gm-label { color: var(--accent); }
+.gm.gate .gm-bubble { background: var(--surface-2); border-top-left-radius: 4px; }
+.gm.you { align-self: flex-end; text-align: right; }
+.gm.you .gm-bubble {
+  background: var(--accent-bg);
+  border-color: rgba(167, 139, 250, 0.35);
+  border-top-right-radius: 4px;
+}
+.gm.status { align-self: stretch; max-width: none; }
+.gm-status-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px dashed var(--border-strong);
+  padding-top: 14px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.gm-status-line .ok { color: var(--ok); font-weight: 600; }
+.gm-status-line .dim { color: var(--ink-3); }
+
+/* ---- landing: report scene ----------------------------------------------------- */
+
 .panel-bar {
   display: flex;
   justify-content: space-between;
@@ -891,10 +996,11 @@ pre.output {
   background: radial-gradient(ellipse 70% 55% at 50% 55%, rgba(139, 107, 250, 0.14), transparent 70%);
   pointer-events: none;
 }
-.closing h2 { font-size: clamp(34px, 5vw, 58px); line-height: 1.08; margin-bottom: 20px; }
+.closing h2 { font-size: clamp(36px, 5.2vw, 62px); line-height: 1.07; margin-bottom: 20px; }
 .closing .lead { margin: 0 auto; }
 .closing-inner { display: flex; flex-direction: column; align-items: center; }
-.landing-footer { border-top: 1px solid var(--border); padding: 22px 0 40px; text-align: center; }
+/* full-bleed bar: the border spans the viewport, the text keeps the gutter */
+.landing-footer { border-top: 1px solid var(--border); padding: 22px clamp(20px, 4vw, 52px) 40px; text-align: center; }
 
 /* ---- misc ------------------------------------------------------------------ */
 
@@ -904,7 +1010,34 @@ pre.output {
 .muted { color: var(--ink-3); font-size: 13px; }
 hr.rule { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
-.auth-box { max-width: 400px; margin: 96px auto; }
+/* ---- auth screen (login) ----------------------------------------------------- */
+
+/* fully centered, fits in one viewport — no vertical scroll on desktop, and a
+   scroll position carried over from a long page has nothing to scroll into */
+.auth-screen {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 62% 46% at 50% 42%, rgba(139, 107, 250, 0.12), transparent 70%);
+  pointer-events: none;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 30px 32px 26px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45), 0 0 50px rgba(139, 107, 250, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.auth-card input:focus { box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15); }
 
 /* ---- motion safety ---------------------------------------------------------- */
 

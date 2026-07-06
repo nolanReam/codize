@@ -147,7 +147,22 @@ export default function BuildLoopPanel() {
         const rect = el.getBoundingClientRect();
         const total = rect.height - window.innerHeight;
         const p = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
-        const next = Math.min(STAGES.length - 1, Math.floor(p * STAGES.length));
+        // stage position with hysteresis: a stage only changes once scroll
+        // clearly crosses into the next band, so micro-scrolls near a boundary
+        // never flip the active card back and forth
+        const H = 0.22; // dead zone, in stage units
+        const pos = p * STAGES.length;
+        const cur = bucketRef.current;
+        let next: number;
+        if (cur < 0) {
+          next = Math.min(STAGES.length - 1, Math.floor(pos));
+        } else if (pos >= cur + 1 + H) {
+          next = Math.min(STAGES.length - 1, Math.floor(pos - H));
+        } else if (pos < cur - H) {
+          next = Math.max(0, Math.floor(pos + H));
+        } else {
+          next = cur;
+        }
         // only re-assert on a real bucket change, so a direct click/focus
         // selection survives incidental scroll events
         if (bucketRef.current !== next) {

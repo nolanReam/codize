@@ -192,3 +192,32 @@ back to a deterministic template-backed roadmap on drift/failure, so a real
 tester is no longer blocked (no manual seeding) — see
 [[roadmap-llm-conventions]]. (2) Missing `favicon.ico` logs a benign 404 on
 every page — cosmetic, deferred.
+
+**M13D.5 (2026-07-05) landing precision fix pass conventions.** (1) **One
+type family on the landing**: `.landing { --display: var(--sans); }` makes
+every display-font usage inside the landing resolve to DM Sans (headlines are
+just bigger/bolder body type, weight 700, -0.025em) while the app interior
+keeps Space Grotesk. The user rejects headlines that read as a *different*
+typeface from body text. (2) **Full-bleed landing**: `.landing` has no
+max-width; header/footer bars span the viewport; every scene carries the
+shared gutter rule (`.landing .hero, .scene, .closing, .proof, .trap-sticky,
+.bl-sticky, .gate-sticky { padding-inline: clamp(20px, 4vw, 52px) }`). When a
+static-mode rule needs to zero a sticky panel's vertical padding, use
+`padding-top/bottom: 0`, never the `padding: 0` shorthand — it would kill the
+gutter (specificity/order traps). (3) **Build Loop anti-jank**: the card row
+is a fixed-height flex row (`.bl { height: 276px }`) so cards trade width but
+the row can never grow-then-shrink; the scroll mapping has hysteresis (dead
+zone H=0.22 stage units around boundaries, track 460vh so each stage holds
+~50vh). (4) **GateScene** simulates the defense as a scroll-revealed chat
+(labels turn_01/your_answer/follow_up/explain_implementation/defense_status/
+recorded_in_report, "simulated preview" pill, no scores/evaluator reasoning);
+the body reserves the exact full-content height (min-height) so the panel
+never resizes as messages surface. **Gotcha:** a styled bubble must not be a
+plain inline `span` — inline boxes fragment border/background per line and
+the text overflows the visual box; set `display: inline-block`. (5) **Login**
+is `.auth-screen` (min-height 100svh, flex-centered, fits one viewport so no
+scroll can carry over) + `.glass .auth-card`, plus a `window.scrollTo(0, 0)`
+on mount; auth logic untouched. (6) **80% Trap proof band** (`.proof`): the
+trap is presented as a named pattern, not a statistic, with two compact
+arXiv citations (Perry et al. 2211.03622, Fu et al. 2310.02059) — keep claims
+hedged ("research has found…can carry"), never claim proven Codize outcomes.
