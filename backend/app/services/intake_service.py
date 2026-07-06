@@ -4,7 +4,9 @@ The spec fixes the intake flow: exactly five mandatory conversational
 questions, answered sequentially, question 1 verbatim and unskippable. Answers
 are stored on the student's `projects` row (the five intake_* columns —
 docs/db/schema.md). Completion requires all five answers and triggers
-archetype classification into exactly one of the three archetypes.
+archetype classification into exactly one of the three archetypes. Until
+completion, an already-answered question may be revised (M13E.1) —
+classification always runs on the final stored answers.
 
 Classification here is the deterministic fallback: the spec's real
 classification is a temperature-0 LLM call (later milestone, via the M7
@@ -145,9 +147,12 @@ async def submit_answer(repo: ProjectRepository, user_id: str, question_number: 
     if project and project.get("intake_completed_at"):
         raise IntakeAlreadyCompletedError("Intake is already completed.")
     expected = next_question_number(project)
-    if expected is None:
-        raise IntakeSequenceError("All five intake questions are already answered.")
-    if question_number != expected:
+    # Before completion, an already-answered question may be revised (M13E.1).
+    # First-time answering stays strictly sequential — an unanswered question
+    # is only accepted when it is the expected next one, so gaps can never
+    # appear. After completion nothing is editable (checked above).
+    already_answered = bool(project and project.get(ANSWER_COLUMNS[question_number]))
+    if question_number != expected and not already_answered:
         raise IntakeSequenceError(
             f"Questions are answered in order; expected question {expected}."
         )

@@ -8,11 +8,11 @@ export default function NotReady({ title }: { title: string }) {
     <>
       <h1 className="page-title">{title}</h1>
       <div className="notice info">
-        No active roadmap yet. Finish intake and generate your roadmap first — then this surface
-        unlocks.
+        Your project isn&rsquo;t set up yet — answer the five intake questions and Codize builds
+        your roadmap. Then this page unlocks.
       </div>
       <Link href="/app/intake" className="btn primary">
-        Go to intake
+        Start with intake
       </Link>
     </>
   );

@@ -25,3 +25,12 @@ first session with `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set.
 Status transition decision: completing intake sets `intake_completed_at` +
 `archetype_id` but leaves `projects.status = 'intake'`; the roadmap milestone
 (M7) flips it to 'active' when the roadmap is generated.
+
+**M13E.1 update (2026-07-05):** `submit_answer` now allows revising an
+already-answered question until `intake_completed_at` is set (student
+back/edit). First-time answers remain strictly sequential (an unanswered
+question is only accepted when it is the expected next one — gaps are still
+impossible), completion still requires all five, and after completion nothing
+is editable. Classification runs on the final stored answers at completion,
+so pre-completion edits are always consistent. The frontend pairs this with
+an explicit "Finish intake" review step (no auto-complete after Q5).

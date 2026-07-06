@@ -89,7 +89,7 @@ input:focus-visible[type="checkbox"] {
   padding: 14px 10px 4px;
 }
 
-.sidebar a.nav-link {
+.sidebar .nav-link {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -98,8 +98,17 @@ input:focus-visible[type="checkbox"] {
   color: var(--ink-2);
   font-size: 13.5px;
 }
-.sidebar a.nav-link:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
-.sidebar a.nav-link.active { background: var(--accent-bg); color: var(--accent); }
+/* nav-link is also used on a button (the tutorial opener) */
+.sidebar button.nav-link {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--sans);
+  text-align: left;
+}
+.sidebar .nav-link:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.sidebar .nav-link.active { background: var(--accent-bg); color: var(--accent); }
 
 .sidebar .sidebar-footer {
   margin-top: auto;
@@ -110,10 +119,24 @@ input:focus-visible[type="checkbox"] {
   overflow-wrap: anywhere;
 }
 
-.main { flex: 1; padding: 32px 40px 80px; max-width: 1060px; }
+/* the main pane fills everything right of the sidebar; content is centered
+   inside it (main-inner) so wide monitors get intentional margins instead of
+   a dead right half. Text keeps readable measures via .page-sub/.guide. */
+.main { flex: 1; min-width: 0; padding: 32px clamp(20px, 3.5vw, 56px) 80px; }
+.main-inner { max-width: 1460px; margin: 0 auto; }
 
 .page-title { font-size: 22px; margin-bottom: 4px; }
 .page-sub { color: var(--ink-2); margin-bottom: 24px; max-width: 70ch; }
+
+/* two-column workspace: content column + guidance rail. The rail is where the
+   extra horizontal space goes — step guidance, examples, glossary — instead of
+   stretching paragraphs across the screen. Collapses to one column early. */
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; align-items: start; }
+.ws-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 24px; }
+@media (max-width: 1150px) {
+  .workspace { grid-template-columns: 1fr; }
+  .ws-rail { position: static; }
+}
 
 /* ---- cards & grid ------------------------------------------------------ */
 
@@ -209,6 +232,87 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); bo
 
 .checkline { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; }
 .checkline input { width: auto; accent-color: var(--accent); }
+
+/* ---- guidance rail / beginner help --------------------------------------- */
+
+/* rail card: contextual guidance (what this page is, what to do, examples) */
+.guide {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.guide h4 {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.guide p { margin: 6px 0; }
+.guide ul { margin: 6px 0; padding-left: 18px; }
+.guide li { margin: 4px 0; }
+.guide strong { color: var(--ink); font-weight: 600; }
+
+/* example chips: tap to drop a starter answer into the field, then edit it */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+button.chip {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 4px 11px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+button.chip:hover { border-color: var(--accent); color: var(--ink); }
+
+/* "what does this mean?" disclosure — native details, keyboard-friendly */
+details.help {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  margin: 10px 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+details.help summary {
+  cursor: pointer;
+  padding: 9px 14px;
+  color: var(--accent);
+  font-size: 13px;
+}
+details.help[open] summary { border-bottom: 1px solid var(--border); }
+details.help .help-body { padding: 10px 14px; }
+details.help .help-body p { margin: 6px 0; }
+details.help .help-body ul { margin: 6px 0; padding-left: 18px; }
+details.help .help-body li { margin: 4px 0; }
+
+/* tutorial ("How Codize works") step list inside the modal */
+.tutorial-steps { margin: 16px 0 8px; list-style: none; counter-reset: tut; }
+.tutorial-steps li {
+  display: flex;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 14px;
+  color: var(--ink-2);
+  counter-increment: tut;
+}
+.tutorial-steps li::before {
+  content: counter(tut, decimal-leading-zero);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+.tutorial-steps li strong { color: var(--ink); font-weight: 600; }
 
 /* ---- notices / async states -------------------------------------------- */
 
@@ -1038,6 +1142,40 @@ hr.rule { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .auth-card input:focus { box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15); }
+
+/* ---- app shell on small screens --------------------------------------------- */
+
+/* below tablet width the sidebar becomes a wrapping top bar: brand row, then
+   nav links, with account/sign-out inline — the main pane gets the full width */
+@media (max-width: 840px) {
+  .shell { flex-direction: column; }
+  .sidebar {
+    position: static;
+    height: auto;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 4px;
+    padding: 10px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar .brand { width: 100%; padding: 2px 8px 8px; }
+  .sidebar .nav-section { padding: 4px 6px 4px; }
+  .sidebar .nav-link { padding: 5px 9px; font-size: 12.5px; }
+  .sidebar button.nav-link { width: auto; }
+  .sidebar .sidebar-footer {
+    margin-top: 0;
+    margin-left: auto;
+    border-top: none;
+    padding-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .main { padding: 20px 14px 60px; }
+}
 
 /* ---- motion safety ---------------------------------------------------------- */
 

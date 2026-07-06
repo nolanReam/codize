@@ -32,13 +32,22 @@ app/
                         scroll-driven simulated gate exchange (GateScene)
   login/page.tsx        Supabase email/password sign-up + sign-in
   app/
-    layout.tsx          Protected app shell: session guard, sidebar nav,
-                        reconnection check (GET /reconnection → acknowledge)
-    page.tsx            Project Cockpit (evaluation + workflow + intake purpose)
+    layout.tsx          Protected app shell: session guard, sidebar nav (top bar
+                        on mobile), reconnection check (GET /reconnection →
+                        acknowledge), first-visit "How Codize works" tutorial
+                        (localStorage; reopenable from the sidebar Help section)
+    page.tsx            Project Cockpit — the project dashboard (evaluation +
+                        workflow + intake purpose, Continue project, guidance
+                        rail; "+ New project" is a disabled affordance —
+                        multi-project is deferred, see
+                        docs/context/multi_project_dashboard_plan.md)
     intake/page.tsx     Conversational five-question intake → roadmap generation
+                        (per-question helper text + example chips; answers are
+                        editable until the explicit "Finish intake" review step)
     phase/
       page.tsx          Phase Workflow Board (Build Loop + tasks + gate summary)
-      prompt/page.tsx   Prompt Builder (deterministic, client-side)
+      prompt/page.tsx   Prompt Builder (deterministic, client-side; beginner
+                        phase explanation + starter-ask chips via lib/phaseGuide)
       review/page.tsx   Review Board
       evidence/page.tsx Evidence Panel
       verify/page.tsx   Verification Lab
@@ -48,10 +57,12 @@ app/
                         with Markdown copy/download
   icon.svg              App favicon (served by Next as the tab icon)
 components/             Async, NotReady, SaveBar, WorkflowSteps, ReconnectionModal,
+                        Tutorial (How Codize works), GuideCard (guidance rail),
                         TrapTerminal + TiltCard + PatchLoopScene + BuildLoopPanel
                         + GateScene + Reveal (landing-only, scripted, no AI calls)
 lib/                    api client, supabase client, types, prompt builder + test,
-                        report builder + test, useWorkflowSection hook
+                        report builder + test, phase guide + test (static beginner
+                        explanations — no LLM), useWorkflowSection hook
 ```
 
 ## Backend routes consumed
@@ -85,6 +96,20 @@ npm run typecheck
 npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
+
+## Status (M13E.1)
+
+The core-app usability pass (M13E.1) made the protected app beginner-friendly:
+full-width workspace layout with a guidance rail (content + contextual help,
+no more dead right half; the sidebar becomes a top bar on mobile), a
+dismissible/reopenable first-use tutorial, intake helper text + example chips
++ **edit-until-finish** (one small tested backend change: an answered intake
+question can be revised before completion — first-answer order and the
+five-question contract unchanged), a Prompt Builder that explains the current
+phase in plain language with tap-to-use starter asks, and static
+glossary/confusion help throughout. Multiple projects were audited and
+**deferred** (`docs/context/multi_project_dashboard_plan.md`); the cockpit is
+an honest single-project dashboard.
 
 ## Status (M13C.2)
 

@@ -104,6 +104,32 @@ def test_full_intake_flow_through_routes(client):
     assert status["completed"] is True and status["archetype_id"] == 2
 
 
+def test_editing_an_answered_question_before_completion_succeeds(client):
+    answer_all_five(client)
+    resp = client.post(
+        "/intake/answers",
+        json={"question": 3, "answer": "AP CSA Java, no framework yet."},
+        headers=auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["answers"]["stack"] == "AP CSA Java, no framework yet."
+    assert body["next_question"] is None
+    assert body["completed"] is False
+
+
+def test_editing_after_completion_returns_controlled_409(client):
+    answer_all_five(client)
+    assert client.post("/intake/complete", headers=auth_headers()).status_code == 200
+    resp = client.post(
+        "/intake/answers",
+        json={"question": 3, "answer": "changing my stack"},
+        headers=auth_headers(),
+    )
+    assert resp.status_code == 409
+    assert resp.json()["error"]["message"] == "Intake is already completed."
+
+
 def test_out_of_order_answer_returns_controlled_409(client):
     resp = client.post(
         "/intake/answers",

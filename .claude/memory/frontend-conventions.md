@@ -221,3 +221,39 @@ on mount; auth logic untouched. (6) **80% Trap proof band** (`.proof`): the
 trap is presented as a named pattern, not a statistic, with two compact
 arXiv citations (Perry et al. 2211.03622, Fu et al. 2310.02059) — keep claims
 hedged ("research has found…can carry"), never claim proven Codize outcomes.
+
+**M13E.1 (2026-07-05) — core-app usability conventions.** (1) **App layout**:
+`.main` is uncapped (`flex: 1; min-width: 0`) with a centered `.main-inner`
+(max 1460px) — the old `max-width: 1060px` directly on `.main` was the cause
+of the "smushed left, dead right half" complaint (flex kept it left-aligned).
+Pages that need contextual help use `.workspace` (grid: content column +
+330px sticky `.ws-rail`, collapsing ≤1150px) — the rail is where extra width
+goes (GuideCard cards: what the page is, examples, glossary), never
+full-width paragraphs. The shell had NO mobile rules before M13E.1; ≤840px
+the sidebar is now a wrapping top bar (`.shell` column, footer inline via
+`margin-left: auto`). (2) **Tutorial**: `components/Tutorial.tsx`, 9 steps,
+auto-opens once per browser (`codize:tutorial-seen` in localStorage), sidebar
+Help section reopens it. It deliberately closes via button/Escape/backdrop —
+do NOT copy the reconnection modal's locked-dismissal pattern, which is
+spec-mandated only for reconnection; the tutorial must never trap a user.
+Render order: `{!reconnection && showTutorial && <Tutorial/>}` — the
+reconnection modal always wins. (3) **Intake edit-until-finish**: the backend
+(`intake_service.submit_answer`) accepts an already-answered question until
+`intake_completed_at` is set; first-answers stay strictly sequential so gaps
+can never appear. The frontend REMOVED the auto-`completeIntake()` after Q5 —
+completion is an explicit "Finish intake" review card, otherwise the edit
+affordance would be unreachable exactly when users want it most. Q4 edits
+re-render the option buttons, not a textarea. (4) **Chips**: `button.chip`
+fills (replaces) the target field's state — tap-to-use starters for Q3/Q5 and
+the Prompt Builder. Q1/Q2 get placeholder examples only, NOT chips: everyone
+tapping the same purpose would defeat intake. (5) **phaseGuide**:
+`lib/phaseGuide.ts` is the static beginner layer — keyword-matched on phase
+titles (order matters: `integration` before `frontend`, `llm integration`
+before both; `persistence|history` after `conversation ui`), covers all 21
+template titles (unit-tested against the list) with a generic fallback for
+personalized drift. No LLM anywhere; a future AI confusion assistant is a
+separate spec-guardian-gated milestone. (6) **Multi-project is deferred**:
+`get_project` is newest-row-wins, so a second `projects` row would silently
+orphan the first (no error!) — never ship a working "+ New project" until
+`docs/context/multi_project_dashboard_plan.md` is implemented; the disabled
+affordance + honest rail note is the M13E.1 ceiling.

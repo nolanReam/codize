@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import Async from "@/components/Async";
 import WorkflowSteps from "@/components/WorkflowSteps";
 import { ApiError, getCurrentPhase, getPhases, getWorkflow, setTaskCompletion } from "@/lib/api";
+import { phaseGuide } from "@/lib/phaseGuide";
 import type { PhaseList, PhaseView, TaskEntry, WorkflowSections } from "@/lib/types";
 
 // The Phase Workspace, framed around the Build Loop — the tasks are the
@@ -56,10 +57,11 @@ export default function PhaseBoardPage() {
       <>
         <h1 className="page-title">Phase Workspace</h1>
         <div className="notice info">
-          No active roadmap yet. Finish intake and generate your roadmap first.
+          Your project isn&rsquo;t set up yet — answer the five intake questions and Codize builds
+          your roadmap.
         </div>
         <Link href="/app/intake" className="btn primary">
-          Go to intake
+          Start with intake
         </Link>
       </>
     );
@@ -74,7 +76,17 @@ export default function PhaseBoardPage() {
               <h1 className="page-title">
                 Phase {phase.phase}: {phase.phase_title}
               </h1>
-              <p className="page-sub">{phase.core_concept}</p>
+              <p className="page-sub" style={{ marginBottom: 10 }}>{phase.core_concept}</p>
+              <details className="help" style={{ maxWidth: 640 }}>
+                <summary>What does this phase mean in plain words?</summary>
+                <div className="help-body">
+                  <p>{phaseGuide(phase.phase_title).meaning}</p>
+                  <p>
+                    The Prompt Builder has tap-to-use starter asks for exactly this phase — you
+                    don&rsquo;t need to figure out what to ask AI on your own.
+                  </p>
+                </div>
+              </details>
             </div>
             <span className="pill accent">
               {phase.completed_task_count}/{phase.total_task_count} tasks

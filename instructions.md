@@ -1,343 +1,374 @@
-# Codize M13D.5 — Landing Page Precision Fix Pass
+# Codize M13E.1 — Core App Usability + Beginner Guidance Pass
 
-Fix the issues found in the M13D.4 visual review.
+Fix the first-user experience inside the Codize app.
 
-This is a focused frontend design/UX polish milestone.
+This is a protected-app usability, onboarding, intake, and prompt-builder clarity milestone.
 
 Do not start M14.
 
-Do not change backend behavior.
+Do not redesign the landing page.
 
-Do not modify gate evaluator logic.
+Do not change gate evaluator logic.
 
 Do not make the gate evidence-aware.
 
-Do not create migrations.
+Do not create migrations unless a small safe migration is absolutely required, and explain first.
 
 Do not add analytics.
 
-Do not add product features.
+Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, hosted coding runtime, or gamification.
 
-Do not redesign protected app screens except the login page visual/layout fixes explicitly listed below.
-
-Do not replace the landing page from scratch.
+Do not implement full multiple-project support in this milestone unless the backend already safely supports it end-to-end.
 
 ## Current State
 
-M13D.4 was completed at commit:
+Recent commits:
 
-- `833e48b76890cce9c58f1f94ef54b00e96631659`
+- M13D.4 landing page scroll fix: `833e48b76890cce9c58f1f94ef54b00e96631659`
+- M13D.5 landing page precision fix: `0dc6b34ddc9399470bab858a7db53f9e5865d8ab`
 
-M13D.4 completed:
+The landing page is now improved enough to pause visual polish.
 
-- Garamond removed
-- centered landing scenes
-- scroll-driven Build Loop
-- shorter Build Loop cards
-- premium hero TiltCard
-- CSS-simulated glass
-- sign-in-card reference used as inspiration only
-- no liquid-glass-js
-- no React Three Fiber
-- no backend changes
+The next problem is inside the app:
 
-The page is closer, but the user found several concrete issues that need fixing.
+- the post-login app feels smushed
+- there is unused space on the right
+- new users feel overwhelmed
+- intake questions are confusing
+- prompt builder assumes the user already knows what to ask AI
+- phase language feels too technical
+- user needs examples and guidance
+- user wants a dashboard/projects experience
+- user may eventually need a way to ask Codize what they are confused about
 
 ## User Feedback To Address
 
-Fix these exact issues:
+Fix these concrete issues:
 
-1. Bigger headline text still feels like a different font from body text.
-2. The hero headline should be larger.
-3. Header and footer appear to stop after a certain width; the user wants them to extend across the full screen.
-4. The whole screen should feel used, not boxed into a narrow layout.
-5. The terminal text inside the hero should be left-aligned like a real terminal.
-6. The terminal window itself should remain centered.
-7. The scroll-expanding Build Loop works but feels clunky.
-8. When a new Build Loop box opens, the other boxes briefly increase in height and then shrink back down; fix that janky height behavior.
-9. A Build Loop box should stay open longer while scrolling so users have time to read it.
-10. The Gate section is confusing because it shows two boxes without enough clear flow.
-11. The Gate section should simulate the user answering gate questions through a scroll animation.
-12. The “80% Trap” concept needs more proof/context for skeptical users.
-13. When clicking sign in from far down the landing page, the login page opens scrolled down.
-14. The login page should not be scrollable and should be completely centered on screen.
+1. After logging in, the app leaves a chunk of unused space on the right; use the full screen better.
+2. The protected app feels smushed.
+3. The user wants a dashboard where they can view current projects.
+4. The user wants a plus button to create a project, then go through intake for that project.
+5. The user may want multiple projects, but this needs an architecture audit before full implementation.
+6. The user wants a way to ask about things they are confused on.
+7. Intake asks about frameworks, but the user only knows AP CSA Java and some Python and does not understand whether “framework” means language, stack, library, etc.
+8. The deadline question is unclear: does it mean MVP deadline, feature deadline, first working version, final product?
+9. Intake questions should allow going back and editing before completion if technically safe.
+10. Text boxes should show response examples.
+11. The app needs a tutorial because the workflow feels overwhelming.
+12. Prompt Builder currently assumes the user knows what to tell AI to do.
+13. Prompt Builder should explain the current phase in beginner-friendly language.
+14. Prompt Builder should give examples/starter suggestions for what to ask AI.
+15. Prompt Builder should not just say “Building for Phase 1: API Design & Resource Modeling” without explaining what that means.
 
 ## Goal
 
-Make the landing page feel smoother, clearer, more premium, and less confusing.
+Make Codize feel usable for a student builder who is not already comfortable with professional engineering terminology.
 
-This is not a new concept pass.
+The app should teach the workflow while the user uses it.
 
-This is a precision fix pass.
+The user should always understand:
 
-Prioritize:
+- what page they are on
+- what they are supposed to do next
+- why the step matters
+- what a good answer looks like
+- what to write if they are unsure
+- how this helps them use AI better
 
-- typography consistency
-- full-width header/footer
-- better hero scale
-- real terminal alignment
-- smoother scroll timing
-- clearer Gate story
-- evidence-backed credibility
-- centered non-scroll login page
+The user should not feel like they would rather just code without Codize.
 
-## Typography Fix
+## Read First
 
-The user does not like the big headline font because it still feels different from the body text.
+Read:
 
-Make large text and body text feel like the same type system.
+- `CLAUDE.md`
+- `.claude/memory/frontend-conventions.md`
+- `.claude/memory/product-vision-v3.md`
+- `.claude/memory/workflow-artifact-conventions.md`
+- frontend app shell/layout files
+- frontend dashboard/cockpit files
+- frontend intake files
+- frontend prompt builder files
+- frontend phase/workflow files
+- backend project/intake/roadmap route contracts
+- backend schemas only if needed
 
-Do not use Garamond, Cormorant, Fraunces, or any fancy editorial serif.
+Do not read `conversations.json` unless genuinely needed.
 
-Use the closest safe TeoriaMF-like direction already available in the app.
+## First Actions
 
-If the project currently uses Space Grotesk / DM Sans / IBM Plex Mono, choose the best cohesive combination, but make the big titles feel closer to the body/UI type.
+Inspect current state:
 
-Important:
+```bash
+git status
+git log --oneline -8
+```
 
-- title text should not feel like a different font family from body text
-- headings can still be larger/bolder, but not stylistically separate
-- preserve mono only for terminal/code/system labels
-- do not add unlicensed font files
-- do not download proprietary font files
-- do not use random free font websites
+Then inspect the protected app layout and current routes:
 
-## Hero Fixes
+- `/app`
+- `/app/intake`
+- `/app/phase`
+- `/app/phase/prompt`
+- `/app/phase/review`
+- `/app/phase/evidence`
+- `/app/phase/verify`
+- `/app/gate`
+- `/app/report`
 
-Improve the hero scene.
+Identify the layout cause of the unused right-side space.
 
-Requirements:
+## Task 1 — App Layout / Full-Screen Usage
 
-- make the hero headline larger
-- keep it centered
-- keep the terminal window centered
-- make terminal text inside the terminal left-aligned
-- terminal should feel like a real terminal/dev panel
-- maintain the premium glass/tilt behavior
-- maintain reduced-motion safety
-- do not make the terminal text centered
-- do not make the hero cramped on mobile
-
-The hero should clearly communicate:
-
-> AI built your first 80%. Now you’re stuck fixing the rest.
-
-## Header / Footer Width Fix
-
-The header and footer currently appear to stop after a certain width.
-
-Fix them so the header and footer visually extend across the whole screen.
+Fix the protected app layout so it uses the whole screen better.
 
 Requirements:
 
-- full-bleed visual background/border/glass treatment
-- content may still have a readable max-width inside, but the bar/background should span the viewport
-- no awkward boxed/stopped appearance
-- footer should feel like it belongs to the full page width
+- avoid the “smushed left with empty right side” feeling
+- use responsive full-width layout
+- keep readable max-widths for text, but use extra horizontal space for useful panels
+- add or improve right-side/context panels where helpful
 - no horizontal overflow
+- desktop should feel like a cockpit/workspace, not a narrow form
+- mobile should remain usable
 
-Do not make the header huge.
+Good use of extra space:
 
-Do not make the footer cluttered.
+- current step guidance
+- “what this means” panel
+- next action panel
+- project summary
+- examples
+- help/glossary cards
 
-## Build Loop Scroll Smoothness Fix
+Do not just stretch paragraphs across the full width.
 
-The Build Loop currently works, but feels clunky.
+Use the extra space intentionally.
 
-Fix the scroll-driven expanding boxes.
+## Task 2 — Dashboard / Projects Audit
 
-Requirements:
+The user wants multiple projects and a dashboard with a plus button.
 
-- scroll remains the primary activation mechanism
-- active stage changes smoothly as the user scrolls
-- when a box opens, the whole row/section should not jump taller and then shrink
-- lock or stabilize the card container height so expansion does not create layout jank
-- make cards shorter if needed
-- match content to card height
-- active card should remain active for a longer scroll range
-- add hysteresis/dead-zone/leeway so micro-scrolling does not immediately snap to the next card
-- users should have enough time to read the active card while continuing to scroll
-- hover/focus/click may remain secondary, but should not fight scroll state
-- keyboard and mobile must remain usable
-- reduced-motion must remain usable
+Before implementing, audit the current backend/frontend assumptions.
 
-Possible implementation ideas:
+Answer in docs or memory:
 
-- divide the scroll track into wider stage bands
-- use a sticky panel with fixed-height card container
-- compute active stage with progress thresholds that have more spacing
-- keep active card open until scroll passes the next clear threshold
-- avoid measuring dynamic card height during animation
-- avoid content entering/exiting in a way that changes parent height
+- Does the backend currently support multiple projects per user?
+- Does it support multiple active projects?
+- Do routes assume “current project” instead of project id?
+- Do workflow artifacts, gate sessions, evaluation, unlocks, and reconnection assume one current project?
+- What would break if multiple active projects were added?
+- What is the safest implementation plan?
 
-The Build Loop should feel like a smooth scroll story, not a jittery accordion.
+If full multiple-project support is not already safe, do not implement it now.
 
-## Gate Section Fix
+Instead, implement a safer dashboard improvement:
 
-The Gate section is confusing.
+- `/app` should feel like a dashboard
+- show the current project clearly
+- show “Continue project”
+- show “Start first project” if no project exists
+- show a disabled or clearly marked “New project” / “Multiple projects coming next” affordance only if useful
+- do not create fake multi-project behavior
 
-Make it tell a simple user flow through scroll animation.
+If the backend already supports project listing and multiple active projects safely, implement minimal dashboard support only after confirming route contracts.
 
-The goal is that a visitor instantly understands:
+Do not create a fragile partial multi-project system.
 
-1. User answers a gate question.
-2. Codize asks a deeper follow-up.
-3. User explains implementation.
-4. Codize returns a defense status.
-5. The report records the result.
+## Task 3 — First-Use Tutorial
 
-Possible visual:
+Add a lightweight tutorial or “How Codize works” guide inside the app.
 
-- one centered gate simulation panel
-- scroll reveals turn 1, turn 2, turn 3, evaluation
-- chat/terminal hybrid
-- user answer cards slide in
-- gate question cards appear one at a time
-- final state: `DEFENSE STATUS: READY / NEEDS REVIEW`
-- small report preview updates beside or below it
+It should explain:
 
-Avoid the current “two boxes with unclear meaning” feel.
-
-Do not expose hidden scores.
-
-Do not show evaluator reasoning.
-
-Do not imply the landing page is running a real gate.
-
-This is a simulated visual explanation only.
-
-Use labels like:
-
-- `turn_01`
-- `follow_up`
-- `explain_implementation`
-- `defense_status`
-- `recorded_in_report`
-
-Make the section centered and easy to understand.
-
-## 80% Trap Proof / Credibility Fix
-
-The “80% Trap” is a product metaphor, not a literal statistic.
-
-Do not present “80%” as a verified numerical research claim.
-
-Add a concise credibility layer explaining the real problem:
-
-- AI coding tools can generate code quickly.
-- Generated code may still be insecure, incorrect, or hard to maintain.
-- Users can become overconfident in AI-assisted code.
-- The missing step is review, verification, and explanation.
-
-Add either:
-
-- a short proof paragraph
-- a small “Why this matters” section
-- a small footnote-style citation row
-- or a compact evidence card
-
-Keep it concise.
-
-Do not overwhelm the landing page.
-
-Do not add a huge academic block.
-
-Use these evidence sources or equivalent reputable sources already known to the repo/docs if available:
-
-1. “Do Users Write More Insecure Code with AI Assistants?” by Perry et al. / Stanford-affiliated security study.
-2. “Security Weaknesses of Copilot-Generated Code in GitHub Projects: An Empirical Study.”
-3. Optional: recent developer survey or platform report about AI code review/verification bottlenecks, but only if sourced clearly.
-
-User-facing copy can say something like:
-
-> “The 80% Trap is Codize’s name for a real pattern: AI can accelerate code generation, but research has found that AI-assisted code can still introduce security issues and overconfidence. Codize focuses on the missing workflow after generation: review, verify, explain.”
-
-If adding citations, use compact parenthetical or footnote-style links.
-
-Do not overclaim.
-
-Do not say Codize has proven learning outcomes yet.
-
-## Login Page Scroll Fix
-
-When the user clicks Sign In from far down the landing page, the login page opens scrolled down.
-
-Fix this.
+1. Start with a project idea.
+2. Codize turns it into phases.
+3. For each phase, use Prompt Builder before asking AI.
+4. After AI helps, return to Codize.
+5. Review what AI changed.
+6. Submit evidence.
+7. Verify behavior.
+8. Defend what you built.
+9. Export the Project Defense Report.
 
 Requirements:
 
-- `/login` should reset to the top on navigation
-- login page should be completely centered on screen
-- login page should not be vertically scrollable under normal desktop conditions
-- use `min-height: 100svh` or equivalent
-- ensure body/page scroll state does not carry over visually
-- preserve existing Supabase auth behavior
-- do not add fake Google sign-in
-- do not add fake forgot-password flows
-- do not replace auth logic with demo state
+- non-overwhelming
+- dismissible
+- accessible from dashboard and/or app shell
+- not a huge wall of text
+- can be localStorage-based if backend persistence is unnecessary
+- should not block returning users forever
+- should be easy to reopen
 
-It is acceptable to apply the same premium glass/card style to the real login page if it preserves all auth behavior.
+Use beginner-friendly language.
 
-## Sign-In Reference Boundary
+## Task 4 — Intake Clarity
 
-The provided sign-in card reference is a visual/interaction reference only.
+Improve intake questions so a student understands how to answer.
 
-Use inspiration from:
+Requirements:
 
-- centered full-screen login composition
-- glass card
-- subtle glow
-- edge light
-- premium input focus behavior
-- tilt/glass behavior if safe
+- add response examples/placeholders for each question
+- add short helper text under confusing questions
+- allow going back/editing previous answers before final completion if technically safe
+- preserve backend contract and existing intake flow
+- do not lose user input
+- do not create invalid backend state
 
-Do not copy:
+Specific clarifications:
 
-- fake Google sign-in
-- fake forgot-password
-- “StyleMe” copy
-- demo loading state that replaces real auth
-- unrelated icons or logo
-- unsupported auth methods
+### Frameworks / stack question
+
+Explain that a “framework/stack” can mean:
+
+- coding language: Java, Python, JavaScript
+- framework/library: FastAPI, Flask, React, Next.js
+- database/tool: Supabase, SQLite
+- or “I’m not sure yet”
+
+Examples:
+
+- “AP CSA Java, no framework yet”
+- “Python, maybe Flask or FastAPI”
+- “Next.js + Supabase”
+- “I only know basic Python and Java right now”
+
+The user should not feel dumb for not knowing a framework.
+
+### Deadline question
+
+Clarify that this means:
+
+> When do you want a first working version/demo, not the final polished product?
+
+Examples:
+
+- “tonight”
+- “this weekend”
+- “in 2 weeks”
+- “before my hackathon demo”
+- “no deadline, just learning”
+
+If the backend expects a rough deadline, keep it rough.
+
+## Task 5 — Prompt Builder Beginner Guidance
+
+The Prompt Builder needs to teach the user what to ask AI.
+
+Right now, “Building for Phase 1: API Design & Resource Modeling” is too abstract.
+
+Improve Prompt Builder with:
+
+- beginner-friendly phase explanation
+- “What this phase means” panel
+- “What you might ask AI to do” examples
+- starter task suggestions
+- example filled-in values
+- guidance for users who are unsure
+- clearer labels
+
+For example, for a phase like API Design & Resource Modeling, explain:
+
+> This phase is about deciding what data your app stores and what routes/actions the app needs before you ask AI to write random files.
+
+Give examples like:
+
+- “Help me design the data model for tasks, members, and study groups.”
+- “Suggest database tables and explain what each field means.”
+- “List the API routes I need before writing code.”
+- “Ask me questions if the schema is missing ownership or permissions.”
+- “Do not change my auth setup yet.”
+
+Make fields less intimidating.
+
+For each Prompt Builder field, add:
+
+- a plain-English explanation
+- an example placeholder
+- optional starter chips/buttons where useful
+
+Fields to improve:
+
+- What are you building overall?
+- What is this phase about?
+- What exactly should the AI do?
+- Files/components involved
+- Constraints
+- What must the AI not change?
+- What are you least sure about?
+- Ask for a plan before code
+- Ask for manual verification steps
+
+The prompt builder should help the user produce a better prompt even if they do not know what to ask yet.
+
+## Task 6 — Confusion Help
+
+Add a lightweight “I’m confused” / “What does this mean?” help pattern.
+
+This should be static/contextual for now, not a full AI chatbot unless the repo already has a safe pattern.
+
+Examples:
+
+- help drawer
+- tooltip
+- inline glossary
+- side panel
+- “Not sure what to write?” examples
+- “Use this if you only know Python/Java” helper
+
+Do not add a new LLM chat assistant in this milestone unless it is already supported safely and explicitly trivial.
+
+If an AI confusion assistant is desirable, create a short implementation plan for a future milestone.
+
+The immediate goal is to reduce confusion now with static guidance.
+
+## Task 7 — Copy Tone
+
+Use supportive language.
+
+Avoid making users feel behind.
+
+Good tone:
+
+- “Not sure yet is a valid answer.”
+- “Use the tools you know.”
+- “Codize will help you turn this into a clearer AI prompt.”
+- “A first working version means something you can demo, not a perfect final product.”
+
+Avoid:
+
+- expert-only jargon
+- unexplained acronyms
+- “obviously”
+- “simply”
+- making students feel like they should already know professional engineering terms
 
 ## Scope Boundary
 
-This milestone may modify:
+Allowed changes:
 
-- public landing page
-- landing-specific components
-- landing/global CSS
-- font setup
-- login page layout/styling
-- tiny shared visual utilities if needed
+- protected app layout
+- dashboard/cockpit UI
+- intake UI
+- prompt builder UI
+- static help/glossary components
+- tutorial/onboarding UI
+- small frontend utilities
+- small backend changes only if required for safe intake edit/back behavior and covered by tests
+- docs/memory updates
 
 Do not modify:
 
-- backend
-- auth logic
-- intake flow
-- gate logic
-- report logic
-- workflow artifact logic
-- database
-- protected app functionality
-
-## Accessibility / Performance Requirements
-
-Must support:
-
-- mobile layout
-- keyboard navigation
-- visible focus states
-- good contrast
-- no raw HTML rendering
-- no horizontal overflow
-- no scroll-jacking
-- reduced-motion support
-- no unusable hover-only interactions
-- smooth scroll-driven Build Loop without layout jank
-
-Animations should enhance the story, not block usage.
+- gate evaluator logic
+- gate scoring
+- unlock thresholds
+- workflow artifact validation
+- roadmap generation logic
+- database schema unless absolutely necessary
+- landing page except shared style regressions
+- real auth behavior
 
 ## Testing / Verification
 
@@ -351,31 +382,29 @@ npm test
 npm run build
 ```
 
-If backend files change accidentally, stop and explain.
+If backend code changes, run:
 
-Run a local visual smoke:
+```bash
+cd backend
+pytest
+```
 
-1. landing page loads
-2. hero headline is larger
-3. big text and body text use cohesive font direction
-4. header spans full viewport visually
-5. footer spans full viewport visually
-6. terminal window is centered
-7. terminal text is left-aligned
-8. Build Loop active stage changes smoothly on scroll
-9. Build Loop boxes do not height-jump when active card changes
-10. active Build Loop card stays open long enough while scrolling
-11. Gate section explains answer flow clearly
-12. 80% Trap proof/context appears without overclaiming
-13. CTA routes to `/login`
-14. `/login` opens centered and not scrolled down
-15. login page is not scrollable under normal desktop viewport
-16. mobile layout has no horizontal overflow
-17. keyboard focus is visible
-18. reduced-motion mode is safe
-19. no obvious console errors
+Run a local visual/product smoke:
 
-If login page styling changed, verify existing auth behavior is preserved at least visually and structurally.
+1. login
+2. dashboard uses screen width better
+3. if no project, user understands how to start
+4. tutorial/help is visible and dismissible
+5. intake examples/helper text appear
+6. intake can go back/edit if implemented
+7. framework/stack question is understandable
+8. deadline question is understandable
+9. prompt builder explains the current phase
+10. prompt builder gives example/starter guidance
+11. prompt builder still saves/loads correctly
+12. app has no horizontal overflow
+13. mobile layout remains usable
+14. no obvious console errors
 
 Run a secret scan before commit.
 
@@ -386,36 +415,40 @@ Do not claim tests passed unless they actually ran.
 Update if needed:
 
 - `frontend/README.md`
-- `.claude/memory/frontend-conventions.md`
 - `CLAUDE.md`
+- `.claude/memory/frontend-conventions.md`
+- `docs/pilot/demo_checklist.md` only if user-facing pilot flow changed
 
-Only update docs if new landing-page conventions, font decisions, scroll behavior, citation/proof copy, or login-page behavior should be remembered.
+If multiple projects are deferred, create or update:
 
-Do not rewrite product vision docs.
+- `docs/context/multi_project_dashboard_plan.md`
+
+The multi-project plan should be concrete and honest about route/backend assumptions.
+
+Do not rewrite the product vision docs.
 
 ## End Requirements
 
 At the end, output:
 
 - user feedback addressed
-- design fixes implemented
+- layout/full-screen fixes
+- dashboard/project handling changes
+- whether multiple projects were implemented or deferred, and why
+- tutorial/help added
+- intake clarity fixes
+- whether back/edit was implemented
+- prompt builder guidance fixes
+- confusion-help behavior
 - files changed
-- dependencies added/removed
-- font changes
-- login page changes
-- how Build Loop smoothness was fixed
-- how Gate section flow was clarified
-- how 80% Trap proof/context was added
-- whether citations were added and where
-- accessibility/performance notes
-- commands run
-- test/build results
-- visual smoke result
+- backend changes, if any
+- tests/commands run
+- visual/product smoke result
 - secret scan result
 - known issues
 - git commit hash
-- next step: local visual review, then first pilot tester
+- next step: local product review, then first pilot tester or multi-project milestone
 
-Commit completed landing page precision fix pass.
+Commit completed M13E.1 changes.
 
 Stop after commit.

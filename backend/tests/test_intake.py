@@ -110,11 +110,41 @@ def test_questions_out_of_order_are_rejected():
         run(submit_answer(repo, USER, 4, "skipping ahead"))
 
 
-def test_reanswering_an_answered_question_is_rejected():
+def test_reanswering_before_completion_updates_the_answer():
     repo = InMemoryProjectRepository()
     run(submit_answer(repo, USER, 1, FIVE_ANSWERS[1]))
+    run(submit_answer(repo, USER, 2, FIVE_ANSWERS[2]))
+    status = run(submit_answer(repo, USER, 1, "Actually: help my team split chores fairly."))
+    # An edit never advances or rewinds the sequence.
+    assert status["answered_questions"] == [1, 2]
+    assert status["next_question"] == 3
+    assert status["answers"]["purpose"] == "Actually: help my team split chores fairly."
+    assert status["answers"]["scope"] == FIVE_ANSWERS[2]
+
+
+def test_editing_never_allows_skipping_ahead():
+    repo = InMemoryProjectRepository()
+    run(submit_answer(repo, USER, 1, FIVE_ANSWERS[1]))
+    # Question 3 is unanswered — editing rules don't open it early.
     with pytest.raises(IntakeSequenceError, match="expected question 2"):
-        run(submit_answer(repo, USER, 1, "changed my mind"))
+        run(submit_answer(repo, USER, 3, "skipping ahead"))
+
+
+def test_all_five_answered_can_still_be_edited_until_completion():
+    repo = InMemoryProjectRepository()
+    answer_all_five(repo)
+    status = run(submit_answer(repo, USER, 5, "Before my hackathon demo in March."))
+    assert status["answered_questions"] == [1, 2, 3, 4, 5]
+    assert status["next_question"] is None
+    assert status["completed"] is False
+    assert status["answers"]["timeline"] == "Before my hackathon demo in March."
+
+
+def test_completion_classifies_from_edited_answers():
+    repo = InMemoryProjectRepository()
+    answer_all_five(repo)  # neutral answers → no LLM-core terms
+    run(submit_answer(repo, USER, 2, "A chatbot that calls an LLM to answer questions."))
+    assert run(complete_intake(repo, USER))["archetype_id"] == 1
 
 
 def test_answers_are_normalized_and_purpose_required():

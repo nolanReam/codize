@@ -50,17 +50,22 @@ Walk the whole loop to confirm it's live end-to-end:
 
 1. [ ] Landing page loads.
 2. [ ] Sign in with the test user.
-3. [ ] Intake: answer all five questions (Q1 first, unskippable).
-4. [ ] Roadmap generates → project goes **active** (personalized **or** fallback
+3. [ ] First login shows the "How Codize works" tutorial — dismiss it (it
+       won't reappear; reopen anytime from the sidebar's Help section).
+4. [ ] Intake: answer all five questions (Q1 first, unskippable). Helper text,
+       example placeholders, and tap-to-use chips appear under Q3/Q5; any
+       answer can be **edited until Finish** — completion is an explicit
+       "Finish intake" review step now, not automatic after Q5.
+5. [ ] Roadmap generates → project goes **active** (personalized **or** fallback
        roadmap — both fine).
-5. [ ] Cockpit + phase board render.
-6. [ ] Save one Build Loop artifact (e.g. Prompt Builder), reload the page, and
+6. [ ] Cockpit + phase board render.
+7. [ ] Save one Build Loop artifact (e.g. Prompt Builder), reload the page, and
        confirm it **loads back** (save *and* load work).
-7. [ ] Project Defense: anchor → 3 turns → evaluate returns a verdict.
-8. [ ] Report page assembles; Markdown copy/download works.
-9. [ ] Exported Markdown is clean — **no score, no evaluator reasoning, no keys/
+8. [ ] Project Defense: anchor → 3 turns → evaluate returns a verdict.
+9. [ ] Report page assembles; Markdown copy/download works.
+10. [ ] Exported Markdown is clean — **no score, no evaluator reasoning, no keys/
        JWT, no service-role value** in the text.
-10. [ ] Log out.
+11. [ ] Log out.
 
 If any step fails, fix or note it **before** running testers — don't debug live in
 front of a tester.

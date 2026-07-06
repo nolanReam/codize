@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import ReconnectionModal from "@/components/ReconnectionModal";
+import Tutorial, { TUTORIAL_SEEN_KEY } from "@/components/Tutorial";
 import { acknowledgeReconnection, getReconnection } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
 import type { ReconnectionSummary } from "@/lib/types";
@@ -33,6 +34,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [reconnection, setReconnection] = useState<ReconnectionSummary | null>(null);
   const [ackBusy, setAckBusy] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +48,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       }
       setEmail(data.session.user.email ?? null);
       setReady(true);
+
+      // First visit ever on this browser: open the "How Codize works" guide.
+      // Dismissing stamps localStorage, so returning users are never blocked;
+      // the sidebar button reopens it on demand.
+      if (!localStorage.getItem(TUTORIAL_SEEN_KEY)) setShowTutorial(true);
 
       if (!sessionStorage.getItem(RECONNECT_FLAG)) {
         try {
@@ -73,6 +80,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
+  const closeTutorial = useCallback(() => {
+    localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
+    setShowTutorial(false);
+  }, []);
+
   const keepBuilding = useCallback(async () => {
     setAckBusy(true);
     try {
@@ -99,6 +111,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {reconnection && (
         <ReconnectionModal summary={reconnection} busy={ackBusy} onKeepBuilding={keepBuilding} />
       )}
+      {/* the reconnection modal always wins; the tutorial waits its turn */}
+      {!reconnection && showTutorial && <Tutorial onClose={closeTutorial} />}
       <aside className="sidebar">
         <div className="brand">
           CODIZE<span>_</span>
@@ -135,6 +149,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {item.label}
           </Link>
         ))}
+        <div className="nav-section">Help</div>
+        <button className="nav-link" onClick={() => setShowTutorial(true)}>
+          How Codize works
+        </button>
         <div className="sidebar-footer">
           <div style={{ marginBottom: 8 }}>{email}</div>
           <button className="btn small" onClick={signOut}>
@@ -142,7 +160,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </aside>
-      <main className="main">{children}</main>
+      <main className="main">
+        <div className="main-inner">{children}</div>
+      </main>
     </div>
   );
 }
