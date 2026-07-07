@@ -67,6 +67,10 @@ export default function PhaseBoardPage() {
     );
   }
 
+  const capturedCount = sections
+    ? Object.values(sections).filter((s) => s != null).length
+    : 0;
+
   return (
     <Async loading={loading} error={error} onRetry={load}>
       {phase && (
@@ -88,96 +92,136 @@ export default function PhaseBoardPage() {
                 </div>
               </details>
             </div>
-            <span className="pill accent">
-              {phase.completed_task_count}/{phase.total_task_count} tasks
-            </span>
+            <div className="row">
+              <span className="pill accent">
+                Build tasks: {phase.completed_task_count}/{phase.total_task_count}
+              </span>
+              <span className={`pill ${capturedCount === 4 ? "ok" : ""}`}>
+                Workflow: {capturedCount}/4 captured
+              </span>
+            </div>
           </div>
 
-          <div className="card">
-            <h3>The Build Loop — how to work this phase</h3>
-            <WorkflowSteps sections={sections} />
-            <p className="muted">
-              Plan and prompt in Codize, generate in your AI tool, then come back to review what
-              changed, capture evidence, verify behavior, and defend it at the gate.
-            </p>
-          </div>
+          <div className="workspace">
+            <div>
+              <div className="card">
+                <h3>The Build Loop — how to work this phase</h3>
+                <WorkflowSteps sections={sections} />
+                <p className="muted">
+                  Plan and prompt in Codize, generate in your AI tool, then come back to review
+                  what changed, capture evidence, verify behavior, and defend it at the gate.
+                </p>
+              </div>
 
-          <div className="card-grid" style={{ marginTop: 14 }}>
-            <div className="card">
-              <h3>AI-appropriate tasks</h3>
-              <p className="muted" style={{ marginBottom: 8 }}>
-                Fine to delegate — but review what comes back (that&rsquo;s the Review step).
+              <div className="card-grid" style={{ marginTop: 14 }}>
+                <div className="card">
+                  <h3>AI-appropriate tasks</h3>
+                  <p className="muted" style={{ marginBottom: 8 }}>
+                    Fine to delegate — but review what comes back (that&rsquo;s the Review step).
+                  </p>
+                  {phase.ai_appropriate_tasks.map((t) => (
+                    <label className="task" key={t.task_id}>
+                      <input
+                        type="checkbox"
+                        checked={t.completed}
+                        onChange={() => toggleTask(t)}
+                      />
+                      <span className={t.completed ? "done" : ""}>
+                        <span className="tag">AI</span>
+                        {t.description}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <div className="card">
+                  <h3>Human-required tasks</h3>
+                  <p className="muted" style={{ marginBottom: 8 }}>
+                    These are yours. Delegating them is how the 80% Trap starts.
+                  </p>
+                  {phase.human_required_tasks.map((t) => (
+                    <label className="task" key={t.task_id}>
+                      <input
+                        type="checkbox"
+                        checked={t.completed}
+                        onChange={() => toggleTask(t)}
+                      />
+                      <span className={t.completed ? "done" : ""}>
+                        <span className="tag">YOU</span>
+                        {t.description}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {taskError && <div className="notice error">{taskError}</div>}
+              <p className="muted" style={{ marginTop: 8 }}>
+                <strong>Tick build tasks yourself</strong> as you finish them — they&rsquo;re your
+                to-do list from the roadmap. Saving a prompt, review, evidence, or verification is
+                tracked separately (the &ldquo;Workflow&rdquo; count above) and never ticks a build
+                task. Neither one advances the phase — only passing the gate does.
               </p>
-              {phase.ai_appropriate_tasks.map((t) => (
-                <label className="task" key={t.task_id}>
-                  <input type="checkbox" checked={t.completed} onChange={() => toggleTask(t)} />
-                  <span className={t.completed ? "done" : ""}>
-                    <span className="tag">AI</span>
-                    {t.description}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="card">
-              <h3>Human-required tasks</h3>
-              <p className="muted" style={{ marginBottom: 8 }}>
-                These are yours. Delegating them is how the 80% Trap starts.
-              </p>
-              {phase.human_required_tasks.map((t) => (
-                <label className="task" key={t.task_id}>
-                  <input type="checkbox" checked={t.completed} onChange={() => toggleTask(t)} />
-                  <span className={t.completed ? "done" : ""}>
-                    <span className="tag">YOU</span>
-                    {t.description}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-          {taskError && <div className="notice error">{taskError}</div>}
-          <p className="muted" style={{ marginTop: 8 }}>
-            Ticking tasks never advances the phase — only passing the Interrogation Gate does.
-          </p>
 
-          <div className="card" style={{ marginTop: 14 }}>
-            <h3>This phase&rsquo;s gate</h3>
-            <div className="kv">
-              <span className="k">You&rsquo;ll defend</span>
-              <span>{phase.explanation_gate_targets.join(" · ")}</span>
+              <div className="card" style={{ marginTop: 14 }}>
+                <h3>This phase&rsquo;s gate</h3>
+                <div className="kv">
+                  <span className="k">You&rsquo;ll defend</span>
+                  <span>{phase.explanation_gate_targets.join(" · ")}</span>
+                </div>
+                <div className="kv">
+                  <span className="k">To advance</span>
+                  <span>{phase.unlock_condition}</span>
+                </div>
+                <div className="row" style={{ marginTop: 12 }}>
+                  <Link href="/app/gate" className="btn">
+                    Gate status
+                  </Link>
+                </div>
+              </div>
             </div>
-            <div className="kv">
-              <span className="k">To advance</span>
-              <span>{phase.unlock_condition}</span>
-            </div>
-            <div className="row" style={{ marginTop: 12 }}>
-              <Link href="/app/gate" className="btn">
-                Gate status
-              </Link>
-            </div>
-          </div>
 
-          {phases && (
-            <div className="card" style={{ marginTop: 14 }}>
-              <h3>Roadmap</h3>
-              {phases.phases.map((p) => (
-                <div className="kv" key={p.phase}>
-                  <span className="k mono">
-                    {p.is_current ? "▶" : p.phase < phases.current_phase ? "✓" : "·"} Phase{" "}
-                    {p.phase}
-                  </span>
-                  <span className={p.is_current ? "" : "muted"}>
-                    {p.phase_title}{" "}
-                    <span className="muted">
-                      ({p.completed_task_count}/{p.total_task_count})
-                    </span>
+            <aside className="ws-rail" aria-label="Progress and roadmap">
+              <div className="card">
+                <h3>Two kinds of progress</h3>
+                <div className="kv">
+                  <span className="k">Build tasks</span>
+                  <span>
+                    {phase.completed_task_count}/{phase.total_task_count} done
                   </span>
                 </div>
-              ))}
-              <p className="muted" style={{ marginTop: 8 }}>
-                Later phases open by passing gates, in order.
-              </p>
-            </div>
-          )}
+                <div className="kv">
+                  <span className="k">Codize workflow</span>
+                  <span>{capturedCount}/4 captured</span>
+                </div>
+                <p className="muted" style={{ marginTop: 8 }}>
+                  <strong>Build tasks</strong> = the actual building (checkboxes on the left —
+                  tick them yourself). <strong>Workflow</strong> = what you&rsquo;ve captured in
+                  Codize about that work. Doing one doesn&rsquo;t tick the other.
+                </p>
+              </div>
+              {phases && (
+                <div className="card">
+                  <h3>Roadmap</h3>
+                  {phases.phases.map((p) => (
+                    <div className="kv" key={p.phase}>
+                      <span className="k mono">
+                        {p.is_current ? "▶" : p.phase < phases.current_phase ? "✓" : "·"} Phase{" "}
+                        {p.phase}
+                      </span>
+                      <span className={p.is_current ? "" : "muted"}>
+                        {p.phase_title}{" "}
+                        <span className="muted">
+                          ({p.completed_task_count}/{p.total_task_count})
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                  <p className="muted" style={{ marginTop: 8 }}>
+                    Later phases open by passing gates, in order.
+                  </p>
+                </div>
+              )}
+            </aside>
+          </div>
         </>
       )}
     </Async>

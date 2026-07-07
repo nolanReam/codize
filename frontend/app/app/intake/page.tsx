@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
 import GuideCard from "@/components/GuideCard";
@@ -13,6 +13,7 @@ import {
   getIntakeStatus,
   submitIntakeAnswer,
 } from "@/lib/api";
+import { useDraft } from "@/lib/drafts";
 import type { IntakeQuestion, IntakeStatus } from "@/lib/types";
 
 // Per-question beginner guidance (M13E.1): helper text, an example
@@ -131,12 +132,42 @@ export default function IntakePage() {
     ? questions.find((q) => q.number === status.next_question)
     : null;
 
+  // Unsaved-draft persistence (M13E.2): a half-typed answer survives switching
+  // tabs. Scoped per question; cleared when that question's answer submits.
+  const answerDraft = useDraft<string>(current ? `intake:q${current.number}` : null);
+  const answerDraftApplied = useRef<string | null>(null);
+  useEffect(() => {
+    const surface = current ? `intake:q${current.number}` : null;
+    if (!surface || !answerDraft.ready || answerDraftApplied.current === surface) return;
+    answerDraftApplied.current = surface;
+    if (answerDraft.restored) setAnswer((prev) => (prev === "" ? answerDraft.restored ?? "" : prev));
+  }, [current, answerDraft.ready, answerDraft.restored]);
+  const saveAnswerDraft = answerDraft.save;
+  useEffect(() => {
+    saveAnswerDraft(answer);
+  }, [answer, saveAnswerDraft]);
+
+  const editDraft = useDraft<string>(editing != null ? `intake:edit:q${editing}` : null);
+  const editDraftApplied = useRef<number | null>(null);
+  useEffect(() => {
+    if (editing == null || !editDraft.ready || editDraftApplied.current === editing) return;
+    editDraftApplied.current = editing;
+    if (editDraft.restored) setEditText(editDraft.restored);
+  }, [editing, editDraft.ready, editDraft.restored]);
+  const saveEditDraft = editDraft.save;
+  useEffect(() => {
+    if (editing != null) saveEditDraft(editText);
+  }, [editing, editText, saveEditDraft]);
+
   async function submit(questionNumber: number, text: string) {
     if (!text.trim()) return;
     setBusy(true);
     setError(null);
     try {
       const next = await submitIntakeAnswer(questionNumber, text.trim());
+      answerDraft.clear();
+      editDraft.clear();
+      editDraftApplied.current = null;
       setStatus(next);
       setAnswer("");
       setEditing(null);
@@ -293,6 +324,8 @@ export default function IntakePage() {
                                 className="btn"
                                 disabled={busy}
                                 onClick={() => {
+                                  editDraft.clear(); // cancel = explicit discard
+                                  editDraftApplied.current = null;
                                   setEditing(null);
                                   setEditText("");
                                   setError(null);

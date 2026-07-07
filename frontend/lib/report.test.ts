@@ -129,6 +129,28 @@ describe("buildReportMarkdown", () => {
     expect(md).toContain("Defense not yet attempted");
   });
 
+  it("labels skipped and N/A checks honestly, never as evidence (M13E.2)", () => {
+    const md = buildReportMarkdown(
+      makeInput({
+        sections: {
+          ...fullSections,
+          verification: {
+            checks: [
+              { check: "app_runs_locally", result: "pass", note: "uvicorn boots" },
+              { check: "smoke_test", result: "skipped", note: null },
+              { check: "auth_boundary_checked", result: "not_applicable", note: "no auth yet" },
+            ],
+            explanation: null,
+          },
+        },
+      })
+    );
+    expect(md).toContain("**skipped — not checked yet**");
+    expect(md).toContain("**n/a — doesn't apply**");
+    // The raw enum value never leaks into the export.
+    expect(md).not.toContain("**not_applicable**");
+  });
+
   it("ends with a single trailing newline and no giant gaps", () => {
     const md = buildReportMarkdown(makeInput());
     expect(md.endsWith("\n")).toBe(true);

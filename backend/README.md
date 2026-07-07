@@ -95,14 +95,26 @@ by ticking tasks. Routes: `GET /phases`, `GET /phases/current`,
 current phase. Flow: `POST /gate/start` (eligibility: active project + roadmap
 + current phase; 30-minute cooldown after a failed attempt, derived from
 `gate_sessions.failed_at`) → `POST /gate/{id}/turn1` (body
-`{"anchor_statement"}`; a deterministic server check plus model re-validation
-reject anchors with no concrete implementation element — the gate never starts
-without an anchor) → `POST /gate/{id}/turn2` and `/turn3` (body `{"answer"}`;
+`{"anchor_statement"}`; anchor validation is two-tier since M13E.2 — an
+anchor containing a code-shaped identifier ("strong": backticks, snake_case,
+`tasks.user_id`, `app/models.py`, "the variable is called likes_score") is
+validated server-side and the model is told not to re-reject it (a model
+rejection anyway becomes a retryable 502, never a 422), while an anchor that
+only names an element type ("the users table", "weak") keeps the M9 model
+re-validation; anchors with no concrete element at all are rejected
+deterministically with example-bearing copy — the gate never starts without
+an anchor) → `POST /gate/{id}/turn2` and `/turn3` (body `{"answer"}`;
 each stores the previous answer and returns the next question in one write, so
 LLM failures are retryable with nothing lost) → `POST /gate/{id}/evaluate`
 (separate temperature-0 call; strict fail-closed JSON parse). Turns run at
 temperature 0.3, prompts from `app/prompts/gate_turn_*.md` /
-`gate_evaluation.md`. On PASS: `passed_at` set, `projects.current_phase`
+`gate_evaluation.md`. Every generated question passes through the
+deterministic cleanliness guard (`clean_gate_question`, M13C.2B, hardened in
+M13E.2): markdown/label lines, inline hand-offs ("Let's craft the question:
+…"), and leading meta/reasoning sentences ("Therefore, it is a valid anchor.
+Now I need to formulate…") are stripped, and output still carrying internal
+vocabulary (rubric/evaluator/gate-target language) is rejected as a retryable
+502 — raw model output never reaches the client. On PASS: `passed_at` set, `projects.current_phase`
 advances (never past the final phase), `gate_history_summary` appended. On
 FAIL: `failed_at` set, cooldown starts, no advancement. `GET /gate/current`
 reports the current phase's gate state (not started / in progress with

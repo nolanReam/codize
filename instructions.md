@@ -1,82 +1,256 @@
-# Codize M13E.1 — Core App Usability + Beginner Guidance Pass
+# Codize M13E.2 — Pilot Bugfix Pass 1
 
-Fix the first-user experience inside the Codize app.
+Fix the issues discovered during the first real friend test.
 
-This is a protected-app usability, onboarding, intake, and prompt-builder clarity milestone.
+This is a focused pilot bugfix and UX clarity milestone.
 
 Do not start M14.
 
 Do not redesign the landing page.
 
-Do not change gate evaluator logic.
+Do not change database schema unless absolutely required and explained first.
+
+Do not modify the gate evaluator scoring logic.
 
 Do not make the gate evidence-aware.
-
-Do not create migrations unless a small safe migration is absolutely required, and explain first.
 
 Do not add analytics.
 
 Do not add GitHub OAuth, AI news, browser IDE, community features, tool marketplace, hosted coding runtime, or gamification.
 
-Do not implement full multiple-project support in this milestone unless the backend already safely supports it end-to-end.
+Do not implement full multiple-project support in this milestone.
 
-## Current State
+## Current Context
 
-Recent commits:
+A real tester used Codize and found several issues.
 
-- M13D.4 landing page scroll fix: `833e48b76890cce9c58f1f94ef54b00e96631659`
-- M13D.5 landing page precision fix: `0dc6b34ddc9399470bab858a7db53f9e5865d8ab`
+Known recent work:
 
-The landing page is now improved enough to pause visual polish.
+- Deployment readiness completed.
+- Core app usability pass was started/completed.
+- Friend pilot testing has begun.
+- The app is live enough for testing, but several core UX bugs are blocking trust.
 
-The next problem is inside the app:
+## Tester Issues To Fix
 
-- the post-login app feels smushed
-- there is unused space on the right
-- new users feel overwhelmed
-- intake questions are confusing
-- prompt builder assumes the user already knows what to ask AI
-- phase language feels too technical
-- user needs examples and guidance
-- user wants a dashboard/projects experience
-- user may eventually need a way to ask Codize what they are confused about
+### Issue 1 — Gate Anchor Rejection
 
-## User Feedback To Address
+The tester entered an anchor like:
 
-Fix these concrete issues:
+> i built a variable that stores likes and a function to update them using some advanced python stuff. the variable is called likes_score
 
-1. After logging in, the app leaves a chunk of unused space on the right; use the full screen better.
-2. The protected app feels smushed.
-3. The user wants a dashboard where they can view current projects.
-4. The user wants a plus button to create a project, then go through intake for that project.
-5. The user may want multiple projects, but this needs an architecture audit before full implementation.
-6. The user wants a way to ask about things they are confused on.
-7. Intake asks about frameworks, but the user only knows AP CSA Java and some Python and does not understand whether “framework” means language, stack, library, etc.
-8. The deadline question is unclear: does it mean MVP deadline, feature deadline, first working version, final product?
-9. Intake questions should allow going back and editing before completion if technically safe.
-10. Text boxes should show response examples.
-11. The app needs a tutorial because the workflow feels overwhelming.
-12. Prompt Builder currently assumes the user knows what to tell AI to do.
-13. Prompt Builder should explain the current phase in beginner-friendly language.
-14. Prompt Builder should give examples/starter suggestions for what to ask AI.
-15. Prompt Builder should not just say “Building for Phase 1: API Design & Resource Modeling” without explaining what that means.
+The UI rejected it with:
 
-## Goal
+> You must name at least one concrete element from your implementation, such as a variable, function, or database field.
 
-Make Codize feel usable for a student builder who is not already comfortable with professional engineering terminology.
+This should have passed because `likes_score` is a concrete identifier.
 
-The app should teach the workflow while the user uses it.
+Fix the anchor validator so it accepts realistic student phrasing such as:
 
-The user should always understand:
+- `variable called likes_score`
+- `variable named likes_score`
+- `the variable is called likes_score`
+- `` `likes_score` ``
+- `function called update_likes_score`
+- `function called update_likes_score()`
+- `database field called likes_score`
+- `field named likes_score`
+- `tasks.user_id`
+- `app/models.py`
+- `routes/tasks.py`
 
-- what page they are on
-- what they are supposed to do next
-- why the step matters
-- what a good answer looks like
-- what to write if they are unsure
-- how this helps them use AI better
+The validator should not require perfect professional phrasing.
 
-The user should not feel like they would rather just code without Codize.
+Keep anti-generic validation, but do not reject real identifiers.
+
+Also improve the error message.
+
+Better error copy:
+
+> Name one exact thing from your code, like `likes_score`, `update_likes_score()`, `tasks.user_id`, or `app/models.py`.
+
+Add tests.
+
+### Issue 2 — Gate Question Formatting Leak
+
+A screenshot shows the gate UI rendering raw model/meta text like:
+
+> Therefore, it is a valid anchor. Now, I need to formulate the Turn 1 question...
+
+This is unacceptable.
+
+The user-facing gate question must never display:
+
+- “Therefore”
+- “valid anchor”
+- “Now I need to”
+- “Question Formulation”
+- “Student’s Anchor”
+- “Gate Targets”
+- “Specificity”
+- “Personalization”
+- markdown section labels
+- rubric language
+- prompt-planning language
+- quoted internal prompt text
+- model reasoning/meta commentary
+
+Only the final clean student-facing question should be shown.
+
+Fix this at the backend boundary where gate questions are generated/cleaned.
+
+Preferred behavior:
+
+1. Detect meta/prompt-leak output.
+2. Extract only the final direct question if safe.
+3. If extraction is unsafe, reject and trigger the existing retryable generation path.
+4. Store only the cleaned question.
+5. Never show raw model output to the frontend.
+
+Examples:
+
+Raw bad output:
+
+> Therefore, it is a valid anchor. Now I need to formulate the Turn 1 question... Let's craft the question: "You mentioned building a `likes_score` variable. Can you explain why you chose that?"
+
+User should see only:
+
+> You mentioned building a `likes_score` variable. Can you explain why you chose that?
+
+If output contains multiple questions, prefer the final clean implementation-specific question only if it is safe.
+
+Add tests for the exact leaked pattern from the screenshot.
+
+Do not change final PASS/FAIL evaluator logic.
+
+### Issue 3 — Unsaved Drafts Lost When Switching Tabs
+
+Tester said:
+
+> make sure when switching between tabs, the last thing typed in the boxes is saved even if it wasnt submitted or anything yet
+
+Implement draft persistence for user input in workflow pages.
+
+Affected areas likely include:
+
+- Prompt Builder
+- Review Board
+- Evidence Panel
+- Verification Lab
+- Gate answer textareas if safe
+- intake fields if technically safe
+
+Requirements:
+
+- if user types but does not submit/save, switching tabs/pages should preserve draft text
+- use localStorage/sessionStorage if backend persistence is not appropriate
+- drafts should be scoped by user/project/phase/section
+- submitted/saved backend data should still be source of truth
+- after successful save/submit, clear or reconcile the local draft
+- do not accidentally leak one user/project’s draft into another project/user
+- do not store secrets if the secret-content guard rejects them; handle carefully
+
+Add tests if there is existing frontend test structure for this.
+
+### Issue 4 — High-Resolution Workspace Blank Space
+
+Tester used a higher-resolution monitor and saw large unused blank space after logging in.
+
+Fix the protected app workspace so it uses large screens better.
+
+Requirements:
+
+- avoid narrow/smushed main content on desktop/wide monitors
+- use full available width intelligently
+- preserve readable text widths
+- add useful side/context panels where helpful
+- no horizontal overflow
+- dashboard, phase, and workflow pages should feel like a workspace/cockpit, not a narrow mobile layout stretched onto desktop
+
+Possible improvements:
+
+- wider app shell max-width
+- responsive grid layouts
+- side panel with current project/phase/help/next actions
+- two-column layouts for form + guidance
+- better large-screen spacing
+
+Do not just stretch paragraphs to unreadable widths.
+
+### Issue 5 — Verification `Skipped` / `N/A` Logic
+
+Tester noticed:
+
+> if something is selected as "skipped" it shouldnt be asking how it was checked. Also for n/a
+
+Fix Verification Lab behavior.
+
+Requirements:
+
+- if a verification check is marked `passed` or equivalent, ask for evidence/how it was checked
+- if a check is `failed`, ask what failed / what needs fixing
+- if a check is `skipped`, do not require “how it was checked”; instead ask optional reason or show “skipped for now”
+- if a check is `N/A`, do not require “how it was checked”; optionally ask why it does not apply
+- generated report should label skipped/N/A honestly
+- validation should not block skipped/N/A because the evidence field is empty
+- UI should be clear and not contradictory
+
+Add tests if existing report/verification tests cover this.
+
+### Issue 6 — Phase Progress Confusion
+
+Tester said:
+
+> His phase tasks say 0/5 done and he said that he made the prompt and answered other stuff and did the other things
+
+Clarify the difference between:
+
+1. **Project/phase build tasks** from the roadmap
+2. **Codize workflow artifacts** like Prompt Builder, Review Board, Evidence, Verification
+
+Do not fake roadmap task completion just because the user filled Codize artifacts unless the product intentionally maps those actions.
+
+Fix the UI so it is clear.
+
+Possible approach:
+
+- rename “0/5 tasks done” to “Build tasks: 0/5”
+- add “Codize workflow: 4/4 captured” or similar
+- show separate progress indicators:
+  - Build tasks
+  - Workflow evidence
+  - Gate status
+- explain that building tasks must be checked off separately if that is current behavior
+- if there are existing task-completion controls, make them more visible
+- if task-completion controls are missing/confusing, fix the UI enough for testers to understand
+
+Do not mutate roadmap structure.
+
+Do not automatically mark build tasks done just because user wrote a prompt.
+
+### Issue 7 — Model Configuration Review
+
+Review the current Gemini model configuration.
+
+The user heard that a newer/free Flash model may be available with generous daily limits.
+
+Do not blindly switch models.
+
+Do this instead:
+
+- inspect current `GEMINI_MODEL`
+- document current model used in `.env.example` or docs if needed
+- verify whether the app can safely use a stronger currently available Gemini Flash model by env var only
+- do not hardcode a new model unless confident it is supported
+- make model swapping easy through environment variables
+- update docs to say model can be changed without code deploy if backend env changes
+- if gate prompt leak is fixed by sanitization/retry, do not rely only on model upgrade
+
+If a stronger model is recommended, state exactly where to change it:
+
+- Railway backend env var `GEMINI_MODEL=...`
+
+But do not require it for correctness.
 
 ## Read First
 
@@ -84,15 +258,16 @@ Read:
 
 - `CLAUDE.md`
 - `.claude/memory/frontend-conventions.md`
-- `.claude/memory/product-vision-v3.md`
+- `.claude/memory/gate-conventions.md`
 - `.claude/memory/workflow-artifact-conventions.md`
-- frontend app shell/layout files
-- frontend dashboard/cockpit files
-- frontend intake files
-- frontend prompt builder files
-- frontend phase/workflow files
-- backend project/intake/roadmap route contracts
-- backend schemas only if needed
+- `.claude/memory/deployment-conventions.md`
+- backend gate service/router/schemas/tests
+- frontend gate page
+- frontend workflow pages
+- frontend verification page
+- frontend phase/dashboard/app shell layout
+- frontend report builder/tests
+- backend LLM service/config docs
 
 Do not read `conversations.json` unless genuinely needed.
 
@@ -103,276 +278,21 @@ Inspect current state:
 ```bash
 git status
 git log --oneline -8
+git diff --stat
 ```
 
-Then inspect the protected app layout and current routes:
+Then identify files involved in:
 
-- `/app`
-- `/app/intake`
-- `/app/phase`
-- `/app/phase/prompt`
-- `/app/phase/review`
-- `/app/phase/evidence`
-- `/app/phase/verify`
-- `/app/gate`
-- `/app/report`
+- anchor validation
+- gate question sanitization
+- workflow form draft state
+- verification form validation
+- phase progress display
+- app shell layout
 
-Identify the layout cause of the unused right-side space.
+## Testing Requirements
 
-## Task 1 — App Layout / Full-Screen Usage
-
-Fix the protected app layout so it uses the whole screen better.
-
-Requirements:
-
-- avoid the “smushed left with empty right side” feeling
-- use responsive full-width layout
-- keep readable max-widths for text, but use extra horizontal space for useful panels
-- add or improve right-side/context panels where helpful
-- no horizontal overflow
-- desktop should feel like a cockpit/workspace, not a narrow form
-- mobile should remain usable
-
-Good use of extra space:
-
-- current step guidance
-- “what this means” panel
-- next action panel
-- project summary
-- examples
-- help/glossary cards
-
-Do not just stretch paragraphs across the full width.
-
-Use the extra space intentionally.
-
-## Task 2 — Dashboard / Projects Audit
-
-The user wants multiple projects and a dashboard with a plus button.
-
-Before implementing, audit the current backend/frontend assumptions.
-
-Answer in docs or memory:
-
-- Does the backend currently support multiple projects per user?
-- Does it support multiple active projects?
-- Do routes assume “current project” instead of project id?
-- Do workflow artifacts, gate sessions, evaluation, unlocks, and reconnection assume one current project?
-- What would break if multiple active projects were added?
-- What is the safest implementation plan?
-
-If full multiple-project support is not already safe, do not implement it now.
-
-Instead, implement a safer dashboard improvement:
-
-- `/app` should feel like a dashboard
-- show the current project clearly
-- show “Continue project”
-- show “Start first project” if no project exists
-- show a disabled or clearly marked “New project” / “Multiple projects coming next” affordance only if useful
-- do not create fake multi-project behavior
-
-If the backend already supports project listing and multiple active projects safely, implement minimal dashboard support only after confirming route contracts.
-
-Do not create a fragile partial multi-project system.
-
-## Task 3 — First-Use Tutorial
-
-Add a lightweight tutorial or “How Codize works” guide inside the app.
-
-It should explain:
-
-1. Start with a project idea.
-2. Codize turns it into phases.
-3. For each phase, use Prompt Builder before asking AI.
-4. After AI helps, return to Codize.
-5. Review what AI changed.
-6. Submit evidence.
-7. Verify behavior.
-8. Defend what you built.
-9. Export the Project Defense Report.
-
-Requirements:
-
-- non-overwhelming
-- dismissible
-- accessible from dashboard and/or app shell
-- not a huge wall of text
-- can be localStorage-based if backend persistence is unnecessary
-- should not block returning users forever
-- should be easy to reopen
-
-Use beginner-friendly language.
-
-## Task 4 — Intake Clarity
-
-Improve intake questions so a student understands how to answer.
-
-Requirements:
-
-- add response examples/placeholders for each question
-- add short helper text under confusing questions
-- allow going back/editing previous answers before final completion if technically safe
-- preserve backend contract and existing intake flow
-- do not lose user input
-- do not create invalid backend state
-
-Specific clarifications:
-
-### Frameworks / stack question
-
-Explain that a “framework/stack” can mean:
-
-- coding language: Java, Python, JavaScript
-- framework/library: FastAPI, Flask, React, Next.js
-- database/tool: Supabase, SQLite
-- or “I’m not sure yet”
-
-Examples:
-
-- “AP CSA Java, no framework yet”
-- “Python, maybe Flask or FastAPI”
-- “Next.js + Supabase”
-- “I only know basic Python and Java right now”
-
-The user should not feel dumb for not knowing a framework.
-
-### Deadline question
-
-Clarify that this means:
-
-> When do you want a first working version/demo, not the final polished product?
-
-Examples:
-
-- “tonight”
-- “this weekend”
-- “in 2 weeks”
-- “before my hackathon demo”
-- “no deadline, just learning”
-
-If the backend expects a rough deadline, keep it rough.
-
-## Task 5 — Prompt Builder Beginner Guidance
-
-The Prompt Builder needs to teach the user what to ask AI.
-
-Right now, “Building for Phase 1: API Design & Resource Modeling” is too abstract.
-
-Improve Prompt Builder with:
-
-- beginner-friendly phase explanation
-- “What this phase means” panel
-- “What you might ask AI to do” examples
-- starter task suggestions
-- example filled-in values
-- guidance for users who are unsure
-- clearer labels
-
-For example, for a phase like API Design & Resource Modeling, explain:
-
-> This phase is about deciding what data your app stores and what routes/actions the app needs before you ask AI to write random files.
-
-Give examples like:
-
-- “Help me design the data model for tasks, members, and study groups.”
-- “Suggest database tables and explain what each field means.”
-- “List the API routes I need before writing code.”
-- “Ask me questions if the schema is missing ownership or permissions.”
-- “Do not change my auth setup yet.”
-
-Make fields less intimidating.
-
-For each Prompt Builder field, add:
-
-- a plain-English explanation
-- an example placeholder
-- optional starter chips/buttons where useful
-
-Fields to improve:
-
-- What are you building overall?
-- What is this phase about?
-- What exactly should the AI do?
-- Files/components involved
-- Constraints
-- What must the AI not change?
-- What are you least sure about?
-- Ask for a plan before code
-- Ask for manual verification steps
-
-The prompt builder should help the user produce a better prompt even if they do not know what to ask yet.
-
-## Task 6 — Confusion Help
-
-Add a lightweight “I’m confused” / “What does this mean?” help pattern.
-
-This should be static/contextual for now, not a full AI chatbot unless the repo already has a safe pattern.
-
-Examples:
-
-- help drawer
-- tooltip
-- inline glossary
-- side panel
-- “Not sure what to write?” examples
-- “Use this if you only know Python/Java” helper
-
-Do not add a new LLM chat assistant in this milestone unless it is already supported safely and explicitly trivial.
-
-If an AI confusion assistant is desirable, create a short implementation plan for a future milestone.
-
-The immediate goal is to reduce confusion now with static guidance.
-
-## Task 7 — Copy Tone
-
-Use supportive language.
-
-Avoid making users feel behind.
-
-Good tone:
-
-- “Not sure yet is a valid answer.”
-- “Use the tools you know.”
-- “Codize will help you turn this into a clearer AI prompt.”
-- “A first working version means something you can demo, not a perfect final product.”
-
-Avoid:
-
-- expert-only jargon
-- unexplained acronyms
-- “obviously”
-- “simply”
-- making students feel like they should already know professional engineering terms
-
-## Scope Boundary
-
-Allowed changes:
-
-- protected app layout
-- dashboard/cockpit UI
-- intake UI
-- prompt builder UI
-- static help/glossary components
-- tutorial/onboarding UI
-- small frontend utilities
-- small backend changes only if required for safe intake edit/back behavior and covered by tests
-- docs/memory updates
-
-Do not modify:
-
-- gate evaluator logic
-- gate scoring
-- unlock thresholds
-- workflow artifact validation
-- roadmap generation logic
-- database schema unless absolutely necessary
-- landing page except shared style regressions
-- real auth behavior
-
-## Testing / Verification
-
-Run:
+Run frontend tests/checks:
 
 ```bash
 cd frontend
@@ -382,48 +302,63 @@ npm test
 npm run build
 ```
 
-If backend code changes, run:
+Run backend tests if backend code changes:
 
 ```bash
 cd backend
 pytest
 ```
 
-Run a local visual/product smoke:
+Backend code will likely change for gate anchor/sanitization, so run backend tests.
+
+## Product Smoke
+
+Run a focused local or hosted smoke if possible:
 
 1. login
-2. dashboard uses screen width better
-3. if no project, user understands how to start
-4. tutorial/help is visible and dismissible
-5. intake examples/helper text appear
-6. intake can go back/edit if implemented
-7. framework/stack question is understandable
-8. deadline question is understandable
-9. prompt builder explains the current phase
-10. prompt builder gives example/starter guidance
-11. prompt builder still saves/loads correctly
-12. app has no horizontal overflow
-13. mobile layout remains usable
-14. no obvious console errors
+2. open app on wide viewport
+3. confirm layout uses space better
+4. type into Prompt Builder, switch tab, return, confirm draft remains
+5. verification skipped/N/A does not require checked evidence
+6. phase progress clearly separates build tasks from workflow artifacts
+7. submit anchor containing `likes_score`
+8. confirm anchor passes
+9. generate Turn 1 question
+10. confirm no meta/prompt text leaks
+11. answer gate as far as safe
+12. no console errors
+
+## Secret Scan
 
 Run a secret scan before commit.
 
-Do not claim tests passed unless they actually ran.
+Search for:
+
+```text
+GEMINI_API_KEY
+OPENROUTER_API_KEY
+SUPABASE_SERVICE_ROLE_KEY
+sb_secret_
+sk-or-
+AIza
+service_role
+private key
+JWT
+```
+
+Do not commit real secrets.
 
 ## Documentation Updates
 
 Update if needed:
 
 - `frontend/README.md`
+- `backend/README.md`
 - `CLAUDE.md`
 - `.claude/memory/frontend-conventions.md`
-- `docs/pilot/demo_checklist.md` only if user-facing pilot flow changed
-
-If multiple projects are deferred, create or update:
-
-- `docs/context/multi_project_dashboard_plan.md`
-
-The multi-project plan should be concrete and honest about route/backend assumptions.
+- `.claude/memory/gate-conventions.md`
+- `.claude/memory/deployment-conventions.md`
+- `docs/deployment/friend_pilot_deployment.md` if model env guidance changes
 
 Do not rewrite the product vision docs.
 
@@ -431,24 +366,24 @@ Do not rewrite the product vision docs.
 
 At the end, output:
 
-- user feedback addressed
-- layout/full-screen fixes
-- dashboard/project handling changes
-- whether multiple projects were implemented or deferred, and why
-- tutorial/help added
-- intake clarity fixes
-- whether back/edit was implemented
-- prompt builder guidance fixes
-- confusion-help behavior
+- tester issues addressed
+- gate anchor validator fix
+- gate question leak fix
+- draft persistence behavior
+- wide-screen layout fixes
+- verification skipped/N/A behavior
+- phase progress clarity fix
+- Gemini/model configuration notes
 - files changed
-- backend changes, if any
-- tests/commands run
-- visual/product smoke result
+- backend changes
+- frontend changes
+- commands/tests run
+- smoke result
 - secret scan result
 - known issues
 - git commit hash
-- next step: local product review, then first pilot tester or multi-project milestone
+- next step: redeploy backend/frontend, then resume friend testing
 
-Commit completed M13E.1 changes.
+Commit completed M13E.2 pilot bugfix pass.
 
 Stop after commit.

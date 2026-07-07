@@ -157,6 +157,17 @@ redirect surface exists.
   retries the same turn later. If Gemini quota dies for a while, set
   `OPENROUTER_API_KEY` as the fallback (note: the OpenRouter path is still
   live-unverified — verify one gate turn after enabling it).
+- **Changing the Gemini model needs no code deploy (M13E.2 review).** The
+  model is read from env at startup: set the Railway backend variable
+  `GEMINI_MODEL=<model>` and restart/redeploy the service — that's the whole
+  change. The committed default stays `gemini-2.5-flash-lite` (known-working
+  with the fail-closed roadmap validator and gate flow). A stronger
+  currently-available **Flash** model mainly raises the roadmap
+  personalization rate; before switching, confirm in Google AI Studio that
+  your key can call it and check its free-tier daily limits. Do **not** rely
+  on a model upgrade for gate question cleanliness — leaked meta/preamble
+  output is stripped or rejected (retryable) server-side regardless of model
+  (`gate_service.clean_gate_question`, hardened in M13E.2).
 
 ## 7. Safety limits — present vs deferred
 

@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
+import { useDraft } from "@/lib/drafts";
 import { useWorkflowSection } from "@/lib/useWorkflowSection";
 import type { EvidenceEntry, EvidenceKind } from "@/lib/types";
 
@@ -36,6 +38,39 @@ export default function EvidencePanelPage() {
     setSummary(wf.stored.summary ?? "");
   }, [wf.stored]);
 
+  // Unsaved-draft persistence (M13E.2): backend data prefills first, then the
+  // local draft (including a half-typed "Add evidence" box) overlays once.
+  type EvidenceDraft = {
+    entries: EvidenceEntry[];
+    summary: string;
+    kind: EvidenceKind;
+    content: string;
+  };
+  const draft = useDraft<EvidenceDraft>(wf.phase ? `evidence:${wf.phase.phase}` : null);
+  const draftApplied = useRef(false);
+  useEffect(() => {
+    if (wf.loading || !draft.ready || draftApplied.current) return;
+    draftApplied.current = true;
+    if (draft.restored) {
+      setEntries(draft.restored.entries ?? []);
+      setSummary(draft.restored.summary ?? "");
+      setKind(draft.restored.kind ?? "repo_url");
+      setContent(draft.restored.content ?? "");
+    }
+  }, [wf.loading, draft.ready, draft.restored]);
+  // A successful save re-prefills state from the stored artifact, which would
+  // immediately re-write the just-cleared draft — skip that one echo.
+  const skipDraftEcho = useRef(false);
+  const saveDraft = draft.save;
+  useEffect(() => {
+    if (!draftApplied.current) return;
+    if (skipDraftEcho.current) {
+      skipDraftEcho.current = false;
+      return;
+    }
+    saveDraft({ entries, summary, kind, content });
+  }, [entries, summary, kind, content, saveDraft]);
+
   if (wf.notReady) return <NotReady title="Evidence Panel" />;
 
   function addEntry() {
@@ -51,10 +86,14 @@ export default function EvidencePanelPage() {
   }
 
   async function save() {
-    await wf.save({
+    const ok = await wf.save({
       entries,
       summary: summary.trim() ? summary.slice(0, 2000) : null,
     });
+    if (ok) {
+      skipDraftEcho.current = true;
+      draft.clear();
+    }
   }
 
   return (
@@ -67,6 +106,8 @@ export default function EvidencePanelPage() {
       </p>
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>
+        <div className="workspace">
+          <div>
         {wf.phase && (
           <p className="muted" style={{ marginBottom: 14 }}>
             Evidence for <strong>Phase {wf.phase.phase}: {wf.phase.phase_title}</strong>
@@ -142,6 +183,30 @@ export default function EvidencePanelPage() {
           onSave={save}
           label="Save evidence"
         />
+          </div>
+
+          <aside className="ws-rail" aria-label="Guidance">
+            <GuideCard title="What counts as evidence?">
+              <p>
+                Anything that would convince a skeptical teacher the work is real: a repo link, a
+                commit hash, test output, a terminal paste, a screenshot description.
+              </p>
+            </GuideCard>
+            <GuideCard title="Small proofs beat big claims">
+              <ul>
+                <li>One passing test output &gt; &ldquo;everything works&rdquo;.</li>
+                <li>A commit hash pins <em>when</em> you did it.</li>
+                <li>Failed output is evidence too — of honest verification.</li>
+              </ul>
+            </GuideCard>
+            <GuideCard title="Your text is kept">
+              <p>
+                Entries you add and text you type survive switching tabs as a local draft — press{" "}
+                <strong>Save evidence</strong> to store them to your project.
+              </p>
+            </GuideCard>
+          </aside>
+        </div>
       </Async>
     </>
   );

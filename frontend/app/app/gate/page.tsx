@@ -14,6 +14,7 @@ import {
   submitGateAnchor,
   submitGateAnswer,
 } from "@/lib/api";
+import { useDraft } from "@/lib/drafts";
 import type { GateCurrent, GateEvaluationResult, PhaseView } from "@/lib/types";
 
 const STATE_PILL: Record<GateCurrent["state"], { label: string; cls: string }> = {
@@ -47,6 +48,23 @@ export default function GatePage() {
   const [flowError, setFlowError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<GateEvaluationResult | null>(null);
 
+  // Unsaved-draft persistence (M13E.2): the typed answer survives switching
+  // tabs mid-defense. Scoped per session AND per step, so a restored draft can
+  // never appear under the wrong question; cleared when the step submits.
+  const draftSurface =
+    gate?.state === "in_progress" && gate.gate_session_id && gate.next_action
+      ? `gate:${gate.gate_session_id}:${gate.next_action}`
+      : null;
+  const draft = useDraft<string>(draftSurface);
+  const restoredDraft = draft.ready ? draft.restored : null;
+  useEffect(() => {
+    if (restoredDraft) setInput((prev) => (prev === "" ? restoredDraft : prev));
+  }, [restoredDraft]);
+  const saveDraft = draft.save;
+  useEffect(() => {
+    saveDraft(input);
+  }, [input, saveDraft]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -75,6 +93,7 @@ export default function GatePage() {
     setFlowError(null);
     try {
       await fn();
+      draft.clear(); // the step submitted — its local draft is now stale
       setInput("");
     } catch (err) {
       // 422 (invalid anchor) and 502 (generation failed) both leave the session
@@ -166,27 +185,36 @@ export default function GatePage() {
           <Outcome outcome={outcome} onReset={load} />
         ) : (
           gate && (
-            <>
-              {gate.state === "in_progress" ? (
-                <ActiveFlow
-                  gate={gate}
-                  input={input}
-                  setInput={setInput}
-                  busy={busy}
-                  flowError={flowError}
-                  onAnchor={handleAnchor}
-                  onAnswer={handleAnswer}
-                />
-              ) : gate.state === "cooldown" ? (
-                <CooldownView gate={gate} />
-              ) : gate.state === "passed" ? (
-                <PassedView />
-              ) : (
-                <ReadyView phase={phase} busy={busy} onBegin={handleBegin} flowError={flowError} />
-              )}
+            <div className="workspace">
+              <div>
+                {gate.state === "in_progress" ? (
+                  <ActiveFlow
+                    gate={gate}
+                    input={input}
+                    setInput={setInput}
+                    busy={busy}
+                    flowError={flowError}
+                    onAnchor={handleAnchor}
+                    onAnswer={handleAnswer}
+                  />
+                ) : gate.state === "cooldown" ? (
+                  <CooldownView gate={gate} />
+                ) : gate.state === "passed" ? (
+                  <PassedView />
+                ) : (
+                  <ReadyView
+                    phase={phase}
+                    busy={busy}
+                    onBegin={handleBegin}
+                    flowError={flowError}
+                  />
+                )}
+              </div>
 
-              <GateExplainer />
-            </>
+              <aside className="ws-rail" aria-label="Guidance">
+                <GateExplainer />
+              </aside>
+            </div>
           )
         )}
       </Async>
@@ -303,8 +331,10 @@ function ActiveFlow({
             <h3>Step 1 — Anchor statement</h3>
             <p style={{ marginBottom: 10 }}>{gate.anchor_prompt}</p>
             <p className="muted" style={{ marginBottom: 10 }}>
-              Name at least one real variable, function, or database field from your
-              implementation — that&rsquo;s what makes the defense about <em>your</em> project.
+              Name one exact thing from your code — like <code>likes_score</code>,{" "}
+              <code>update_likes_score()</code>, <code>tasks.user_id</code>, or{" "}
+              <code>app/models.py</code>. Plain phrasing is fine: &ldquo;the variable is called
+              likes_score&rdquo; works.
             </p>
           </>
         ) : (
@@ -517,6 +547,10 @@ function GateExplainer() {
         Ticking tasks never advances a phase — only passing this defense does. The gate uses the
         existing evaluation engine and is not yet aware of your saved workflow artifacts; those are
         for your own reference and your Defense Report.
+      </p>
+      <p className="muted" style={{ marginTop: 8 }}>
+        Answers you&rsquo;re typing survive switching tabs — they&rsquo;re kept as a local draft
+        until you submit.
       </p>
     </div>
   );

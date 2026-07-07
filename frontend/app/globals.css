@@ -123,16 +123,21 @@ input:focus-visible[type="checkbox"] {
    inside it (main-inner) so wide monitors get intentional margins instead of
    a dead right half. Text keeps readable measures via .page-sub/.guide. */
 .main { flex: 1; min-width: 0; padding: 32px clamp(20px, 3.5vw, 56px) 80px; }
-.main-inner { max-width: 1460px; margin: 0 auto; }
+.main-inner { max-width: 1620px; margin: 0 auto; }
 
 .page-title { font-size: 22px; margin-bottom: 4px; }
 .page-sub { color: var(--ink-2); margin-bottom: 24px; max-width: 70ch; }
 
 /* two-column workspace: content column + guidance rail. The rail is where the
    extra horizontal space goes — step guidance, examples, glossary — instead of
-   stretching paragraphs across the screen. Collapses to one column early. */
+   stretching paragraphs across the screen (M13E.2: every core app page now
+   uses it, and very wide monitors get a wider rail). Collapses early. */
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; align-items: start; }
 .ws-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 24px; }
+.ws-rail .card + .card { margin-top: 0; }
+@media (min-width: 1800px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) 400px; gap: 28px; }
+}
 @media (max-width: 1150px) {
   .workspace { grid-template-columns: 1fr; }
   .ws-rail { position: static; }

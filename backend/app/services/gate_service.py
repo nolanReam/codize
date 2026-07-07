@@ -68,22 +68,35 @@ ANCHOR_PROMPT = (
 
 _ANCHOR_REJECTED = "ANCHOR_REJECTED:"
 _ANCHOR_HELP = (
-    "Your anchor must name at least one specific variable, function, or "
-    "database field from your implementation."
+    "Name one exact thing from your code, like `likes_score`, "
+    "`update_likes_score()`, `tasks.user_id`, or `app/models.py`."
 )
 _NO_HISTORY = "No previous gates completed."
 
-# A valid anchor names a concrete implementation element. These patterns are
-# deliberately permissive (the Turn 1 model re-validates); they exist to stop
-# obviously generic anchors ("I built the auth system and it works") without
-# an LLM call.
-_CONCRETE_PATTERNS = (
+# A valid anchor names a concrete implementation element. Two tiers (M13E.2):
+#
+# STRONG — the anchor contains an actual code-shaped identifier (backticks,
+# snake_case, "the variable is called likes_score", a path…). The server-side
+# check is authoritative for these; the Turn 1 model is told the anchor is
+# already validated and must not reject it, because in the pilot it falsely
+# rejected realistic student phrasing that plainly named an identifier.
+#
+# WEAK — the anchor only gestures at an element type ("the users table") with
+# no code-shaped name. Deliberately permissive; the Turn 1 model re-validates
+# these (defense in depth, live-verified in the M9 adversarial suite).
+_STRONG_PATTERNS = (
     re.compile(r"`[^`]+`"),                       # backticked code
     re.compile(r"\b\w+_\w+\b"),                   # snake_case identifier
     re.compile(r"\b[a-z]+[A-Z][A-Za-z]*\b"),      # camelCase identifier
     re.compile(r"\b\w+\s*\("),                    # function call
     re.compile(r"\b\w+\.\w+\b"),                  # dotted name / filename
+    re.compile(r"\b\w+/[\w.\-/]+"),               # path with a slash (routes/tasks.py)
     re.compile(r"['\"]\w+['\"]"),                 # quoted identifier
+    # "a variable called score" / "field named owner" — plain student phrasing
+    # that explicitly names the element.
+    re.compile(r"\b(?:called|named)\s+['\"`]?[A-Za-z_]\w*", re.IGNORECASE),
+)
+_WEAK_PATTERNS = (
     re.compile(
         r"\b\w+\s+(?:table|column|field|function|variable|endpoint|route|"
         r"model|class|policy|trigger|index)\b", re.IGNORECASE,
@@ -147,7 +160,13 @@ def _parse_ts(value) -> datetime | None:
 
 
 def anchor_names_concrete_element(anchor: str) -> bool:
-    return any(p.search(anchor) for p in _CONCRETE_PATTERNS)
+    return any(p.search(anchor) for p in _STRONG_PATTERNS + _WEAK_PATTERNS)
+
+
+def anchor_has_strong_element(anchor: str) -> bool:
+    """True when the anchor contains a code-shaped identifier — the server-side
+    check is authoritative and the model must not re-reject it."""
+    return any(p.search(anchor) for p in _STRONG_PATTERNS)
 
 
 def _load_prompt(name: str) -> str:
@@ -171,7 +190,7 @@ def _history(project: dict) -> str:
     return project.get("gate_history_summary") or _NO_HISTORY
 
 
-def _turn1_prompt(project: dict, phase: dict, anchor: str) -> str:
+def _turn1_prompt(project: dict, phase: dict, anchor: str, strong: bool) -> str:
     base = _fill(_load_prompt("gate_turn_1.md"), {
         "GATE_TARGETS": json.dumps(phase["explanation_gate_targets"]),
         "GATE_DEPTH": phase["gate_depth"],
@@ -179,9 +198,21 @@ def _turn1_prompt(project: dict, phase: dict, anchor: str) -> str:
         "STUDENT_STACK": project["intake_stack"],
         "GATE_HISTORY_SUMMARY": _history(project),
     })
-    # Composition live-verified in docs/prebuild/adversarial_tests.md: the
-    # model re-validates the anchor (defense in depth) and replies with either
-    # the rejection marker or the bare Turn 1 question.
+    # Composition tails live-tuned in M9 (docs/prebuild/adversarial_tests.md);
+    # "respond with ONLY the text of the one question" is load-bearing.
+    if strong:
+        # M13E.2: the anchor names a code-shaped identifier, so the server-side
+        # check is authoritative — the model must not re-reject realistic
+        # student phrasing ("the variable is called likes_score").
+        return (
+            f"{base}\n\n---\n\n"
+            f'The student\'s reply to the anchor request (Step 1) was:\n\n"{anchor}"\n\n'
+            "This reply has already been validated server-side: it names at "
+            "least one concrete implementation element, so it IS a valid anchor. "
+            "Do not re-validate it and do not reject it. Perform Step 2: respond "
+            "with ONLY the text of the one Turn 1 question — no validation "
+            "commentary, no preamble, no restatement of the anchor."
+        )
     return (
         f"{base}\n\n---\n\n"
         f'The student\'s reply to the anchor request (Step 1) was:\n\n"{anchor}"\n\n'
@@ -258,12 +289,19 @@ _META_SENTENCE = re.compile(
     r"valid anchor\b|"
     r"this\s+is\s+a\s+valid\b|"
     r"that(?:'s| is)\s+a\s+valid\b|"
+    r"it(?:'s|\s+is)\s+a\s+valid\b|"
+    r"therefore\b|"
     r"the anchor(?:\s+statement)?\s+is\b|"
     r"here(?:'s| is| are)\b[^?]*\b(?:question|hypothetical|follow[\s-]?up|turn)\b|"
     r"(?:according to|as per|per)\s+(?:the\s+)?(?:rubric|evaluator|criteria|instructions?|gate\s+targets?)\b|"
     r"based on\s+(?:the\s+)?(?:rubric|criteria|evaluator|gate\s+targets?)\b|"
     r"i(?:'ll| will| am going to| shall)\s+(?:now\s+)?ask\b|"
     r"i(?:'ll| will)?\s*now\s+ask\b|"
+    r"(?:now,?\s+)?i\s+(?:need|want|have|am\s+going)\s+to\b|"
+    r"now,?\s+i\b|"
+    r"let(?:'s|\s+us)\s+(?:craft|formulate|write|compose|draft|construct|generate|proceed|move|begin)\b|"
+    r"(?:question|prompt)\s+formulation\b|"
+    r"student'?s\s+anchor\b|"
     r"(?:step|turn)\s*\d\b|"
     r"note\s*:|"
     r"as instructed\b|"
@@ -273,12 +311,38 @@ _META_SENTENCE = re.compile(
 )
 
 # An inline hand-off: preamble that ends by announcing the question on the same
-# line ("… Here is the Turn 1 question: <q>"). Removed up to and including the
-# colon so a question with no space after the colon is still recovered.
+# line ("… Here is the Turn 1 question: <q>", "… Let's craft the question: <q>").
+# Removed up to and including the colon so a question with no space after the
+# colon is still recovered.
 _HANDOFF = re.compile(
-    r"^.*?(?:here(?:'s| is| are)|this is|below is|the following is)"
+    r"^.*?(?:here(?:'s| is| are)|this is|below is|the following is|"
+    r"let(?:'s| us) (?:craft|formulate|write|compose|draft)|"
+    r"i(?:'ll| will| need to| am going to)?\s*(?:now\s+)?(?:craft|formulate|write|compose|ask))"
     r"[^:?]{0,80}?(?:question|hypothetical|follow[\s-]?up)[^:?]{0,20}?:\s*",
     re.IGNORECASE | re.DOTALL,
+)
+
+# A line that is only a markdown heading, a bold section label, or a bare
+# internal label ("**Question Formulation**", "### Student's Anchor") — never
+# part of a legitimate student-facing question; dropped whole. A line
+# containing "?" is never treated as a label (it may BE the question,
+# heading/italic-formatted).
+_LABEL_LINE = re.compile(
+    r"^\s*(?:#{1,6}\s[^?\n]*|\*{1,2}[^*\n?]{1,80}\*{1,2}:?\s*|-{3,}\s*|"
+    r"(?:question\s+formulation|student'?s\s+anchor|anchor\s+validation|gate\s+targets?)\s*:?\s*)$",
+    re.IGNORECASE,
+)
+
+# Backstop (M13E.2): internal/rubric vocabulary that must never reach the
+# student, even inside an otherwise question-shaped output. A match after
+# sanitization rejects the output as retryable — same path as all-meta output.
+_HARD_LEAK = re.compile(
+    r"valid\s+anchor|anchor_rejected|question\s+formulation|student'?s\s+anchor|"
+    r"gate\s+targets?|gate\s+depth|\brubric\b|\bevaluator\b|"
+    r"\bspecificity\b|\bpersonalization\b|"
+    r"now,?\s+i\s+need\s+to|i\s+need\s+to\s+formulate|"
+    r"^#{1,6}\s|\*\*[^*\n]+\*\*\s*:",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
@@ -310,8 +374,15 @@ def sanitize_gate_question(raw: str) -> str:
     Returns the cleaned question text (possibly empty if the output was only
     preamble). Leaves already-clean output byte-for-byte unchanged."""
     text = _unwrap(raw.strip())
+    # Drop whole lines that are markdown headings / internal section labels.
+    text = "\n".join(ln for ln in text.splitlines() if not _LABEL_LINE.match(ln)).strip()
     handoff = _HANDOFF.sub("", text, count=1)
-    text = handoff.strip()
+    if handoff != text:
+        # The announced question is often quoted ('Let\'s craft the question:
+        # "…?"') — unwrap again after removing the hand-off.
+        text = _unwrap(handoff.strip())
+    else:
+        text = handoff.strip()
 
     sentences = _sentences(text)
     dropped = 0
@@ -320,7 +391,7 @@ def sanitize_gate_question(raw: str) -> str:
         dropped += 1
     if dropped == 0:
         return text  # nothing to strip — preserve original formatting
-    return " ".join(s.strip() for s in sentences[dropped:]).strip()
+    return _unwrap(" ".join(s.strip() for s in sentences[dropped:]).strip())
 
 
 def clean_gate_question(raw: str) -> str:
@@ -330,7 +401,7 @@ def clean_gate_question(raw: str) -> str:
     as a retryable failure (nothing is stored), so the student simply re-runs
     the step and a clean question is generated."""
     cleaned = sanitize_gate_question(raw)
-    if not cleaned or _is_meta(cleaned):
+    if not cleaned or _is_meta(cleaned) or _HARD_LEAK.search(cleaned):
         raise GateGenerationError(_GENERIC_RETRY)
     return cleaned
 
@@ -478,9 +549,17 @@ async def submit_anchor(
     anchor = anchor_statement.strip()
     if not anchor or not anchor_names_concrete_element(anchor):
         raise AnchorInvalidError(_ANCHOR_HELP)
+    strong = anchor_has_strong_element(anchor)
 
-    raw = (await _complete(llm, _turn1_prompt(project, phase, anchor), TURN_TEMPERATURE)).strip()
+    raw = (await _complete(llm, _turn1_prompt(project, phase, anchor, strong), TURN_TEMPERATURE)).strip()
     if raw.startswith(_ANCHOR_REJECTED):
+        if strong:
+            # The anchor names a real identifier and the model was told not to
+            # re-validate. A rejection here is the model disobeying, not the
+            # student failing — treat it as a retryable generation failure so
+            # the student is never told a valid anchor is invalid (M13E.2).
+            logger.warning("model rejected a pre-validated strong anchor; retryable")
+            raise GateGenerationError(_GENERIC_RETRY)
         raise AnchorInvalidError(raw[len(_ANCHOR_REJECTED):].strip() or _ANCHOR_HELP)
     # Deterministic cleanliness guard: strip any leaked preamble/meta, reject
     # an all-meta output (retryable — nothing stored below on the raise).

@@ -10,6 +10,7 @@ import type {
   GateCurrent,
   PhaseView,
   VerificationCheckId,
+  VerificationResult,
   WorkflowSections,
 } from "./types";
 
@@ -37,6 +38,15 @@ const SECURITY_CHECKS: VerificationCheckId[] = [
   "secret_exposure_checked",
   "rls_wrong_user_checked",
 ];
+
+// Honest result labels (M13E.2): a skipped or N/A check was not checked, and
+// the report must say so plainly instead of printing a raw enum value.
+export const VERIFICATION_RESULT_LABELS: Record<VerificationResult, string> = {
+  pass: "pass",
+  fail: "fail",
+  skipped: "skipped — not checked yet",
+  not_applicable: "n/a — doesn't apply",
+};
 
 export interface ReportInput {
   evaluation: Evaluation;
@@ -278,8 +288,9 @@ export function buildReportMarkdown(input: ReportInput): string {
     verBody.push("**Self-reported checks**", "");
     for (const c of ver.checks) {
       const label = VERIFICATION_LABELS[c.check] ?? c.check;
+      const result = VERIFICATION_RESULT_LABELS[c.result] ?? c.result;
       const note = c.note?.trim() ? ` — ${c.note.trim()}` : "";
-      verBody.push(`- ${label}: **${c.result}**${note}`);
+      verBody.push(`- ${label}: **${result}**${note}`);
     }
     verBody.push("");
     if (ver.explanation?.trim()) verBody.push(line("What this verification proves", ver.explanation), "");

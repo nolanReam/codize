@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
 import { getIntakeStatus } from "@/lib/api";
+import { useDraft } from "@/lib/drafts";
 import { phaseGuide } from "@/lib/phaseGuide";
 import { buildPrompt, type PromptBuilderInputs } from "@/lib/promptBuilder";
 import { useWorkflowSection } from "@/lib/useWorkflowSection";
@@ -59,6 +60,30 @@ export default function PromptBuilderPage() {
     });
   }, [wf.stored]);
 
+  // Unsaved-draft persistence (M13E.2): the saved artifact prefills first,
+  // then any local draft (typed but never saved) overlays it once.
+  const draft = useDraft<PromptBuilderInputs>(
+    wf.phase ? `prompt_builder:${wf.phase.phase}` : null
+  );
+  const draftApplied = useRef(false);
+  useEffect(() => {
+    if (wf.loading || !draft.ready || draftApplied.current) return;
+    draftApplied.current = true;
+    if (draft.restored) setInputs({ ...EMPTY, ...draft.restored });
+  }, [wf.loading, draft.ready, draft.restored]);
+  // A successful save re-prefills state from the stored artifact, which would
+  // immediately re-write the just-cleared draft — skip that one echo.
+  const skipDraftEcho = useRef(false);
+  const saveDraft = draft.save;
+  useEffect(() => {
+    if (!draftApplied.current) return;
+    if (skipDraftEcho.current) {
+      skipDraftEcho.current = false;
+      return;
+    }
+    saveDraft(inputs);
+  }, [inputs, saveDraft]);
+
   // The student's own intake answers, offered as tap-to-use starters (never
   // auto-filled — the student stays the author of every field).
   useEffect(() => {
@@ -90,7 +115,7 @@ export default function PromptBuilderPage() {
   async function save() {
     const result = built ?? buildPrompt(inputs);
     setBuilt(result);
-    await wf.save({
+    const ok = await wf.save({
       inputs: {
         project_goal: inputs.projectGoal.slice(0, 2000),
         phase_goal: inputs.phaseGoal.slice(0, 2000),
@@ -106,6 +131,10 @@ export default function PromptBuilderPage() {
       why_stronger: result.whyStronger.slice(0, 2000),
       bad_prompt_comparison: result.badPrompt.slice(0, 8000),
     });
+    if (ok) {
+      skipDraftEcho.current = true;
+      draft.clear();
+    }
   }
 
   async function copy() {

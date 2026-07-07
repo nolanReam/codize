@@ -8,31 +8,47 @@ previous answer AND the next question in ONE session update, so an LLM
 failure (502) leaves the session exactly where it was and the same call can
 be retried — never split those writes.
 
-Anchor is validated twice by design: a deterministic server-side
-concrete-element check (`gate_service.anchor_names_concrete_element`, cheap
-regexes for code-shaped tokens) runs BEFORE any LLM call, then the Turn 1
-prompt composition instructs the model to re-validate and reply
-`ANCHOR_REJECTED: <what's missing>` (→ 422) or the bare question text. The
-composition tails appended to the prompt files at call time were live-tuned
-in M9 — "respond with ONLY the text of the one question" is what stops
-Gemini from prefixing validation commentary. Don't remove the tails.
+Anchor validation is TWO-TIER since M13E.2 (pilot fix — the model falsely
+rejected "the variable is called likes_score"): `_STRONG_PATTERNS`
+(backticks, snake_case, camelCase, call-parens, dotted, slash-path, quoted,
+"called/named X") make the server-side check AUTHORITATIVE — the Turn 1
+composition tail tells the model the anchor is pre-validated and must not be
+rejected, and if the model replies `ANCHOR_REJECTED:` anyway it is treated as
+a retryable `GateGenerationError` (502, nothing stored), NEVER a 422 — a
+student with a real identifier is never told their anchor is invalid.
+`_WEAK_PATTERNS` (bare element-type mentions like "the users table") keep the
+M9 model re-validation (`ANCHOR_REJECTED:` → 422). The deterministic help
+copy shows concrete examples (`likes_score`, `update_likes_score()`,
+`tasks.user_id`, `app/models.py`). The composition tails appended at call
+time were live-tuned in M9 — "respond with ONLY the text of the one
+question" is what stops Gemini from prefixing validation commentary. Don't
+remove the tails; keep both tail variants in sync if either changes.
 
 Every user-facing generated question is passed through `clean_gate_question`
-(M13C.2B) at the generation boundary — Turn 1 (after the ANCHOR_REJECTED
-check), Turn 2, and Turn 3. It is a **deterministic** guard (no extra LLM
-call): `sanitize_gate_question` unwraps code fences/quotes, removes an inline
-"…here is the Turn 1 question:" hand-off, and drops leading meta/preamble
-sentences (`_META_SENTENCE`: "the student…", "valid anchor", rubric/evaluator
-language, "Step 2"/"Turn 1", "I will now ask", etc.) — but never a sentence
-ending in `?` and never the last remaining sentence, so legitimate questions
-(imperatives, anchor-referencing, gate_turn_2's "Good — you covered…"
-phrasing) pass through byte-for-byte. If the result is empty or still all-meta,
-it raises `GateGenerationError`, which the existing turn flow already treats as
-retryable (nothing stored). The evaluator is NOT routed through it — verdicts
-stay on `parse_evaluation`. This fixed the flash-lite "valid anchor…" preamble
-leak found in the M13C.2 smoke; prompts were deliberately left unchanged (so
-the adversarial/prebuild suites did not need re-running). Add a deterministic
-unit test to `test_gate_service.py` for any change to the meta patterns.
+(M13C.2B, hardened M13E.2) at the generation boundary — Turn 1 (after the
+ANCHOR_REJECTED check), Turn 2, and Turn 3. It is a **deterministic** guard
+(no extra LLM call): `sanitize_gate_question` unwraps code fences/quotes,
+drops whole markdown-heading/`**label**` lines (`_LABEL_LINE` — but never a
+line containing `?`, which may BE the question), removes an inline hand-off
+("…here is/let's craft/I need to formulate … the question: <q>", re-unwrapping
+the announced quote), and drops leading meta/preamble sentences
+(`_META_SENTENCE`: "the student…", "valid anchor", "Therefore…",
+"Now, I need to…", "Let's craft…", rubric/evaluator language, "Step 2",
+"I will now ask", etc.) — but never a sentence ending in `?` and never the
+last remaining sentence, so legitimate questions (imperatives,
+anchor-referencing, gate_turn_2's "Good — you covered…" phrasing) pass
+through byte-for-byte. `clean_gate_question` additionally rejects any cleaned
+output still containing hard-leak vocabulary (`_HARD_LEAK`: "valid anchor",
+"gate targets", rubric/evaluator, bare "specificity"/"personalization",
+markdown labels) — same retryable path. If the result is empty, all-meta, or
+hard-leaking, it raises `GateGenerationError`, which the existing turn flow
+treats as retryable (nothing stored). The evaluator is NOT routed through it —
+verdicts stay on `parse_evaluation`. M13C.2B fixed the flash-lite "valid
+anchor…" preamble; M13E.2 fixed the pilot's "Therefore, it is a valid anchor.
+Now I need to formulate…" reasoning leak (exact pattern pinned in tests).
+Prompts were deliberately left unchanged both times (adversarial/prebuild
+suites did not need re-running). Add a deterministic unit test to
+`test_gate_service.py` for any change to the meta/leak patterns.
 
 The evaluator parse is strict AND fail-closed (`parse_evaluation`): verdict ∈
 {PASS, FAIL}, non-empty one-sentence reason, score an int 0–10 (bool and

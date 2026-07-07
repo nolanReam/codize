@@ -107,10 +107,15 @@ export default function CockpitPage() {
                   <span>{evaluation.completed_phases}</span>
                 </div>
                 <div className="kv">
-                  <span className="k">Phase tasks</span>
+                  <span className="k">Build tasks</span>
                   <span>
-                    {evaluation.completed_task_count} / {evaluation.total_task_count} done
+                    {evaluation.completed_task_count} / {evaluation.total_task_count} done — tick
+                    them on the Phase page
                   </span>
+                </div>
+                <div className="kv">
+                  <span className="k">Codize workflow</span>
+                  <span>{savedCount} / 4 artifacts captured this phase</span>
                 </div>
                 <div className="row" style={{ marginTop: 14 }}>
                   <Link href="/app/phase" className="btn primary">
@@ -192,6 +197,11 @@ export default function CockpitPage() {
                   <span className="muted">Verification</span>
                   {sectionPill(sections?.verification != null)}
                 </div>
+                <p className="muted" style={{ marginTop: 10 }}>
+                  These artifacts document your work — saving them never ticks a build task.
+                  Build tasks are the roadmap&rsquo;s checkboxes on the Phase page, and only
+                  passing the gate advances the phase.
+                </p>
               </div>
 
               <div className="card" style={{ marginTop: 14 }}>

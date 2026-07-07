@@ -257,3 +257,32 @@ separate spec-guardian-gated milestone. (6) **Multi-project is deferred**:
 orphan the first (no error!) — never ship a working "+ New project" until
 `docs/context/multi_project_dashboard_plan.md` is implemented; the disabled
 affordance + honest rail note is the M13E.1 ceiling.
+
+**M13E.2 (2026-07-06) — pilot bugfix conventions.** (1) **Local drafts**
+(`lib/drafts.ts`): unsubmitted text survives tab/page switches via
+localStorage keys `codize:draft:<user id>:<surface>` (surface = section+phase,
+gate session+step, or intake question — never unscoped; user id comes from the
+Supabase session, so drafts can't cross accounts on a shared machine).
+`useDraft` restores once AFTER the backend prefill (backend stays source of
+truth; a `draftApplied`/`appliedFor` ref gates the overlay), debounce-writes
+400ms (the pending write is deliberately NOT cancelled on unmount — that's
+the tab-switch case), refuses to persist secret-marker content (same 4
+markers as `schemas/workflow.py`), and is cleared on successful save/submit
+— with a one-shot `skipDraftEcho` ref per page because a successful save
+re-prefills state from the stored artifact and would otherwise instantly
+rewrite the just-cleared draft. Pure helpers are unit-tested with a fake
+storage (vitest runs in node — no jsdom, keep hook logic thin). Intake
+"Cancel" on an edit clears that edit's draft (explicit discard). (2) **Every
+core page uses `.workspace`** now (cockpit, intake, prompt, review, evidence,
+verify, gate, phase); `.main-inner` is 1620px and ≥1800px widens the rail to
+400px. The gate explainer and the phase page's roadmap/"Two kinds of
+progress" cards live in the rail. (3) **Progress split language**: "Build
+tasks: X/Y" (roadmap checkboxes, ticked manually) vs "Workflow: N/4 captured"
+(saved artifacts) — never conflate them, never auto-tick a build task from an
+artifact save; the phase page and cockpit both carry an explicit "saving
+artifacts never ticks a build task" line. (4) **Verification notes are
+result-specific** (`NOTE_PROMPTS`): pass→how checked, fail→what broke,
+skipped/n/a→optional reason with a "no evidence needed" hint; the report
+labels them honestly (`VERIFICATION_RESULT_LABELS`: "skipped — not checked
+yet", "n/a — doesn't apply") and never prints the raw enum. Notes stay
+optional for every result — nothing blocks a save.

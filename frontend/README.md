@@ -62,7 +62,10 @@ components/             Async, NotReady, SaveBar, WorkflowSteps, ReconnectionMod
                         + GateScene + Reveal (landing-only, scripted, no AI calls)
 lib/                    api client, supabase client, types, prompt builder + test,
                         report builder + test, phase guide + test (static beginner
-                        explanations — no LLM), useWorkflowSection hook
+                        explanations — no LLM), useWorkflowSection hook, drafts +
+                        test (localStorage draft persistence — unsubmitted text
+                        survives tab switches; user/phase/section-scoped keys,
+                        secret-marker guard, cleared on successful save)
 ```
 
 ## Backend routes consumed
@@ -101,6 +104,20 @@ npm run typecheck
 npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
+
+## Status (M13E.2)
+
+Pilot bugfix pass from the first real friend test: **local draft persistence**
+on every text surface (workflow pages, gate answers, intake — typed-but-unsaved
+text survives switching tabs; backend data stays the source of truth and a
+successful save clears the draft), **wide-screen workspace** (every core page
+now uses the two-column `.workspace` grid with a guidance rail; `.main-inner`
+widened, larger rail ≥1800px), **Verification Lab result-specific prompts**
+(pass→"how did you check", fail→"what broke", skipped/n/a→optional reason with
+"no evidence needed" — and the report labels skipped/n/a honestly), and
+**progress clarity** ("Build tasks: X/Y" vs "Workflow: N/4 captured" — saving
+artifacts never ticks a build task). Backend M13E.2 changes (anchor validator
+tiers + gate question leak hardening) are documented in `backend/README.md`.
 
 ## Status (M13E.1)
 

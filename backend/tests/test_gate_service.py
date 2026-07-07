@@ -151,14 +151,90 @@ def test_generic_anchor_rejected_without_llm_call():
     assert run(gates.get_session(USER, sid))["anchor_statement"] is None
 
 
-def test_llm_rejected_anchor_is_422_and_stores_nothing():
+def test_llm_rejected_weak_anchor_is_422_and_stores_nothing():
+    # "users table" is a weak match (element type, no code-shaped identifier) —
+    # the model's re-validation stays authoritative for these.
     repo, gates, _ = make_repos()
     sid = run(start_gate(repo, gates, USER))["gate_session_id"]
     llm = ScriptedLLM(["ANCHOR_REJECTED: Name a concrete element from your implementation."])
     with pytest.raises(AnchorInvalidError, match="concrete element"):
-        run(submit_anchor(repo, gates, llm, USER, sid, ANCHOR))
+        run(submit_anchor(repo, gates, llm, USER, sid, "I set up the users table for my league"))
     session = run(gates.get_session(USER, sid))
     assert session["anchor_statement"] is None and session["turns"] == []
+
+
+def test_model_rejection_of_strong_anchor_is_retryable_never_a_422():
+    # M13E.2 pilot fix: the tester's anchor named `likes_score` and the model
+    # still replied ANCHOR_REJECTED. A strong (code-shaped) anchor is validated
+    # server-side; a model rejection is a generation failure (502, retryable),
+    # never "your anchor is invalid".
+    repo, gates, _ = make_repos()
+    sid = run(start_gate(repo, gates, USER))["gate_session_id"]
+    tester_anchor = (
+        "i built a variable that stores likes and a function to update them "
+        "using some advanced python stuff. the variable is called likes_score"
+    )
+    llm = ScriptedLLM([
+        "ANCHOR_REJECTED: You must name at least one concrete element.",
+        "Why did you make likes_score a variable instead of a database column?",
+    ])
+    with pytest.raises(GateGenerationError):
+        run(submit_anchor(repo, gates, llm, USER, sid, tester_anchor))
+    session = run(gates.get_session(USER, sid))
+    assert session["anchor_statement"] is None and session["turns"] == []
+    # The prompt told the model the anchor was pre-validated.
+    assert "already been validated server-side" in llm.calls[0][0]
+    # Retry succeeds with a clean question.
+    out = run(submit_anchor(repo, gates, llm, USER, sid, tester_anchor))
+    assert out["question"].startswith("Why did you make likes_score")
+
+
+@pytest.mark.parametrize("anchor", [
+    # Realistic student phrasing from the pilot (M13E.2) — all must pass the
+    # deterministic check AND count as strong (no model re-validation).
+    "i built a variable that stores likes and a function to update them using "
+    "some advanced python stuff. the variable is called likes_score",
+    "variable called likes_score",
+    "variable named likes_score",
+    "the variable is called likes_score",
+    "`likes_score`",
+    "function called update_likes_score",
+    "function called update_likes_score()",
+    "database field called likes_score",
+    "field named likes_score",
+    "tasks.user_id",
+    "app/models.py",
+    "routes/tasks.py",
+    "a variable called score",
+])
+def test_realistic_student_anchors_are_accepted_and_strong(anchor):
+    assert gate_service.anchor_names_concrete_element(anchor)
+    assert gate_service.anchor_has_strong_element(anchor)
+
+
+def test_weak_anchor_still_goes_through_model_revalidation():
+    # An element type with no code-shaped name is concrete enough to reach the
+    # model, but not strong — the re-validation tail must stay in the prompt.
+    anchor = "I set up the users table for my league"
+    assert gate_service.anchor_names_concrete_element(anchor)
+    assert not gate_service.anchor_has_strong_element(anchor)
+    repo, gates, _ = make_repos()
+    sid = run(start_gate(repo, gates, USER))["gate_session_id"]
+    llm = ScriptedLLM(["Why did you choose a separate users table?"])
+    run(submit_anchor(repo, gates, llm, USER, sid, anchor))
+    assert "Apply the Step 1 validation rules" in llm.calls[0][0]
+
+
+def test_anchor_help_message_shows_concrete_examples():
+    repo, gates, _ = make_repos()
+    sid = run(start_gate(repo, gates, USER))["gate_session_id"]
+    llm = ScriptedLLM(["should never be called"])
+    with pytest.raises(AnchorInvalidError) as err:
+        run(submit_anchor(repo, gates, llm, USER, sid, "I built the auth system and it works"))
+    # The improved copy names exact examples a student can copy the shape of.
+    assert "likes_score" in str(err.value)
+    assert "app/models.py" in str(err.value)
+    assert llm.calls == []
 
 
 def test_anchor_stored_with_session_and_turn1_uses_targets_and_anchor():
@@ -423,6 +499,32 @@ def test_clean_questions_pass_through_unchanged(q):
         "```\nWhy did you put user_id on the matches table?\n```",
         "Why did you put user_id on the matches table?",
     ),
+    # M13E.2 — the exact leak pattern from the pilot screenshot: reasoning
+    # commentary, an "I need to formulate" plan, and a quoted hand-off.
+    (
+        "Therefore, it is a valid anchor. Now I need to formulate the Turn 1 "
+        'question... Let\'s craft the question: "You mentioned building a '
+        '`likes_score` variable. Can you explain why you chose that?"',
+        "You mentioned building a `likes_score` variable. Can you explain why "
+        "you chose that?",
+    ),
+    # Same family, sentence-by-sentence (no inline hand-off colon quote).
+    (
+        "Therefore, it is a valid anchor. Now, I need to formulate the Turn 1 "
+        "question. Why does update_likes_score() write to likes_score directly?",
+        "Why does update_likes_score() write to likes_score directly?",
+    ),
+    # Markdown section labels are dropped whole.
+    (
+        "**Question Formulation**\nWhat happens to likes_score if two users "
+        "click like at the same time?",
+        "What happens to likes_score if two users click like at the same time?",
+    ),
+    (
+        "### Turn 1 Question\nWalk me through what update_likes_score() does "
+        "step by step.",
+        "Walk me through what update_likes_score() does step by step.",
+    ),
 ])
 def test_meta_preamble_is_stripped(raw, expected):
     assert sanitize_gate_question(raw) == expected
@@ -435,6 +537,11 @@ def test_meta_preamble_is_stripped(raw, expected):
     "The student must demonstrate ownership understanding.",
     "According to the evaluator criteria, this should test specificity.",
     "Here is a question that satisfies the rubric requirements.",
+    # M13E.2 hard-leak backstop: rubric/internal vocabulary embedded INSIDE a
+    # question-shaped output is rejected (retryable), never shown.
+    "Given the Gate Targets, how does your likes_score variable handle a tie?",
+    "Since this is a valid anchor, what breaks if likes_score goes negative?",
+    "To probe Specificity: which exact function updates likes_score?",
 ])
 def test_all_meta_output_is_rejected_and_retryable(raw):
     with pytest.raises(GateGenerationError):
