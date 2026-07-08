@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import Async from "@/components/Async";
+import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import {
   ApiError,
@@ -172,9 +173,8 @@ export default function GatePage() {
         <div>
           <h1 className="page-title">Project Defense</h1>
           <p className="page-sub">
-            Defend what you built — in your own words, about your own implementation. The gate
-            asks three questions specific to your project. Generic, textbook answers don&rsquo;t
-            pass, because they don&rsquo;t prove <em>you</em> understand it.
+            Three questions about <em>your</em> code, answered in your own words. Not a test of
+            intelligence — a check that you understand what you shipped.
           </p>
         </div>
         {pill && !outcome && <span className={`pill ${pill.cls}`}>{pill.label}</span>}
@@ -246,17 +246,51 @@ function ReadyView({
           </span>
         </div>
       )}
-      {phase?.core_concept && (
-        <p className="muted" style={{ marginTop: 8 }}>
-          You&rsquo;ll be defending your understanding of: {phase.core_concept}
-        </p>
-      )}
       <p style={{ marginTop: 12 }}>
-        You&rsquo;ll start with a one-sentence <strong>anchor statement</strong> — a concrete
-        piece of what you built, naming a real variable, function, or database field. Then Codize
-        asks three probing questions about it. Take your time; there&rsquo;s no timer once
-        you&rsquo;ve begun.
+        You&rsquo;ll name one real thing you built, then answer three questions about it.
+        No timer, no trick questions — and <strong>you can keep your code open</strong> while
+        you answer.
       </p>
+      <details className="help">
+        <summary>What exactly will happen?</summary>
+        <div className="help-body">
+          <ol style={{ margin: "6px 0", paddingLeft: 20 }}>
+            <li>
+              You write a one-sentence <strong>anchor</strong> — a concrete piece of what you
+              built. Like:
+              <br />
+              <span className="mono" style={{ fontSize: 12 }}>
+                &ldquo;I built a likes_score variable and an update_likes_score() function.&rdquo;
+              </span>
+              <br />
+              <span className="mono" style={{ fontSize: 12 }}>
+                &ldquo;My POST /tasks route inserts into the tasks table with a user_id
+                column.&rdquo;
+              </span>
+            </li>
+            <li>Codize asks three questions specific to that anchor.</li>
+            <li>
+              A separate evaluation decides pass or fail. Nothing is graded until the final
+              answer.
+            </li>
+          </ol>
+        </div>
+      </details>
+      <details className="help">
+        <summary>What makes a good answer?</summary>
+        <div className="help-body">
+          <ul>
+            <li>Be specific about <em>your</em> code.</li>
+            <li>Name real variables, files, functions, or fields.</li>
+            <li>A generic textbook answer will not pass — even if it&rsquo;s technically right.</li>
+            <li>&ldquo;I&rsquo;d have to check X&rdquo; is more honest than bluffing.</li>
+          </ul>
+          <p className="muted">
+            Failing just means &ldquo;review and try again later&rdquo; — a short cooldown, no
+            other penalty.
+          </p>
+        </div>
+      </details>
       {flowError && (
         <div className="notice error" style={{ marginTop: 12 }}>
           {flowError}
@@ -431,13 +465,16 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
 
   return (
     <div className="card">
-      <div className="notice info">This defense didn&rsquo;t pass yet — and that&rsquo;s useful signal.</div>
+      <div className="notice info">
+        Didn&rsquo;t pass this time — that just means &ldquo;review and try again&rdquo;, not
+        that you&rsquo;re bad at this.
+      </div>
       <p style={{ marginTop: 12 }}>{outcome.reason}</p>
       {cooldownMin != null && (
         <p className="muted" style={{ marginTop: 10 }}>
-          You can try again in about {cooldownMin} minute{cooldownMin === 1 ? "" : "s"}. Use the
-          time to walk your own code — the gate rewards specifics about what <em>you</em> built,
-          not textbook definitions.
+          You can retry in about {cooldownMin} minute{cooldownMin === 1 ? "" : "s"} — a built-in
+          study break. Open your own code and walk the part you were asked about; specifics are
+          what pass.
         </p>
       )}
       <div className="row" style={{ marginTop: 16 }}>
@@ -475,14 +512,14 @@ function CooldownView({ gate }: { gate: GateCurrent }) {
         </span>
       </div>
       <p className="notice info" style={{ marginTop: 12 }}>
-        A recent attempt didn&rsquo;t pass.
+        Last attempt didn&rsquo;t pass — normal part of the loop.
         {cooldownMin != null && (
           <>
             {" "}
-            You can try again in about {cooldownMin} minute{cooldownMin === 1 ? "" : "s"}.
+            Retry opens in about {cooldownMin} minute{cooldownMin === 1 ? "" : "s"}.
           </>
         )}{" "}
-        Use the time to re-read the phase concept and walk your own code.
+        Good use of the break: open your code and re-walk the part you were asked about.
       </p>
       {gate.reason && (
         <div className="kv" style={{ marginTop: 8 }}>
@@ -526,32 +563,28 @@ function PassedView() {
 
 function GateExplainer() {
   return (
-    <div className="card" style={{ borderColor: "var(--border-strong)" }}>
-      <h3>How the defense works</h3>
-      <ol className="trap-steps" style={{ marginTop: 0 }}>
-        <li>
-          You give an <strong>anchor statement</strong> — a concrete piece of your implementation
-          you&rsquo;re ready to defend.
-        </li>
-        <li>Codize asks three questions specific to what you built.</li>
-        <li>
-          A separate evaluation decides pass or fail on structural understanding, ripple effects,
-          and implementation specificity.
-        </li>
-        <li>
-          <strong>Pass</strong> and you advance to the next phase. <strong>Fail</strong> and
-          there&rsquo;s a short cooldown before you can retry — no penalty beyond the wait.
-        </li>
-      </ol>
-      <p className="muted" style={{ marginTop: 12 }}>
-        Ticking tasks never advances a phase — only passing this defense does. The gate uses the
-        existing evaluation engine and is not yet aware of your saved workflow artifacts; those are
-        for your own reference and your Defense Report.
-      </p>
-      <p className="muted" style={{ marginTop: 8 }}>
-        Answers you&rsquo;re typing survive switching tabs — they&rsquo;re kept as a local draft
-        until you submit.
-      </p>
-    </div>
+    <>
+      <div className="guide" style={{ borderColor: "var(--border-strong)" }}>
+        <div style={{ padding: "12px 16px" }}>
+          <p style={{ margin: 0 }}>
+            <strong>While you answer:</strong> keep your code open, name real variables / files /
+            functions, and be specific about <em>your</em> implementation. Generic textbook
+            answers don&rsquo;t pass. Your typing survives tab switches.
+          </p>
+        </div>
+      </div>
+      <GuideCard title="How it works">
+        <ol style={{ margin: "6px 0", paddingLeft: 18 }}>
+          <li>Anchor: one concrete piece of what you built.</li>
+          <li>Three questions about it.</li>
+          <li>A separate evaluation decides pass / fail.</li>
+          <li>Pass → next phase. Fail → short cooldown, then retry.</li>
+        </ol>
+        <p>
+          Passing this is the only thing that advances a phase. The gate doesn&rsquo;t read your
+          saved artifacts — those feed your Defense Report.
+        </p>
+      </GuideCard>
+    </>
   );
 }

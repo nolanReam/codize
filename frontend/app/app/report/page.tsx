@@ -116,9 +116,9 @@ export default function ReportPage() {
         <div>
           <h1 className="page-title">Project Defense Report</h1>
           <p className="page-sub">
-            Everything you&rsquo;d need to stand behind this project — in a demo, an interview, or
-            when it breaks. Assembled from your real workflow. Verification is self-reported, so
-            this is a record of what you did and can explain, not a guarantee the project works.
+            Everything you&rsquo;d need to stand behind this project, assembled from your real
+            workflow — a record of what you did and can explain (self-reported), not a guarantee
+            it works.
           </p>
         </div>
         {input && (

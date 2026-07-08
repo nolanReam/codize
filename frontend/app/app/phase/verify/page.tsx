@@ -129,9 +129,8 @@ export default function VerificationLabPage() {
     <>
       <h1 className="page-title">Verification Lab</h1>
       <p className="page-sub">
-        Prove the code works instead of trusting the AI&rsquo;s word for it. These are manual
-        checks — record what you actually did. A recorded &ldquo;fail&rdquo; is more valuable
-        than a fake &ldquo;pass&rdquo;.
+        A quick honesty check, not homework — mark what you actually tried. It lands in your
+        Defense Report.
       </p>
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>
@@ -139,8 +138,8 @@ export default function VerificationLabPage() {
           <div>
         {wf.phase && (
           <p className="muted" style={{ marginBottom: 14 }}>
-            Verifying <strong>Phase {wf.phase.phase}: {wf.phase.phase_title}</strong> ·{" "}
-            {recorded}/{CHECKS.length} checks recorded
+            Phase {wf.phase.phase}: {wf.phase.phase_title} · {recorded}/{CHECKS.length} recorded ·
+            you can save any time and come back later
           </p>
         )}
 

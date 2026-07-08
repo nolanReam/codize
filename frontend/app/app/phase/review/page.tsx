@@ -104,9 +104,8 @@ export default function ReviewBoardPage() {
     <>
       <h1 className="page-title">Review Board</h1>
       <p className="page-sub">
-        You just used an AI tool. Before building on top of the result, put it on the record —
-        this is what separates directing AI from trusting it. Your answers feed your Project
-        Defense Report.
+        Back from your AI tool? Note what it actually did before you build on it. Every field is
+        optional — skip what you don&rsquo;t know.
       </p>
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>

@@ -105,6 +105,23 @@ npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
 
+## Status (M13E.3)
+
+Cognitive-load reduction pass from the first tester's qualitative feedback
+("overwhelming, text-heavy"): **progressive disclosure everywhere** — GuideCard
+is now a collapsed `<details>`, every screen keeps at most 1–2 visible
+explanatory sentences with the rest behind "What does this mean?" disclosures,
+and every core screen has **one accented primary action** (cockpit "Do this
+next", phase "Next step" pointing at the first uncaptured Build Loop artifact,
+Prompt Builder "Step 1"). The Prompt Builder (the pilot's favorite surface) is
+now three short steps with starter + quick-add guardrail chips; the Evidence
+Panel is "proof you checked something — one small piece is enough" with five
+tap-to-pick kinds and a "skip for now" path; Verification reads as a quick
+honesty check; the gate is framed as coaching (example anchors, "what makes a
+good answer", softened fail/cooldown copy — evaluator strictness unchanged).
+`components/LoopOverview.tsx` answers "what am I about to do" in 8 collapsed
+lines. See `.claude/memory/pilot-ux-lessons.md` for the density rule.
+
 ## Status (M13E.2)
 
 Pilot bugfix pass from the first real friend test: **local draft persistence**

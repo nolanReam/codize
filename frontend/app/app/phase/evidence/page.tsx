@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
@@ -10,16 +11,19 @@ import { useDraft } from "@/lib/drafts";
 import { useWorkflowSection } from "@/lib/useWorkflowSection";
 import type { EvidenceEntry, EvidenceKind } from "@/lib/types";
 
-const KINDS: { value: EvidenceKind; label: string; placeholder: string }[] = [
+// The five everyday kinds are always visible as tap-to-pick chips; the more
+// technical kinds live behind "More types" (M13E.3 — the panel read as a
+// legal form to the first tester). Same backend enum, friendlier surface.
+const KINDS: { value: EvidenceKind; label: string; placeholder: string; primary?: boolean }[] = [
+  { value: "screenshot_note", label: "Screenshot", placeholder: "what the screenshot shows — link or description", primary: true },
+  { value: "terminal_output", label: "Terminal output", placeholder: "paste the relevant output", primary: true },
+  { value: "test_output", label: "Test result", placeholder: "3 passed in 0.21s", primary: true },
+  { value: "changed_files", label: "Files you changed", placeholder: "app/routes/tasks.py, app/models.py", primary: true },
+  { value: "note", label: "Short note", placeholder: "anything that shows the work is real", primary: true },
   { value: "repo_url", label: "Repo URL", placeholder: "https://github.com/you/project" },
   { value: "commit_hash", label: "Commit hash", placeholder: "a1b2c3d" },
-  { value: "changed_files", label: "Changed files", placeholder: "app/routes/tasks.py, app/models.py" },
-  { value: "terminal_output", label: "Terminal output", placeholder: "paste the relevant output" },
-  { value: "test_output", label: "Test output", placeholder: "3 passed in 0.21s" },
-  { value: "screenshot_note", label: "Screenshot note/link", placeholder: "screenshot of the working flow — link or description" },
   { value: "app_url", label: "App URL", placeholder: "https://myapp.example.com" },
-  { value: "api_response", label: "API response example", placeholder: '{"id": 1, "status": "created"}' },
-  { value: "note", label: "Note", placeholder: "anything else that proves the work" },
+  { value: "api_response", label: "API response", placeholder: '{"id": 1, "status": "created"}' },
 ];
 
 // Evidence Panel — manual, self-reported evidence for v0.1. Nothing is
@@ -28,7 +32,7 @@ export default function EvidencePanelPage() {
   const wf = useWorkflowSection("evidence");
   const [entries, setEntries] = useState<EvidenceEntry[]>([]);
   const [summary, setSummary] = useState("");
-  const [kind, setKind] = useState<EvidenceKind>("repo_url");
+  const [kind, setKind] = useState<EvidenceKind>("screenshot_note");
   const [content, setContent] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -54,7 +58,7 @@ export default function EvidencePanelPage() {
     if (draft.restored) {
       setEntries(draft.restored.entries ?? []);
       setSummary(draft.restored.summary ?? "");
-      setKind(draft.restored.kind ?? "repo_url");
+      setKind(draft.restored.kind ?? "screenshot_note");
       setContent(draft.restored.content ?? "");
     }
   }, [wf.loading, draft.ready, draft.restored]);
@@ -100,9 +104,8 @@ export default function EvidencePanelPage() {
     <>
       <h1 className="page-title">Evidence Panel</h1>
       <p className="page-sub">
-        Attach proof of the work: repo links, commits, outputs, screenshots-as-notes. Manual for
-        v0.1 — Codize doesn&rsquo;t fetch or verify anything for you, and pasting a real API key
-        is rejected on save.
+        Proof you checked something — <strong>one small piece is enough</strong> for this phase.
+        It goes straight into your Defense Report.
       </p>
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>
@@ -114,23 +117,42 @@ export default function EvidencePanelPage() {
           </p>
         )}
 
-        <div className="card">
-          <h3>Add evidence</h3>
+        <div className="card" style={{ borderColor: "var(--accent)" }}>
+          <h3>Add one piece of proof</h3>
           {formError && <div className="notice error">{formError}</div>}
-          <div className="field">
-            <label>Type</label>
-            <select value={kind} onChange={(e) => setKind(e.target.value as EvidenceKind)}>
-              {KINDS.map((k) => (
-                <option key={k.value} value={k.value}>
-                  {k.label}
-                </option>
-              ))}
-            </select>
+          <div className="chips" style={{ marginTop: 0 }}>
+            {KINDS.filter((k) => k.primary).map((k) => (
+              <button
+                key={k.value}
+                type="button"
+                className={`chip${kind === k.value ? " active" : ""}`}
+                onClick={() => setKind(k.value)}
+              >
+                {k.label}
+              </button>
+            ))}
           </div>
-          <div className="field">
-            <label>Content</label>
+          <details className="help">
+            <summary>More types</summary>
+            <div className="help-body">
+              <div className="chips" style={{ marginTop: 0 }}>
+                {KINDS.filter((k) => !k.primary).map((k) => (
+                  <button
+                    key={k.value}
+                    type="button"
+                    className={`chip${kind === k.value ? " active" : ""}`}
+                    onClick={() => setKind(k.value)}
+                  >
+                    {k.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </details>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>{KINDS.find((k) => k.value === kind)?.label}</label>
             <textarea
-              rows={4}
+              rows={3}
               maxLength={8000}
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -142,14 +164,27 @@ export default function EvidencePanelPage() {
               <p className="hint">7–40 hex characters, e.g. a1b2c3d.</p>
             ) : null}
           </div>
-          <button className="btn" onClick={addEntry} disabled={!content.trim()}>
-            Add entry
-          </button>
+          <div className="row">
+            <button className="btn primary" onClick={addEntry} disabled={!content.trim()}>
+              Add entry
+            </button>
+            <span className="muted">
+              Nothing yet? That&rsquo;s fine —{" "}
+              <Link href="/app/phase" className="mono" style={{ fontSize: 12 }}>
+                skip for now →
+              </Link>{" "}
+              and come back after your next AI session.
+            </span>
+          </div>
         </div>
 
         <div className="card">
           <h3>Collected evidence ({entries.length}/20)</h3>
-          {entries.length === 0 && <p className="empty">Nothing attached yet.</p>}
+          {entries.length === 0 && (
+            <p className="empty">
+              Nothing attached yet — add one piece above and it shows up in your Defense Report.
+            </p>
+          )}
           {entries.map((entry, idx) => (
             <div className="task" key={idx}>
               <span className="tag">{entry.kind}</span>
@@ -186,23 +221,22 @@ export default function EvidencePanelPage() {
           </div>
 
           <aside className="ws-rail" aria-label="Guidance">
-            <GuideCard title="What counts as evidence?">
+            <GuideCard title="Why bother?">
               <p>
-                Anything that would convince a skeptical teacher the work is real: a repo link, a
-                commit hash, test output, a terminal paste, a screenshot description.
+                Evidence turns &ldquo;it works, trust me&rdquo; into something you can show a
+                teacher or interviewer. One passing test output beats &ldquo;everything
+                works&rdquo; — and failed output counts too: it proves honest checking.
               </p>
             </GuideCard>
-            <GuideCard title="Small proofs beat big claims">
-              <ul>
-                <li>One passing test output &gt; &ldquo;everything works&rdquo;.</li>
-                <li>A commit hash pins <em>when</em> you did it.</li>
-                <li>Failed output is evidence too — of honest verification.</li>
-              </ul>
-            </GuideCard>
-            <GuideCard title="Your text is kept">
+            <GuideCard title="The fine print">
               <p>
-                Entries you add and text you type survive switching tabs as a local draft — press{" "}
-                <strong>Save evidence</strong> to store them to your project.
+                Manual for v0.1 — Codize doesn&rsquo;t fetch or verify anything for you, and it
+                records what you <em>did</em>, not that the code is correct. Pasting a real API
+                key is rejected on save.
+              </p>
+              <p>
+                Your typing survives tab switches as a local draft; <strong>Save evidence</strong>{" "}
+                stores it to your project.
               </p>
             </GuideCard>
           </aside>

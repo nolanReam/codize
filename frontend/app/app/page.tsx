@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import Async from "@/components/Async";
 import GuideCard from "@/components/GuideCard";
+import LoopOverview from "@/components/LoopOverview";
 import WorkflowSteps from "@/components/WorkflowSteps";
 import { ApiError, getEvaluation, getIntakeStatus, getWorkflow } from "@/lib/api";
 import type { Evaluation, WorkflowSections } from "@/lib/types";
@@ -16,10 +17,6 @@ const STATE_PILL: Record<string, { label: string; cls: string }> = {
   cooldown: { label: "GATE COOLDOWN", cls: "danger" },
   complete: { label: "ROADMAP COMPLETE", cls: "ok" },
 };
-
-function sectionPill(present: boolean) {
-  return <span className={`pill ${present ? "ok" : ""}`}>{present ? "saved" : "not started"}</span>;
-}
 
 // The Project Cockpit — the dashboard for your (currently one) project. A
 // brand-new user never lands here: the spec routes signup straight into
@@ -70,7 +67,7 @@ export default function CockpitPage() {
       <div className="spread">
         <div>
           <h1 className="page-title">Project Cockpit</h1>
-          <p className="page-sub">Your project at a glance — where you are, and what to do next.</p>
+          <p className="page-sub">Where you are, and the one thing to do next.</p>
         </div>
         <div className="row">
           {pill && <span className={`pill ${pill.cls}`}>{pill.label}</span>}
@@ -88,7 +85,30 @@ export default function CockpitPage() {
         {evaluation && (
           <div className="workspace">
             <div>
-              <div className="card" style={{ borderColor: "var(--border-strong)" }}>
+              {/* 1. The one thing to do next — the page's primary action. */}
+              <div className="card" style={{ borderColor: "var(--accent)" }}>
+                <h3>Do this next</h3>
+                <p style={{ fontSize: 17, fontWeight: 600 }}>{evaluation.next_action}</p>
+                <div className="row" style={{ marginTop: 12 }}>
+                  <Link
+                    href={evaluation.state === "gate_ready" ? "/app/gate" : "/app/phase"}
+                    className="btn primary"
+                  >
+                    {evaluation.state === "gate_ready" ? "Start the defense" : "Continue project"}
+                  </Link>
+                  {evaluation.state === "cooldown" &&
+                    evaluation.cooldown_seconds_remaining != null && (
+                      <span className="muted">
+                        Gate retry in ~{Math.ceil(evaluation.cooldown_seconds_remaining / 60)} min
+                        — good time to review your work.
+                      </span>
+                    )}
+                </div>
+                <LoopOverview />
+              </div>
+
+              {/* 2. The project, and all progress in one compact card. */}
+              <div className="card" style={{ marginTop: 14 }}>
                 <h3>Your project</h3>
                 {purpose ? (
                   <p style={{ fontSize: 16, fontWeight: 600 }}>&ldquo;{purpose}&rdquo;</p>
@@ -103,123 +123,58 @@ export default function CockpitPage() {
                   </span>
                 </div>
                 <div className="kv">
-                  <span className="k">Phases passed</span>
-                  <span>{evaluation.completed_phases}</span>
-                </div>
-                <div className="kv">
                   <span className="k">Build tasks</span>
                   <span>
-                    {evaluation.completed_task_count} / {evaluation.total_task_count} done — tick
-                    them on the Phase page
+                    {evaluation.completed_task_count} / {evaluation.total_task_count} done
                   </span>
                 </div>
                 <div className="kv">
-                  <span className="k">Codize workflow</span>
-                  <span>{savedCount} / 4 artifacts captured this phase</span>
+                  <span className="k">Workflow</span>
+                  <span>{savedCount} / 4 captured this phase</span>
                 </div>
-                <div className="row" style={{ marginTop: 14 }}>
-                  <Link href="/app/phase" className="btn primary">
-                    Continue project
-                  </Link>
-                  {(evaluation.state === "gate_ready" || evaluation.state === "cooldown") && (
-                    <Link href="/app/gate" className="btn">
-                      Project Defense
-                    </Link>
-                  )}
-                </div>
+                {evaluation.recent_gate && (
+                  <div className="kv">
+                    <span className="k">Latest gate</span>
+                    <span
+                      className={`pill ${
+                        evaluation.recent_gate.outcome === "passed"
+                          ? "ok"
+                          : evaluation.recent_gate.outcome === "failed"
+                            ? "danger"
+                            : "warn"
+                      }`}
+                    >
+                      {evaluation.recent_gate.outcome}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className="card" style={{ marginTop: 14 }}>
-                <h3>Next action</h3>
-                <p style={{ fontSize: 16 }}>{evaluation.next_action}</p>
-              </div>
-
-              <div className="card-grid" style={{ marginTop: 14 }}>
-                <div className="card">
-                  <h3>Gate</h3>
-                  {evaluation.recent_gate ? (
-                    <>
-                      <div className="kv">
-                        <span className="k">Latest</span>
-                        <span className={`pill ${
-                          evaluation.recent_gate.outcome === "passed"
-                            ? "ok"
-                            : evaluation.recent_gate.outcome === "failed"
-                              ? "danger"
-                              : "warn"
-                        }`}>
-                          {evaluation.recent_gate.outcome}
-                        </span>
-                      </div>
-                      {evaluation.recent_gate.summary && (
-                        <p className="muted" style={{ marginTop: 8 }}>
-                          {evaluation.recent_gate.summary}
-                        </p>
-                      )}
-                      {evaluation.state === "cooldown" &&
-                        evaluation.cooldown_seconds_remaining != null && (
-                          <p className="muted" style={{ marginTop: 8 }}>
-                            Retry available in ~
-                            {Math.ceil(evaluation.cooldown_seconds_remaining / 60)} min.
-                          </p>
-                        )}
-                    </>
-                  ) : (
-                    <p className="empty">No gate attempts on this phase yet.</p>
-                  )}
-                </div>
-
-                <div className="card">
-                  <h3>Unlocks</h3>
-                  {evaluation.unlocks && evaluation.unlocks.length > 0 ? (
-                    evaluation.unlocks.map((u) => (
-                      <div className="kv" key={u.id}>
-                        <span className="k">Phase {u.phase}</span>
-                        <span>{u.description}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="empty">Nothing unlocked yet. Keep building well.</p>
-                  )}
-                </div>
-              </div>
-
+              {/* 3. The loop strip — visual, links to each step. */}
               <div className="card" style={{ marginTop: 14 }}>
                 <h3>Build Loop — Phase {evaluation.current_phase}</h3>
                 <WorkflowSteps sections={sections} />
-                <div className="row">
-                  <span className="muted">Prompt Builder</span>
-                  {sectionPill(sections?.prompt_builder != null)}
-                  <span className="muted">Review Board</span>
-                  {sectionPill(sections?.review_board != null)}
-                  <span className="muted">Evidence</span>
-                  {sectionPill(sections?.evidence != null)}
-                  <span className="muted">Verification</span>
-                  {sectionPill(sections?.verification != null)}
-                </div>
-                <p className="muted" style={{ marginTop: 10 }}>
-                  These artifacts document your work — saving them never ticks a build task.
-                  Build tasks are the roadmap&rsquo;s checkboxes on the Phase page, and only
-                  passing the gate advances the phase.
-                </p>
-              </div>
-
-              <div className="card" style={{ marginTop: 14 }}>
-                <h3>Project Defense Report</h3>
-                <p className="muted">
-                  {savedCount} of 4 workflow artifacts captured for this phase. Your report
-                  assembles from your intake, phases, artifacts, gate outcome, and unlocks — and
-                  you can copy or download it as Markdown for a demo or interview.
-                </p>
-                <div className="row" style={{ marginTop: 12 }}>
-                  <Link href="/app/report" className="btn">
+                <div className="row" style={{ marginTop: 10 }}>
+                  <Link href="/app/report" className="btn small">
                     Open Defense Report
                   </Link>
-                  <Link href="/app/gate" className="btn">
-                    Project Defense
-                  </Link>
+                  <span className="muted">
+                    Everything you save here lands in your report.
+                  </span>
                 </div>
               </div>
+
+              {evaluation.unlocks && evaluation.unlocks.length > 0 && (
+                <div className="card" style={{ marginTop: 14 }}>
+                  <h3>Unlocked</h3>
+                  {evaluation.unlocks.map((u) => (
+                    <div className="kv" key={u.id}>
+                      <span className="k">Phase {u.phase}</span>
+                      <span>{u.description}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <aside className="ws-rail" aria-label="Guidance">

@@ -240,23 +240,30 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); bo
 
 /* ---- guidance rail / beginner help --------------------------------------- */
 
-/* rail card: contextual guidance (what this page is, what to do, examples) */
+/* rail card: contextual guidance. Since M13E.3 it's a native <details> —
+   collapsed by default, title always visible (text-density rule: guidance is
+   revealed on demand, never a wall of text). */
 .guide {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 14px 16px;
   font-size: 13.5px;
   color: var(--ink-2);
 }
-.guide h4 {
+.guide summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 11px 16px;
   font-family: var(--mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--accent);
-  margin-bottom: 8px;
 }
+.guide summary::-webkit-details-marker { display: none; }
+.guide summary::after { content: " +"; color: var(--ink-3); }
+.guide[open] summary::after { content: " –"; }
+.guide .guide-body { padding: 0 16px 12px; }
 .guide p { margin: 6px 0; }
 .guide ul { margin: 6px 0; padding-left: 18px; }
 .guide li { margin: 4px 0; }
@@ -277,6 +284,7 @@ button.chip {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 button.chip:hover { border-color: var(--accent); color: var(--ink); }
+button.chip.active { border-color: var(--accent); color: var(--ink); background: var(--accent-bg, var(--surface)); }
 
 /* "what does this mean?" disclosure — native details, keyboard-friendly */
 details.help {

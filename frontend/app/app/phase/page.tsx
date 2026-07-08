@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import Async from "@/components/Async";
+import GuideCard from "@/components/GuideCard";
 import WorkflowSteps from "@/components/WorkflowSteps";
 import { ApiError, getCurrentPhase, getPhases, getWorkflow, setTaskCompletion } from "@/lib/api";
 import { phaseGuide } from "@/lib/phaseGuide";
@@ -71,6 +72,43 @@ export default function PhaseBoardPage() {
     ? Object.values(sections).filter((s) => s != null).length
     : 0;
 
+  // The one obvious next step: the first workflow artifact not yet captured,
+  // or the gate once all four are in. Order mirrors the Build Loop.
+  const WORKFLOW_ORDER: {
+    key: keyof WorkflowSections;
+    label: string;
+    href: string;
+    hint: string;
+  }[] = [
+    {
+      key: "prompt_builder",
+      label: "Plan your prompt",
+      href: "/app/phase/prompt",
+      hint: "Turn this phase into one clear ask for your AI tool.",
+    },
+    {
+      key: "review_board",
+      label: "Review what the AI did",
+      href: "/app/phase/review",
+      hint: "Back from your AI tool? Note what it changed before building on it.",
+    },
+    {
+      key: "evidence",
+      label: "Save one piece of proof",
+      href: "/app/phase/evidence",
+      hint: "A test output, a screenshot note, a commit — one is enough.",
+    },
+    {
+      key: "verification",
+      label: "Run a quick check",
+      href: "/app/phase/verify",
+      hint: "Mark what you actually checked. Skipped is allowed.",
+    },
+  ];
+  const nextStep = sections
+    ? WORKFLOW_ORDER.find((s) => sections[s.key] == null) ?? null
+    : WORKFLOW_ORDER[0];
+
   return (
     <Async loading={loading} error={error} onRetry={load}>
       {phase && (
@@ -104,20 +142,41 @@ export default function PhaseBoardPage() {
 
           <div className="workspace">
             <div>
-              <div className="card">
-                <h3>The Build Loop — how to work this phase</h3>
-                <WorkflowSteps sections={sections} />
-                <p className="muted">
-                  Plan and prompt in Codize, generate in your AI tool, then come back to review
-                  what changed, capture evidence, verify behavior, and defend it at the gate.
-                </p>
+              {/* The one obvious next step for this phase. */}
+              <div className="card" style={{ borderColor: "var(--accent)" }}>
+                <h3>Next step</h3>
+                {nextStep ? (
+                  <>
+                    <p style={{ fontSize: 16, fontWeight: 600 }}>{nextStep.label}</p>
+                    <p className="muted" style={{ marginTop: 4 }}>{nextStep.hint}</p>
+                    <div className="row" style={{ marginTop: 12 }}>
+                      <Link href={nextStep.href} className="btn primary">
+                        {nextStep.label} →
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 16, fontWeight: 600 }}>
+                      All four artifacts captured — defend this phase.
+                    </p>
+                    <div className="row" style={{ marginTop: 12 }}>
+                      <Link href="/app/gate" className="btn primary">
+                        Start the defense →
+                      </Link>
+                    </div>
+                  </>
+                )}
+                <div style={{ marginTop: 12 }}>
+                  <WorkflowSteps sections={sections} />
+                </div>
               </div>
 
               <div className="card-grid" style={{ marginTop: 14 }}>
                 <div className="card">
                   <h3>AI-appropriate tasks</h3>
                   <p className="muted" style={{ marginBottom: 8 }}>
-                    Fine to delegate — but review what comes back (that&rsquo;s the Review step).
+                    Fine to hand to your AI tool.
                   </p>
                   {phase.ai_appropriate_tasks.map((t) => (
                     <label className="task" key={t.task_id}>
@@ -136,7 +195,7 @@ export default function PhaseBoardPage() {
                 <div className="card">
                   <h3>Human-required tasks</h3>
                   <p className="muted" style={{ marginBottom: 8 }}>
-                    These are yours. Delegating them is how the 80% Trap starts.
+                    These are yours.
                   </p>
                   {phase.human_required_tasks.map((t) => (
                     <label className="task" key={t.task_id}>
@@ -155,10 +214,7 @@ export default function PhaseBoardPage() {
               </div>
               {taskError && <div className="notice error">{taskError}</div>}
               <p className="muted" style={{ marginTop: 8 }}>
-                <strong>Tick build tasks yourself</strong> as you finish them — they&rsquo;re your
-                to-do list from the roadmap. Saving a prompt, review, evidence, or verification is
-                tracked separately (the &ldquo;Workflow&rdquo; count above) and never ticks a build
-                task. Neither one advances the phase — only passing the gate does.
+                Tick these yourself as you finish building. Only the gate advances the phase.
               </p>
 
               <div className="card" style={{ marginTop: 14 }}>
@@ -180,24 +236,17 @@ export default function PhaseBoardPage() {
             </div>
 
             <aside className="ws-rail" aria-label="Progress and roadmap">
-              <div className="card">
-                <h3>Two kinds of progress</h3>
-                <div className="kv">
-                  <span className="k">Build tasks</span>
-                  <span>
-                    {phase.completed_task_count}/{phase.total_task_count} done
-                  </span>
-                </div>
-                <div className="kv">
-                  <span className="k">Codize workflow</span>
-                  <span>{capturedCount}/4 captured</span>
-                </div>
-                <p className="muted" style={{ marginTop: 8 }}>
-                  <strong>Build tasks</strong> = the actual building (checkboxes on the left —
-                  tick them yourself). <strong>Workflow</strong> = what you&rsquo;ve captured in
+              <GuideCard title="Two kinds of progress">
+                <p>
+                  <strong>Build tasks</strong> ({phase.completed_task_count}/
+                  {phase.total_task_count}) = the actual building — the checkboxes, ticked by
+                  you.
+                </p>
+                <p>
+                  <strong>Workflow</strong> ({capturedCount}/4) = what you&rsquo;ve captured in
                   Codize about that work. Doing one doesn&rsquo;t tick the other.
                 </p>
-              </div>
+              </GuideCard>
               {phases && (
                 <div className="card">
                   <h3>Roadmap</h3>

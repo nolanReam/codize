@@ -258,6 +258,36 @@ orphan the first (no error!) — never ship a working "+ New project" until
 `docs/context/multi_project_dashboard_plan.md` is implemented; the disabled
 affordance + honest rail note is the M13E.1 ceiling.
 
+**M13E.3 (2026-07-07) — cognitive-load / text-density conventions** (root
+cause of the pilot's "overwhelming" feedback — see [[pilot-ux-lessons]]).
+(1) **GuideCard is a `<details>`** — collapsed by default, `defaultOpen` prop
+for rare must-see cards; never revert it to an always-open card, and never
+put load-bearing instructions ONLY inside one. (2) **Density rule**: max 1–2
+explanatory sentences visible at the top of a screen; everything else behind
+`details.help`/GuideCard; prefer chips + placeholders over hint paragraphs;
+don't repeat the same workflow explanation across pages. (3) **One primary
+action per screen**: an accent-bordered card (`borderColor: var(--accent)`)
+with one `btn primary` — cockpit's "Do this next" (state-aware target:
+gate_ready → gate, else phase), the phase page's "Next step" (first
+null workflow section in Build Loop order, else the gate), Prompt Builder's
+Step 1. (4) **Prompt Builder is the hero surface** (pilot 5/5): Step 1 = the
+ask + starter chips (guide.asks + roadmap AI tasks merged into one chip row),
+Steps 2/3 = optional context/guardrails with short labels and no hint
+paragraphs; guardrail quick-add chips ("Plan first" → planFirst,
+"Give manual verification steps" → wantChecks, others append via
+`addConstraint` — append, never overwrite, dedupe by `includes`).
+(5) **Evidence = "one small piece is enough"**: 5 primary kind chips
+(screenshot/terminal/test/changed-files/note), technical kinds behind "More
+types", explicit "skip for now →" escape hatch; honesty fine print lives in
+the collapsed rail card, never deleted. (6) **Gate copy is coaching, never
+punishment**: "not a test of intelligence", "you can keep your code open",
+fail = "review and try again"; example anchors + "what makes a good answer"
+are collapsed details on ReadyView; strictness stays server-side only.
+(7) `LoopOverview` (components/) is the reusable 8-line "what you'll actually
+do" answer — collapsed `details.help`, currently on the cockpit hero; reuse
+it instead of writing new onboarding walls. (8) `button.chip.active` marks a
+selected chip (evidence kind picker).
+
 **M13E.2 (2026-07-06) — pilot bugfix conventions.** (1) **Local drafts**
 (`lib/drafts.ts`): unsubmitted text survives tab/page switches via
 localStorage keys `codize:draft:<user id>:<surface>` (surface = section+phase,
