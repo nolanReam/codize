@@ -208,6 +208,32 @@ roadmap; unknown phase/section → 404, workspace not ready → 409, invalid
 payload → 422). A write touches exactly one column; unknown keys in stored
 data are dropped on read.
 
+## Defense context pack (M14A)
+
+`services/defense_context_service.py` (+ `schemas/defense_context.py`) builds
+the deterministic, ownership-safe context pack the future artifact-aware
+Project Defense (M14B) will ground its questions in. **The gate does not
+consume it yet** — the builder is a standalone internal service (no API
+route; nothing raw is exposed to clients) and wiring it into gate prompts is
+a separate spec-guardian-reviewed milestone. The M14B seam is
+`build_defense_context(project_repo, user_id, phase_number)` →
+`DefenseContextPack`, then `render_defense_context(pack)` → the deterministic
+string (untrusted-data header + sorted-key JSON). Properties: read-only
+(ProjectRepository only — gates/unlocks/profiles unreachable by
+construction, no LLM import, no DB write); ownership through the shared
+`phase_service.load_active_project` path with the existing
+WorkspaceNotReady/PhaseNotFound error conventions; purpose-built normalized
+shapes for project, phase, build-task progress, intake, and the four
+workflow sections; explicit provenance (`SourceType` per source — student
+claims/evidence/verification are labeled self-reported, never verified
+facts); missing artifacts are first-class (`missing_sources` + manifest
+`present=false`, never a failure); value-shaped secret redaction
+(`[REDACTED_SECRET]`, applied recursively before truncation — env-var names
+survive); deterministic per-source + total character budgets with visible
+truncation metadata (`…[TRUNCATED]`, priority squeeze order keeps the phase
+identity and the built prompt longest); and zero account-level data (no user
+id, email, tokens, or profile fields — tested).
+
 ## Tests
 
 ```bash

@@ -71,6 +71,13 @@ def _phase_view(project: dict, phase_number: int) -> dict:
     }
 
 
+def stored_sections(project: dict, phase_number: int) -> dict:
+    """One phase's stored section map from an already-loaded project (only
+    well-formed known sections survive) — shared with the defense context
+    builder (M14A), which loads the project once itself. Read-only."""
+    return _stored_sections(project, phase_number)
+
+
 async def get_phase_artifacts(
     repo: ProjectRepository, user_id: str, phase_number: int
 ) -> dict:

@@ -16,7 +16,11 @@ import anywhere in the module (tested by source inspection + route-level
 provider-explosion test). The Interrogation Gate does NOT read these
 artifacts — making the gate evidence-aware is a future spec-guardian-reviewed
 change with its own adversarial-testing round, not a quiet extension (see
-[[gate-conventions]], [[product-vision-v3]]). The Project Defense Report has
+[[gate-conventions]], [[product-vision-v3]]). Since M14A the read seam
+`workflow_service.stored_sections(project, phase_number)` (public wrapper,
+read-only) feeds the defense context builder — which normalizes/redacts/
+bounds artifact content for FUTURE M14B use without touching the gate (see
+[[defense-context-conventions]]). The Project Defense Report has
 no backend endpoint: M13C assembles it client-side from `GET /workflow/{phase}`
 plus the existing evaluation/phases/unlocks/gate routes.
 

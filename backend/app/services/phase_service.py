@@ -147,6 +147,13 @@ def current_phase_view(project: dict) -> dict:
     return _phase_view(project, _find_phase(project, project["current_phase"]))
 
 
+def phase_view(project: dict, phase_number: int) -> dict:
+    """Full view of any phase of an already-loaded active project
+    (PhaseNotFoundError if absent) — shared with the defense context builder
+    (M14A), which loads the project once itself."""
+    return _phase_view(project, _find_phase(project, phase_number))
+
+
 def incomplete_tasks(phase_view: dict) -> list[dict]:
     """The not-yet-completed tasks of a phase view, id + description only —
     shared with the reconnection (M11) and evaluation (M12) services."""

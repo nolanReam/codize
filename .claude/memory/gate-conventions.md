@@ -75,6 +75,14 @@ decision to make). Live-verified against real Gemini + real Supabase in M9:
 one full PASS gate (phase 1→2) and one full FAIL gate (textbook answer
 auto-failed, 30-min cooldown enforced live with Retry-After).
 
+M14A built the standalone defense context pack
+(`defense_context_service.build_defense_context` — see
+[[defense-context-conventions]]) but the gate still does NOT read workflow
+artifacts: nothing in gate_service imports or consumes the pack. Wiring it
+into gate question generation is M14B — a spec-guardian-reviewed change with
+its own adversarial-testing round; until then any "evidence-aware" behavior
+in the gate is a regression.
+
 Prompt-hole lessons from the live adversarial runs (all in
 `docs/prebuild/adversarial_tests.md`): flash-lite counted generic role
 descriptions ("the owner column") as implementation-specific → Condition 3
