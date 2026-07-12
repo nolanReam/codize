@@ -258,6 +258,32 @@ orphan the first (no error!) — never ship a working "+ New project" until
 `docs/context/multi_project_dashboard_plan.md` is implemented; the disabled
 affordance + honest rail note is the M13E.1 ceiling.
 
+**M13E.4 (2026-07-12) — UI system polish conventions** (skill-driven pass;
+Impeccable/Taste/Emil-motion were requested but not installed — the installed
+`ui-ux` + `frontend-design` skills served as the critics). The system, all in
+globals.css: (1) **`.card.primary`** is the app's visual signature — a 2px
+accent LEFT RAIL (never a full violet outline) marking the ONE primary card
+per screen (cockpit hero, phase next-step, prompt Step 1, gate active step,
+evidence add, verify checks, intake current question); it's the only card
+with a hover lift, and the sidebar's active link echoes it via
+`inset 2px 0 0 var(--accent)`. Never use inline
+`style={{borderColor:"var(--accent)"}}` again. (2) **No resting glow**:
+`.btn.primary` is a crisp solid; depth (shadow+lift) appears on hover only;
+all buttons get `:active scale(0.98)` press feedback. (3) **Softened status
+color**: pills/notices use `color-mix(... 35–40%, transparent)` borders over
+full-strength ones; **cooldown is `warn` (amber), never `danger`** — red is
+reserved for genuine errors and honest recorded "fail" data. (4) **Fewer
+boxes**: `details.help` and `.loop .step` are borderless (tint-on-surface);
+`.card:hover` border change removed; generic cards don't react. (5) **Type
+scale**: page-title 26px display; textareas are SANS 14px (mono is only for
+code-like output — pre.output, .mono, code); page-sub max 62ch. (6) **Motion
+budget** (all transform/opacity, all neutralized by the global
+prefers-reduced-motion kill switch at the end of globals.css): `reveal`
+(disclosure bodies, 180ms), `rise` (pre.output — the prompt payoff, 240ms),
+primary-card hover lift, button/chip press scale. Do not add ambient or
+looping animation to the protected app. (7) Focus: inputs use a 3px
+color-mix ring (box-shadow), buttons/links keep the 2px outline.
+
 **M13E.3 (2026-07-07) — cognitive-load / text-density conventions** (root
 cause of the pilot's "overwhelming" feedback — see [[pilot-ux-lessons]]).
 (1) **GuideCard is a `<details>`** — collapsed by default, `defaultOpen` prop

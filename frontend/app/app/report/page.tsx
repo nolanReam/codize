@@ -123,7 +123,7 @@ export default function ReportPage() {
         </div>
         {input && (
           <div className="row">
-            <button className="btn" onClick={copyMarkdown}>
+            <button className="btn primary" onClick={copyMarkdown}>
               {copied ? "Copied ✓" : "Copy as Markdown"}
             </button>
             <button className="btn" onClick={downloadMarkdown}>
@@ -190,7 +190,7 @@ function ReportBody({ input }: { input: ReportInput }) {
         <div className="row" style={{ marginBottom: 8 }}>
           <span
             className={`pill ${
-              status === "passed" ? "ok" : status === "cooldown" ? "danger" : status === "in_progress" ? "warn" : ""
+              status === "passed" ? "ok" : status === "cooldown" ? "warn" : status === "in_progress" ? "warn" : ""
             }`}
           >
             {defenseLabel(status)}

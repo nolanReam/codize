@@ -105,6 +105,19 @@ npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
 
+## Status (M13E.4)
+
+Skill-driven UI polish pass (visual system only — zero behavior change): a
+`.card.primary` accent-left-rail signature marks each screen's one primary
+card (with the app's only hover lift, echoed by the sidebar active state);
+primary buttons lost their resting glow (depth on hover, press feedback on
+all buttons/chips); status pills and notices soften their borders and
+cooldown reads amber, never red; help disclosures and the Build Loop strip
+are borderless tints instead of more boxes; the type scale rose (26px
+titles, sans textareas — mono reserved for code-like output); and three
+subtle transform/opacity motions (disclosure reveal, generated-prompt rise,
+focus rings) live inside the existing `prefers-reduced-motion` kill switch.
+
 ## Status (M13E.3)
 
 Cognitive-load reduction pass from the first tester's qualitative feedback

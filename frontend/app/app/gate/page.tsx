@@ -18,10 +18,11 @@ import {
 import { useDraft } from "@/lib/drafts";
 import type { GateCurrent, GateEvaluationResult, PhaseView } from "@/lib/types";
 
+// Cooldown is amber, not red — a study break, not an error (M13E.4).
 const STATE_PILL: Record<GateCurrent["state"], { label: string; cls: string }> = {
   not_started: { label: "READY TO DEFEND", cls: "accent" },
   in_progress: { label: "DEFENSE IN PROGRESS", cls: "warn" },
-  cooldown: { label: "COOLDOWN", cls: "danger" },
+  cooldown: { label: "COOLDOWN", cls: "warn" },
   passed: { label: "PASSED", cls: "ok" },
 };
 
@@ -359,7 +360,7 @@ function ActiveFlow({
       ))}
 
       {/* The step the student is on right now. */}
-      <div className="card" style={{ borderColor: "var(--accent)" }}>
+      <div className="card primary">
         {isAnchor ? (
           <>
             <h3>Step 1 — Anchor statement</h3>

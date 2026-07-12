@@ -107,8 +107,13 @@ input:focus-visible[type="checkbox"] {
   font-family: var(--sans);
   text-align: left;
 }
+.sidebar .nav-link { transition: background 0.12s ease, color 0.12s ease; }
 .sidebar .nav-link:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
-.sidebar .nav-link.active { background: var(--accent-bg); color: var(--accent); }
+.sidebar .nav-link.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent); /* echoes the primary-card rail */
+}
 
 .sidebar .sidebar-footer {
   margin-top: auto;
@@ -125,8 +130,8 @@ input:focus-visible[type="checkbox"] {
 .main { flex: 1; min-width: 0; padding: 32px clamp(20px, 3.5vw, 56px) 80px; }
 .main-inner { max-width: 1620px; margin: 0 auto; }
 
-.page-title { font-size: 22px; margin-bottom: 4px; }
-.page-sub { color: var(--ink-2); margin-bottom: 24px; max-width: 70ch; }
+.page-title { font-size: 26px; margin-bottom: 6px; }
+.page-sub { color: var(--ink-2); margin-bottom: 28px; max-width: 62ch; line-height: 1.6; }
 
 /* two-column workspace: content column + guidance rail. The rail is where the
    extra horizontal space goes — step guidance, examples, glossary — instead of
@@ -148,28 +153,40 @@ input:focus-visible[type="checkbox"] {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px 20px;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  border-radius: 12px;
+  padding: 20px 22px;
+  transition: border-color 0.15s ease;
 }
-.card:hover { border-color: var(--border-strong); }
-.card + .card { margin-top: 14px; }
+.card + .card { margin-top: 16px; }
 .card h3 {
   font-family: var(--mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--ink-3);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+/* the screen's ONE primary card — the signature accent left rail (M13E.4).
+   Quieter than a full violet outline; there should be at most one per view. */
+.card.primary {
+  border-color: var(--border-strong);
+  border-left: 2px solid var(--accent);
+  transition: border-color 0.15s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.card.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .card-grid .card + .card { margin-top: 0; }
 
-.kv { display: flex; gap: 8px; margin: 3px 0; font-size: 14px; }
-.kv .k { color: var(--ink-3); min-width: 130px; flex-shrink: 0; }
+.kv { display: flex; gap: 8px; margin: 4px 0; font-size: 14px; }
+.kv .k { color: var(--ink-3); min-width: 130px; flex-shrink: 0; font-size: 13px; padding-top: 1px; }
 
 /* ---- pills / status ---------------------------------------------------- */
 
+/* status pills: tinted background + colored text, softened border — status
+   should read at a glance without shouting (M13E.4) */
 .pill {
   display: inline-block;
   font-family: var(--mono);
@@ -177,13 +194,14 @@ input:focus-visible[type="checkbox"] {
   padding: 2px 9px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
+  background: var(--surface-2);
   color: var(--ink-2);
   white-space: nowrap;
 }
-.pill.ok { color: var(--ok); border-color: var(--ok); background: var(--ok-bg); }
-.pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
-.pill.danger { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
-.pill.accent { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
+.pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: var(--ok-bg); }
+.pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); background: var(--warn-bg); }
+.pill.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); background: var(--danger-bg); }
+.pill.accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-bg); }
 
 /* ---- buttons ----------------------------------------------------------- */
 
@@ -199,20 +217,25 @@ input:focus-visible[type="checkbox"] {
   color: var(--ink);
   cursor: pointer;
   text-align: center;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease,
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease,
     box-shadow 0.15s ease, filter 0.15s ease;
 }
 .btn:hover { border-color: var(--accent); text-decoration: none; }
+.btn:active:not(:disabled) { transform: scale(0.98); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* primary: crisp solid accent — no resting glow; depth appears on hover only */
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
-  box-shadow: 0 0 22px var(--glow);
 }
-.btn.primary:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 30px var(--glow); }
-.btn.primary:active { transform: translateY(0); }
+.btn.primary:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(139, 107, 250, 0.28);
+}
+.btn.primary:active { transform: translateY(0) scale(0.98); box-shadow: none; }
 .btn.small { padding: 5px 12px; font-size: 13px; }
 
 /* ---- forms ------------------------------------------------------------- */
@@ -226,14 +249,21 @@ textarea, select {
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border-strong);
-  border-radius: 7px;
+  border-radius: 8px;
   color: var(--ink);
   font-family: var(--sans);
   font-size: 14px;
   padding: 9px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-textarea { font-family: var(--mono); font-size: 13px; line-height: 1.5; resize: vertical; }
-input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+/* prose answers read better in the body face; mono stays for code-like
+   output (pre.output, .mono) — M13E.4 typography pass */
+textarea { font-size: 14px; line-height: 1.55; resize: vertical; }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
 
 .checkline { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; }
 .checkline input { width: auto; accent-color: var(--accent); }
@@ -263,7 +293,8 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); bo
 .guide summary::-webkit-details-marker { display: none; }
 .guide summary::after { content: " +"; color: var(--ink-3); }
 .guide[open] summary::after { content: " –"; }
-.guide .guide-body { padding: 0 16px 12px; }
+.guide summary:hover { color: color-mix(in srgb, var(--accent) 80%, white); }
+.guide .guide-body { padding: 0 16px 12px; animation: reveal 0.18s ease-out; }
 .guide p { margin: 6px 0; }
 .guide ul { margin: 6px 0; padding-left: 18px; }
 .guide li { margin: 4px 0; }
@@ -284,11 +315,19 @@ button.chip {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 button.chip:hover { border-color: var(--accent); color: var(--ink); }
-button.chip.active { border-color: var(--accent); color: var(--ink); background: var(--accent-bg, var(--surface)); }
+button.chip:active { transform: scale(0.96); }
+button.chip { transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.1s ease; }
+button.chip.active { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); background: var(--accent-bg); }
 
-/* "what does this mean?" disclosure — native details, keyboard-friendly */
+/* disclosure body reveal — transform/opacity only, killed by the global
+   reduced-motion switch at the end of this file */
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(-3px); }
+}
+
+/* "what does this mean?" disclosure — native details, keyboard-friendly.
+   Borderless since M13E.4: a soft inset tint instead of a box-in-a-box. */
 details.help {
-  border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-2);
   margin: 10px 0;
@@ -300,9 +339,10 @@ details.help summary {
   padding: 9px 14px;
   color: var(--accent);
   font-size: 13px;
+  border-radius: 8px;
 }
-details.help[open] summary { border-bottom: 1px solid var(--border); }
-details.help .help-body { padding: 10px 14px; }
+details.help summary:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+details.help .help-body { padding: 2px 14px 12px; animation: reveal 0.18s ease-out; }
 details.help .help-body p { margin: 6px 0; }
 details.help .help-body ul { margin: 6px 0; padding-left: 18px; }
 details.help .help-body li { margin: 4px 0; }
@@ -330,9 +370,9 @@ details.help .help-body li { margin: 4px 0; }
 /* ---- notices / async states -------------------------------------------- */
 
 .notice { border-radius: 8px; padding: 12px 16px; font-size: 14px; margin: 12px 0; border: 1px solid; }
-.notice.error { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
-.notice.ok { border-color: var(--ok); background: var(--ok-bg); color: var(--ok); }
-.notice.info { border-color: var(--border-strong); background: var(--surface-2); color: var(--ink-2); }
+.notice.error { border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: var(--danger-bg); color: var(--danger); }
+.notice.ok { border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: var(--ok-bg); color: var(--ok); }
+.notice.info { border-color: var(--border); background: var(--surface-2); color: var(--ink-2); }
 
 .loading { color: var(--ink-3); font-family: var(--mono); font-size: 13px; padding: 24px 0; }
 .loading::after { content: " ▍"; animation: blink 1s steps(2) infinite; }
@@ -342,20 +382,22 @@ details.help .help-body li { margin: 4px 0; }
 
 /* ---- workflow loop strip ------------------------------------------------ */
 
-.loop { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 18px 0 24px; }
+/* borderless steps since M13E.4 — the strip reads as one instrument row, not
+   seven more boxes; state lives in the dot and a quiet tint */
+.loop { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 16px 0 20px; }
 .loop .step {
   display: flex; align-items: center; gap: 7px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 13px;
   color: var(--ink-2);
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.loop a.step:hover { border-color: var(--accent); color: var(--ink); text-decoration: none; }
-.loop .step.current { border-color: var(--accent); background: var(--accent-bg); color: var(--ink); }
+.loop a.step:hover { background: var(--accent-bg); color: var(--ink); text-decoration: none; }
+.loop .step.current { background: var(--accent-bg); color: var(--accent); }
 .loop .step .n { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
-.loop .sep { color: var(--ink-3); font-family: var(--mono); }
+.loop .sep { color: var(--ink-3); font-family: var(--mono); opacity: 0.6; }
 .loop .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--ink-3); flex-shrink: 0; }
 .loop .dot.done { background: var(--ok); }
 
@@ -369,17 +411,24 @@ details.help .help-body li { margin: 4px 0; }
 
 /* ---- prompt output ------------------------------------------------------- */
 
+/* the generated prompt is the payoff — it gets the one entrance animation
+   in the app (transform/opacity; neutralized under reduced motion) */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
 pre.output {
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px 16px;
   font-family: var(--mono);
   font-size: 13px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 420px;
   overflow-y: auto;
+  animation: rise 0.24s ease-out;
 }
 
 /* ---- modal (reconnection) ------------------------------------------------ */

@@ -143,7 +143,7 @@ export default function PhaseBoardPage() {
           <div className="workspace">
             <div>
               {/* The one obvious next step for this phase. */}
-              <div className="card" style={{ borderColor: "var(--accent)" }}>
+              <div className="card primary">
                 <h3>Next step</h3>
                 {nextStep ? (
                   <>

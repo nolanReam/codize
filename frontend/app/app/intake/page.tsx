@@ -347,7 +347,7 @@ export default function IntakePage() {
               })}
 
             {current && (
-              <div className="card" style={{ borderColor: "var(--accent)" }}>
+              <div className="card primary">
                 <h3>Question {current.number} of 5</h3>
                 <p style={{ fontSize: 17, marginBottom: 10 }}>{current.text}</p>
                 {QUESTION_HELP[current.number] && (
@@ -411,7 +411,7 @@ export default function IntakePage() {
 
             {/* all five answered: explicit review step before classification */}
             {readyToFinish && (
-              <div className="card" style={{ borderColor: "var(--accent)" }}>
+              <div className="card primary">
                 <h3>All five answered — review before you finish</h3>
                 <p>
                   Read your answers above once more. Anything off? Use <strong>Edit</strong> —

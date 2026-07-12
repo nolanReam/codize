@@ -175,7 +175,7 @@ export default function PromptBuilderPage() {
         <div className="workspace">
           <div>
             {/* Step 1 — the ask. The only required field, starters included. */}
-            <div className="card" style={{ borderColor: "var(--accent)", marginBottom: 14 }}>
+            <div className="card primary" style={{ marginBottom: 16 }}>
               <h3>Step 1 — What should the AI do?</h3>
               <textarea
                 rows={3}

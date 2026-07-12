@@ -143,7 +143,7 @@ export default function VerificationLabPage() {
           </p>
         )}
 
-        <div className="card">
+        <div className="card primary">
           <h3>Checks</h3>
           {CHECKS.map((check) => (
             <div key={check.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border)" }}>

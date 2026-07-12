@@ -117,7 +117,7 @@ export default function EvidencePanelPage() {
           </p>
         )}
 
-        <div className="card" style={{ borderColor: "var(--accent)" }}>
+        <div className="card primary">
           <h3>Add one piece of proof</h3>
           {formError && <div className="notice error">{formError}</div>}
           <div className="chips" style={{ marginTop: 0 }}>

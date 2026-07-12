@@ -11,10 +11,11 @@ import WorkflowSteps from "@/components/WorkflowSteps";
 import { ApiError, getEvaluation, getIntakeStatus, getWorkflow } from "@/lib/api";
 import type { Evaluation, WorkflowSections } from "@/lib/types";
 
+// Cooldown is amber, not red — it's a wait, not an error (M13E.4).
 const STATE_PILL: Record<string, { label: string; cls: string }> = {
   in_progress: { label: "IN PROGRESS", cls: "accent" },
   gate_ready: { label: "GATE READY", cls: "warn" },
-  cooldown: { label: "GATE COOLDOWN", cls: "danger" },
+  cooldown: { label: "GATE COOLDOWN", cls: "warn" },
   complete: { label: "ROADMAP COMPLETE", cls: "ok" },
 };
 
@@ -86,7 +87,7 @@ export default function CockpitPage() {
           <div className="workspace">
             <div>
               {/* 1. The one thing to do next — the page's primary action. */}
-              <div className="card" style={{ borderColor: "var(--accent)" }}>
+              <div className="card primary">
                 <h3>Do this next</h3>
                 <p style={{ fontSize: 17, fontWeight: 600 }}>{evaluation.next_action}</p>
                 <div className="row" style={{ marginTop: 12 }}>
