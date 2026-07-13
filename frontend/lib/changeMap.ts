@@ -20,6 +20,13 @@ export const CHANGE_MAP_TEXT_MAX = 600;
 export const CHANGE_MAP_NOTE_MAX = 1_000;
 export const CHANGE_MAP_STUDENT_ITEMS_MAX = 20;
 
+// Python/Pydantic string limits count Unicode code points, while JavaScript's
+// string.length counts UTF-16 code units. Array.from keeps the browser-side
+// counters and blockers aligned with the backend for non-BMP characters.
+export function changeMapCharacterCount(value: string): number {
+  return Array.from(value).length;
+}
+
 export const CHANGE_MAP_PAGE_TITLE = "Review Your Change Map";
 export const CHANGE_MAP_PAGE_INTRO =
   "Codize drafted what appears to have changed from the material you brought back; review and correct it before continuing.";
@@ -228,8 +235,11 @@ export function deriveReviewProgress(
       return decision != null && decision !== "pending_review";
     }
   ).length;
+  const reviewedStudentItems = state.studentAddedItems.filter(
+    (item) => item.studentText.trim().length > 0
+  ).length;
   const total = aiItems.length + state.studentAddedItems.length;
-  const reviewed = reviewedAi + state.studentAddedItems.length;
+  const reviewed = reviewedAi + reviewedStudentItems;
   return { reviewed, total, pending: total - reviewed };
 }
 
@@ -291,10 +301,10 @@ export function reviewBlocker(
     if (draft.studentDecision === "edited" && !draft.studentText.trim()) {
       return "Add your correction before saving the item marked “I need to correct it.”";
     }
-    if (draft.studentText.length > CHANGE_MAP_TEXT_MAX) {
+    if (changeMapCharacterCount(draft.studentText) > CHANGE_MAP_TEXT_MAX) {
       return `One correction is over the ${CHANGE_MAP_TEXT_MAX}-character limit.`;
     }
-    if (draft.studentNote.length > CHANGE_MAP_NOTE_MAX) {
+    if (changeMapCharacterCount(draft.studentNote) > CHANGE_MAP_NOTE_MAX) {
       return `One review note is over the ${CHANGE_MAP_NOTE_MAX.toLocaleString()}-character limit.`;
     }
   }
@@ -303,10 +313,10 @@ export function reviewBlocker(
   }
   for (const item of state.studentAddedItems) {
     if (!item.studentText.trim()) return "Describe each item you added before saving.";
-    if (item.studentText.length > CHANGE_MAP_TEXT_MAX) {
+    if (changeMapCharacterCount(item.studentText) > CHANGE_MAP_TEXT_MAX) {
       return `One added item is over the ${CHANGE_MAP_TEXT_MAX}-character limit.`;
     }
-    if (item.studentNote.length > CHANGE_MAP_NOTE_MAX) {
+    if (changeMapCharacterCount(item.studentNote) > CHANGE_MAP_NOTE_MAX) {
       return `One added-item note is over the ${CHANGE_MAP_NOTE_MAX.toLocaleString()}-character limit.`;
     }
   }
@@ -314,7 +324,22 @@ export function reviewBlocker(
 }
 
 export function isReviewDirty(map: StoredChangeMap, state: ChangeMapReviewState): boolean {
-  return JSON.stringify(state) !== JSON.stringify(reviewStateFromMap(map));
+  const aiIds = map.items
+    .filter((item) => item.origin === "ai_inferred")
+    .map((item) => item.item_id);
+  const stateIds = Object.keys(state.itemDecisions);
+  if (aiIds.length !== stateIds.length || aiIds.some((id) => !stateIds.includes(id))) {
+    return true;
+  }
+
+  // Compare what the PUT would actually persist. This deliberately ignores a
+  // retained correction draft after the student switches back to another
+  // decision; keeping that text supports toggling without creating a phantom
+  // unsaved change or silently returning a confirmed map to draft.
+  return (
+    JSON.stringify(deriveSavePayload(map, state)) !==
+    JSON.stringify(deriveSavePayload(map, reviewStateFromMap(map)))
+  );
 }
 
 export function isMapStale(map: StoredChangeMap | null): boolean {

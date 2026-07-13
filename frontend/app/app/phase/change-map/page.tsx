@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import { ChangeMapErrorNotice, SourceReferences } from "@/components/ChangeMapSafety";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
@@ -20,6 +21,7 @@ import {
   CHANGE_MAP_PAGE_TITLE,
   CHANGE_MAP_STUDENT_ITEMS_MAX,
   CHANGE_MAP_TEXT_MAX,
+  changeMapCharacterCount,
   changeMapDraftSurface,
   confirmationReadiness,
   decisionLabel,
@@ -34,7 +36,6 @@ import {
   REVIEWABLE_DECISIONS,
   reviewBlocker,
   reviewStateFromMap,
-  sourceFieldLabel,
   STUDENT_ADDED_DECISIONS,
   type AiItemReviewDraft,
   type ChangeMapReviewState,
@@ -57,34 +58,6 @@ function decisionTone(decision: ChangeMapStudentDecision): string {
   return "";
 }
 
-function SourceReferences({ item }: { item: ChangeMapItem }) {
-  return (
-    <details className="help source-disclosure">
-      <summary>Why did Codize suggest this?</summary>
-      <div className="help-body">
-        {item.source_references.map((reference, index) => (
-          <div className="source-reference" key={`${reference.source_field}-${index}`}>
-            <strong>{sourceFieldLabel(reference.source_field)}</strong>
-            {reference.file_path && (
-              <p>
-                File: <code>{reference.file_path}</code>
-              </p>
-            )}
-            {reference.supporting_excerpt && (
-              <pre className="source-excerpt" aria-label="Supporting source excerpt">
-                {reference.supporting_excerpt}
-              </pre>
-            )}
-          </div>
-        ))}
-        <p className="source-honesty">
-          This source supported the draft. It does not prove the draft is correct.
-        </p>
-      </div>
-    </details>
-  );
-}
-
 function AiReviewItem({
   item,
   draft,
@@ -101,7 +74,17 @@ function AiReviewItem({
   onNote: (note: string) => void;
 }) {
   const correctionMissing = draft.studentDecision === "edited" && !draft.studentText.trim();
+  const correctionCount = changeMapCharacterCount(draft.studentText);
+  const correctionTooLong = correctionCount > CHANGE_MAP_TEXT_MAX;
+  const correctionError = correctionMissing
+    ? "Add your corrected wording before saving."
+    : correctionTooLong
+      ? `Shorten this correction to ${CHANGE_MAP_TEXT_MAX} characters or fewer.`
+      : null;
   const correctionErrorId = `${item.item_id}-correction-error`;
+  const noteCount = changeMapCharacterCount(draft.studentNote);
+  const noteTooLong = noteCount > CHANGE_MAP_NOTE_MAX;
+  const noteErrorId = `${item.item_id}-note-error`;
   return (
     <article
       className={`change-map-item${draft.studentDecision === "rejected" ? " rejected" : ""}`}
@@ -159,15 +142,15 @@ function AiReviewItem({
                   rows={3}
                   value={draft.studentText}
                   onChange={(event) => onText(event.target.value)}
-                  aria-invalid={correctionMissing}
-                  aria-describedby={correctionMissing ? correctionErrorId : undefined}
+                  aria-invalid={correctionError != null}
+                  aria-describedby={correctionError ? correctionErrorId : undefined}
                 />
                 <p className="hint">
-                  {draft.studentText.length.toLocaleString()} / {CHANGE_MAP_TEXT_MAX}
+                  {correctionCount.toLocaleString()} / {CHANGE_MAP_TEXT_MAX}
                 </p>
-                {correctionMissing && (
+                {correctionError && (
                   <p className="field-error" id={correctionErrorId}>
-                    Add your corrected wording before saving.
+                    {correctionError}
                   </p>
                 )}
               </>
@@ -205,10 +188,17 @@ function AiReviewItem({
               value={draft.studentNote}
               onChange={(event) => onNote(event.target.value)}
               placeholder="Record what you still need to check or remember."
+              aria-invalid={noteTooLong}
+              aria-describedby={noteTooLong ? noteErrorId : undefined}
             />
             <p className="hint">
-              {draft.studentNote.length.toLocaleString()} / {CHANGE_MAP_NOTE_MAX.toLocaleString()}
+              {noteCount.toLocaleString()} / {CHANGE_MAP_NOTE_MAX.toLocaleString()}
             </p>
+            {noteTooLong && (
+              <p className="field-error" id={noteErrorId}>
+                Shorten this note to {CHANGE_MAP_NOTE_MAX.toLocaleString()} characters or fewer.
+              </p>
+            )}
           </div>
         </details>
       ) : (
@@ -237,7 +227,17 @@ function StudentAddedItem({
   onRemove: () => void;
 }) {
   const textMissing = !item.studentText.trim();
+  const textCount = changeMapCharacterCount(item.studentText);
+  const textTooLong = textCount > CHANGE_MAP_TEXT_MAX;
+  const textError = textMissing
+    ? "Describe the item before saving."
+    : textTooLong
+      ? `Shorten this item to ${CHANGE_MAP_TEXT_MAX} characters or fewer.`
+      : null;
   const textErrorId = `${item.localId}-text-error`;
+  const noteCount = changeMapCharacterCount(item.studentNote);
+  const noteTooLong = noteCount > CHANGE_MAP_NOTE_MAX;
+  const noteErrorId = `${item.localId}-note-error`;
   return (
     <article className="change-map-item student-added">
       <div className="change-map-item-head">
@@ -272,16 +272,16 @@ function StudentAddedItem({
               rows={3}
               value={item.studentText}
               onChange={(event) => onChange({ studentText: event.target.value })}
-              aria-invalid={textMissing}
-              aria-describedby={textMissing ? textErrorId : undefined}
+              aria-invalid={textError != null}
+              aria-describedby={textError ? textErrorId : undefined}
               placeholder="Describe the change, decision, risk, or question Codize missed."
             />
             <p className="hint">
-              {item.studentText.length.toLocaleString()} / {CHANGE_MAP_TEXT_MAX}
+              {textCount.toLocaleString()} / {CHANGE_MAP_TEXT_MAX}
             </p>
-            {textMissing && (
+            {textError && (
               <p className="field-error" id={textErrorId}>
-                Describe the item before saving.
+                {textError}
               </p>
             )}
           </div>
@@ -292,10 +292,17 @@ function StudentAddedItem({
               rows={2}
               value={item.studentNote}
               onChange={(event) => onChange({ studentNote: event.target.value })}
+              aria-invalid={noteTooLong}
+              aria-describedby={noteTooLong ? noteErrorId : undefined}
             />
             <p className="hint">
-              {item.studentNote.length.toLocaleString()} / {CHANGE_MAP_NOTE_MAX.toLocaleString()}
+              {noteCount.toLocaleString()} / {CHANGE_MAP_NOTE_MAX.toLocaleString()}
             </p>
+            {noteTooLong && (
+              <p className="field-error" id={noteErrorId}>
+                Shorten this note to {CHANGE_MAP_NOTE_MAX.toLocaleString()} characters or fewer.
+              </p>
+            )}
           </div>
           <fieldset className="decision-picker">
             <legend>Current status</legend>
@@ -412,6 +419,10 @@ export default function ChangeMapPage() {
   const draftSurface = wf.phase && map ? changeMapDraftSurface(wf.phase.phase, map) : null;
   const draft = useDraft<ChangeMapReviewState>(draftSurface);
   const draftAppliedFor = useRef<string | null>(null);
+  const dirtyTracker = useRef<{ surface: string | null; dirty: boolean }>({
+    surface: null,
+    dirty: false,
+  });
 
   useEffect(() => {
     if (
@@ -453,6 +464,17 @@ export default function ChangeMapPage() {
     }
     saveLocalDraft(review);
   }, [dirty, draft.loadedSurface, draftSurface, editMode, map?.stale, review, saveLocalDraft]);
+
+  const clearLocalDraft = draft.clear;
+  useEffect(() => {
+    if (!draftSurface || draft.loadedSurface !== draftSurface) return;
+    if (dirtyTracker.current.surface !== draftSurface) {
+      dirtyTracker.current = { surface: draftSurface, dirty };
+      return;
+    }
+    if (dirtyTracker.current.dirty && !dirty) clearLocalDraft();
+    dirtyTracker.current = { surface: draftSurface, dirty };
+  }, [clearLocalDraft, dirty, draft.loadedSurface, draftSurface]);
 
   if (wf.notReady) return <NotReady title="Review Your Change Map" />;
 
@@ -667,6 +689,13 @@ export default function ChangeMapPage() {
                   ? "Review saved."
                   : ""}
       </p>
+      <p className="sr-only" role="alert">
+        {saveError
+          ? `Review save failed. ${saveError}`
+          : confirmError
+            ? `Confirmation failed. ${confirmError}`
+            : ""}
+      </p>
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>
         <div className="workspace">
@@ -676,6 +705,8 @@ export default function ChangeMapPage() {
                 For <strong>Phase {wf.phase.phase}: {wf.phase.phase_title}</strong>
               </p>
             )}
+
+            {generationError && <ChangeMapErrorNotice message={generationError} />}
 
             {pageModel.state === "missing_import" && (
               <div className="card primary change-map-empty">
@@ -698,7 +729,6 @@ export default function ChangeMapPage() {
                   what may still need inspection.
                 </p>
                 <p className="muted">You will review every item before confirming the map.</p>
-                {generationError && <div className="notice error">{generationError}</div>}
                 <button className="btn primary" type="button" onClick={() => void runGeneration(false)}>
                   Create Change Map
                 </button>
@@ -909,7 +939,10 @@ export default function ChangeMapPage() {
                     </p>
                   )}
                   {dirty && !draftBlocked && (
-                    <p className="hint">Review draft saved on this device for this map and phase.</p>
+                    <p className="hint">
+                      Codize will try to restore this unsaved review on this device for this map and
+                      phase.
+                    </p>
                   )}
                   {justSaved && (
                     <div className="notice ok" role="status">

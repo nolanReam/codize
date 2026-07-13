@@ -13,6 +13,7 @@ import {
   CHANGE_MAP_PAGE_INTRO,
   CHANGE_MAP_PAGE_TITLE,
   CHANGE_MAP_SOURCE_FIELD_LABELS,
+  changeMapCharacterCount,
   changeMapDraftSurface,
   changeMapStepStatus,
   confirmationReadiness,
@@ -233,6 +234,19 @@ describe("review progress and effective display", () => {
     });
   });
 
+  it("does not report an incomplete student-added row as reviewed", () => {
+    const stored = map({ items: [aiItem("one", "behavior_change", "confirmed")] });
+    const state = reviewStateFromMap(stored);
+    state.studentAddedItems.push({
+      localId: "local-empty",
+      category: "changed_file",
+      studentText: "   ",
+      studentNote: "",
+      studentDecision: "confirmed",
+    });
+    expect(deriveReviewProgress(stored, state)).toEqual({ reviewed: 1, total: 2, pending: 1 });
+  });
+
   it("uses the AI draft for accepted, pending, rejected, and unresolved records", () => {
     for (const decision of ["confirmed", "pending_review", "rejected", "uncertain", "needs_inspection"] as const) {
       const item = aiItem("one", "behavior_change", decision);
@@ -328,6 +342,25 @@ describe("dirty state and confirmation readiness", () => {
     expect(isReviewDirty(stored, state)).toBe(false);
     state.itemDecisions["cm-file"].studentDecision = "confirmed";
     expect(isReviewDirty(stored, state)).toBe(true);
+  });
+
+  it("ignores retained correction text after returning to the saved decision", () => {
+    const stored = map({ items: [aiItem("one", "behavior_change", "confirmed")] });
+    const state = reviewStateFromMap(stored);
+    state.itemDecisions.one.studentDecision = "edited";
+    state.itemDecisions.one.studentText = stored.items[0].draft_text ?? "";
+    state.itemDecisions.one.studentDecision = "confirmed";
+    expect(isReviewDirty(stored, state)).toBe(false);
+  });
+
+  it("matches backend Unicode code-point limits instead of UTF-16 units", () => {
+    const stored = map({ items: [aiItem("one", "behavior_change", "edited")] });
+    const state = reviewStateFromMap(stored);
+    state.itemDecisions.one.studentText = "🚀".repeat(600);
+    expect(changeMapCharacterCount(state.itemDecisions.one.studentText)).toBe(600);
+    expect(reviewBlocker(stored, state)).toBeNull();
+    state.itemDecisions.one.studentText += "🚀";
+    expect(reviewBlocker(stored, state)).toMatch(/600-character/i);
   });
 
   it("blocks pending, unsaved, stale, and already-confirmed maps", () => {
