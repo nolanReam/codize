@@ -99,3 +99,19 @@ Report integration deliberately NOT wired (spec-guardian change later).
 Adversarial matrix: `docs/testing/m15c_change_map_adversarial.md`. See
 [[implementation-import-conventions]], [[workflow-artifact-conventions]],
 [[defense-context-conventions]], [[grounded-defense-conventions]].
+
+**M15C.2 frontend consumer (built 2026-07-13):** strict mirror types and the
+three API methods live in `frontend/lib/types.ts` + `api.ts`; the page is
+`/app/phase/change-map`; pure UI/domain logic is `lib/changeMap.ts`. The client
+never generates on load, never auto-regenerates, never treats supported as
+verified, never shows numeric confidence, and renders bounded references as
+plain text only. The update payload contains only `updates` (AI item id + the
+three student-owned decision/text/note fields) and the full
+`student_added_items` replacement set (no origin/id/provenance). Confirmation
+is locally gated on saved/non-stale/no-pending state but the backend remains
+authoritative. Stale/confirmed maps stay visible; replacing a map is explicit
+and destructive-review wording is mandatory. Local review drafts reuse the
+existing secret-guarded system with a generated-map timestamp in the surface
+key, so replacement maps cannot consume old decisions. Build Loop status is
+separate from N/5. No M16 consumer is wired. Full conventions:
+[[change-map-ui-conventions]].

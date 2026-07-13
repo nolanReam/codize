@@ -4,7 +4,11 @@
 // backend design and are shown as-is; 5xx bodies are never surfaced.
 
 import { getAccessToken } from "./supabase";
+import { generationRequestBody } from "./changeMap";
 import type {
+  ChangeMapConfirmationResponse,
+  ChangeMapMutationResult,
+  ChangeMapUpdateRequest,
   DefenseContextSummary,
   Evaluation,
   EvidenceArtifact,
@@ -135,6 +139,29 @@ export const saveWorkflowSection = <S extends WorkflowSectionName>(
     `/workflow/${phase}/${section}`,
     { method: "PUT", body: payload }
   );
+
+// --- Change Map (M15C.1 backend / M15C.2 UI) ---------------------------------
+
+// Normal generation deliberately sends no body. Replacing an existing map is
+// possible only through the explicit `replace_existing: true` path.
+export const generateChangeMap = (phase: number, replaceExisting = false) => {
+  const body = generationRequestBody(replaceExisting);
+  return request<ChangeMapMutationResult>(`/workflow/${phase}/change-map/generate`, {
+    method: "POST",
+    ...(body ? { body } : {}),
+  });
+};
+
+export const updateChangeMap = (phase: number, payload: ChangeMapUpdateRequest) =>
+  request<ChangeMapMutationResult>(`/workflow/${phase}/change-map`, {
+    method: "PUT",
+    body: payload,
+  });
+
+export const confirmChangeMap = (phase: number) =>
+  request<ChangeMapConfirmationResponse>(`/workflow/${phase}/change-map/confirm`, {
+    method: "POST",
+  });
 
 // --- reconnection / evaluation / gate --------------------------------------------
 

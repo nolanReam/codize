@@ -371,3 +371,21 @@ skipped/n/a→optional reason with a "no evidence needed" hint; the report
 labels them honestly (`VERIFICATION_RESULT_LABELS`: "skipped — not checked
 yet", "n/a — doesn't apply") and never prints the raw enum. Notes stay
 optional for every result — nothing blocks a save.
+
+**M15C.2 (2026-07-13) — Change Map review UI.** The frontend-only page is
+`app/app/phase/change-map/page.tsx`, reached after Bring Back and before
+Review. It extends the existing API/types/workflow-fetch/drafts/SaveBar/CSS
+system—no second client, fetch state machine, persistence layer, or design
+system. Exact pure logic lives in `lib/changeMap.ts` and is unit-tested:
+student-facing mappings, category grouping, review progress, effective display,
+student-only PUT shaping, validation, dirty/readiness/stale/page-state helpers,
+local-draft compatibility, and phase next-step routing. Normal generation sends
+no body and is explicit-click only; replacement alone sends
+`replace_existing=true` after an inline warning. Source excerpts are rendered
+only as React text in a bounded `<pre>` inside a collapsed native disclosure.
+One primary `.card.primary` contains only populated category sections separated
+by quiet rules; item rows are not nested cards. Semantic fieldsets/radios carry
+decisions, status/error announcements use live regions, long paths/excerpts
+wrap or scroll, and controls stack at 640px. Change Map is top-level workflow
+state with its own not-created/draft/reviewed/stale status and is excluded from
+the five-section count. See [[change-map-ui-conventions]].

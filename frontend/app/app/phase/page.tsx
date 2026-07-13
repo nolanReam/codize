@@ -7,8 +7,15 @@ import Async from "@/components/Async";
 import GuideCard from "@/components/GuideCard";
 import WorkflowSteps from "@/components/WorkflowSteps";
 import { ApiError, getCurrentPhase, getPhases, getWorkflow, setTaskCompletion } from "@/lib/api";
+import { derivePhaseNextStep } from "@/lib/changeMap";
 import { phaseGuide } from "@/lib/phaseGuide";
-import type { PhaseList, PhaseView, TaskEntry, WorkflowSections } from "@/lib/types";
+import type {
+  PhaseList,
+  PhaseView,
+  StoredChangeMap,
+  TaskEntry,
+  WorkflowSections,
+} from "@/lib/types";
 
 // The Phase Workspace, framed around the Build Loop — the tasks are the
 // phase's raw material; the loop is how you work through them with AI.
@@ -16,6 +23,7 @@ export default function PhaseBoardPage() {
   const [phase, setPhase] = useState<PhaseView | null>(null);
   const [phases, setPhases] = useState<PhaseList | null>(null);
   const [sections, setSections] = useState<WorkflowSections | null>(null);
+  const [changeMap, setChangeMap] = useState<StoredChangeMap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notReady, setNotReady] = useState(false);
@@ -30,7 +38,10 @@ export default function PhaseBoardPage() {
       setPhase(current);
       const [list, workflow] = await Promise.allSettled([getPhases(), getWorkflow(current.phase)]);
       if (list.status === "fulfilled") setPhases(list.value);
-      if (workflow.status === "fulfilled") setSections(workflow.value.sections);
+      if (workflow.status === "fulfilled") {
+        setSections(workflow.value.sections);
+        setChangeMap(workflow.value.change_map);
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setNotReady(true);
       else setError(err instanceof ApiError ? err.message : "Couldn't load the phase workspace.");
@@ -72,48 +83,9 @@ export default function PhaseBoardPage() {
     ? Object.values(sections).filter((s) => s != null).length
     : 0;
 
-  // The one obvious next step: the first workflow artifact not yet captured,
-  // or the gate once all four are in. Order mirrors the Build Loop.
-  const WORKFLOW_ORDER: {
-    key: keyof WorkflowSections;
-    label: string;
-    href: string;
-    hint: string;
-  }[] = [
-    {
-      key: "prompt_builder",
-      label: "Plan your prompt",
-      href: "/app/phase/prompt",
-      hint: "Turn this phase into one clear ask for your AI tool.",
-    },
-    {
-      key: "implementation_import",
-      label: "Bring back what changed",
-      href: "/app/phase/import",
-      hint: "Back from your AI tool? Paste the response, diff, or your own notes — whatever you have.",
-    },
-    {
-      key: "review_board",
-      label: "Review what the AI did",
-      href: "/app/phase/review",
-      hint: "Note what you accepted, rejected, or edited before building on it.",
-    },
-    {
-      key: "evidence",
-      label: "Save one piece of proof",
-      href: "/app/phase/evidence",
-      hint: "A test output, a screenshot note, a commit — one is enough.",
-    },
-    {
-      key: "verification",
-      label: "Run a quick check",
-      href: "/app/phase/verify",
-      hint: "Mark what you actually checked. Skipped is allowed.",
-    },
-  ];
-  const nextStep = sections
-    ? WORKFLOW_ORDER.find((s) => sections[s.key] == null) ?? null
-    : WORKFLOW_ORDER[0];
+  // Change Map is an AI-drafted/student-reviewed step between the five
+  // captured artifacts. It never changes the N/5 count above.
+  const nextStep = derivePhaseNextStep(sections, changeMap);
 
   return (
     <Async loading={loading} error={error} onRetry={load}>
@@ -151,30 +123,15 @@ export default function PhaseBoardPage() {
               {/* The one obvious next step for this phase. */}
               <div className="card primary">
                 <h3>Next step</h3>
-                {nextStep ? (
-                  <>
-                    <p style={{ fontSize: 16, fontWeight: 600 }}>{nextStep.label}</p>
-                    <p className="muted" style={{ marginTop: 4 }}>{nextStep.hint}</p>
-                    <div className="row" style={{ marginTop: 12 }}>
-                      <Link href={nextStep.href} className="btn primary">
-                        {nextStep.label} →
-                      </Link>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 16, fontWeight: 600 }}>
-                      All five workflow steps captured — defend this phase.
-                    </p>
-                    <div className="row" style={{ marginTop: 12 }}>
-                      <Link href="/app/gate" className="btn primary">
-                        Start the defense →
-                      </Link>
-                    </div>
-                  </>
-                )}
+                <p style={{ fontSize: 16, fontWeight: 600 }}>{nextStep.label}</p>
+                <p className="muted" style={{ marginTop: 4 }}>{nextStep.hint}</p>
+                <div className="row" style={{ marginTop: 12 }}>
+                  <Link href={nextStep.href} className="btn primary">
+                    {nextStep.label} →
+                  </Link>
+                </div>
                 <div style={{ marginTop: 12 }}>
-                  <WorkflowSteps sections={sections} />
+                  <WorkflowSteps sections={sections} changeMap={changeMap} />
                 </div>
               </div>
 

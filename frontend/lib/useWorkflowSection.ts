@@ -8,11 +8,12 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiError, getCurrentPhase, getWorkflow, saveWorkflowSection } from "./api";
-import type { PhaseView, WorkflowSectionName, WorkflowSections } from "./types";
+import type { PhaseView, StoredChangeMap, WorkflowSectionName, WorkflowSections } from "./types";
 
 export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
   const [phase, setPhase] = useState<PhaseView | null>(null);
   const [stored, setStored] = useState<WorkflowSections[S] | null>(null);
+  const [changeMap, setChangeMap] = useState<StoredChangeMap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notReady, setNotReady] = useState(false);
@@ -29,6 +30,7 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
       const workflow = await getWorkflow(current.phase);
       setPhase(current);
       setStored(workflow.sections[section]);
+      setChangeMap(workflow.change_map);
       setSavedAt((workflow.sections[section] as { saved_at?: string } | null)?.saved_at ?? null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -65,5 +67,17 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
     [phase, section]
   );
 
-  return { phase, stored, loading, error, notReady, reload: load, save, saving, saveError, savedAt };
+  return {
+    phase,
+    stored,
+    changeMap,
+    loading,
+    error,
+    notReady,
+    reload: load,
+    save,
+    saving,
+    saveError,
+    savedAt,
+  };
 }

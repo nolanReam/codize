@@ -9,7 +9,7 @@ import GuideCard from "@/components/GuideCard";
 import LoopOverview from "@/components/LoopOverview";
 import WorkflowSteps from "@/components/WorkflowSteps";
 import { ApiError, getEvaluation, getIntakeStatus, getWorkflow } from "@/lib/api";
-import type { Evaluation, WorkflowSections } from "@/lib/types";
+import type { Evaluation, StoredChangeMap, WorkflowSections } from "@/lib/types";
 
 // Cooldown is amber, not red — it's a wait, not an error (M13E.4).
 const STATE_PILL: Record<string, { label: string; cls: string }> = {
@@ -26,6 +26,7 @@ export default function CockpitPage() {
   const router = useRouter();
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [sections, setSections] = useState<WorkflowSections | null>(null);
+  const [changeMap, setChangeMap] = useState<StoredChangeMap | null>(null);
   const [purpose, setPurpose] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,10 @@ export default function CockpitPage() {
         getWorkflow(ev.current_phase ?? 1),
         getIntakeStatus(),
       ]);
-      if (workflow.status === "fulfilled") setSections(workflow.value.sections);
+      if (workflow.status === "fulfilled") {
+        setSections(workflow.value.sections);
+        setChangeMap(workflow.value.change_map);
+      }
       if (intake.status === "fulfilled") setPurpose(intake.value.answers?.purpose ?? null);
       setLoading(false);
     } catch (err) {
@@ -154,13 +158,13 @@ export default function CockpitPage() {
               {/* 3. The loop strip — visual, links to each step. */}
               <div className="card" style={{ marginTop: 14 }}>
                 <h3>Build Loop — Phase {evaluation.current_phase}</h3>
-                <WorkflowSteps sections={sections} />
+                <WorkflowSteps sections={sections} changeMap={changeMap} />
                 <div className="row" style={{ marginTop: 10 }}>
                   <Link href="/app/report" className="btn small">
                     Open Defense Report
                   </Link>
                   <span className="muted">
-                    Everything you save here lands in your report.
+                    Your five captured workflow records feed the report.
                   </span>
                 </div>
               </div>

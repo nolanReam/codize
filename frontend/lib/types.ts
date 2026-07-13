@@ -152,6 +152,103 @@ export interface ImplementationImportArtifact {
   saved_at?: string;
 }
 
+// Change Map (M15C.1 backend / M15C.2 UI). This is an AI-drafted,
+// student-reviewed sibling of the five workflow sections. It is deliberately
+// not a sixth section and never contributes to the N/5 captured count.
+export type ChangeMapStatus = "draft" | "confirmed";
+
+export type ChangeMapCategory =
+  | "changed_file"
+  | "behavior_change"
+  | "implementation_decision"
+  | "out_of_scope_change"
+  | "security_sensitive_area"
+  | "unresolved_risk"
+  | "unverified_behavior"
+  | "question_to_understand";
+
+export type ChangeMapOrigin = "ai_inferred" | "student_added";
+
+export type ChangeMapStudentDecision =
+  | "pending_review"
+  | "confirmed"
+  | "edited"
+  | "rejected"
+  | "uncertain"
+  | "needs_inspection";
+
+export type ChangeMapAiUncertainty = "supported" | "ambiguous" | "needs_inspection";
+
+export type ChangeMapSourceField = "content" | "changed_files" | "student_summary";
+
+export type ChangeMapSourceKind = ImplementationImportSourceKind;
+
+export interface ChangeMapSourceReference {
+  source_field: ChangeMapSourceField;
+  source_kind: ChangeMapSourceKind;
+  file_path: string | null;
+  supporting_excerpt: string | null;
+}
+
+export interface ChangeMapItem {
+  item_id: string;
+  origin: ChangeMapOrigin;
+  category: ChangeMapCategory;
+  draft_text: string | null;
+  ai_uncertainty: ChangeMapAiUncertainty | null;
+  uncertainty_reason: string | null;
+  source_references: ChangeMapSourceReference[];
+  student_decision: ChangeMapStudentDecision;
+  student_text: string | null;
+  student_note: string | null;
+}
+
+export interface StoredChangeMap {
+  schema_version: "1.0";
+  status: ChangeMapStatus;
+  source_import_saved_at: string;
+  generated_at: string;
+  confirmed_at: string | null;
+  source_redacted: boolean;
+  source_truncated: boolean;
+  stale: boolean;
+  items: ChangeMapItem[];
+}
+
+export interface ChangeMapMutationResult extends StoredChangeMap {
+  phase: number;
+}
+
+export interface ChangeMapGenerateRequest {
+  replace_existing?: true;
+}
+
+export interface ChangeMapItemUpdate {
+  item_id: string;
+  student_decision: ChangeMapStudentDecision;
+  student_text: string | null;
+  student_note: string | null;
+}
+
+export type StudentAddedChangeMapDecision =
+  | "confirmed"
+  | "uncertain"
+  | "needs_inspection";
+
+export interface StudentAddedChangeMapItemRequest {
+  category: ChangeMapCategory;
+  student_text: string;
+  student_note: string | null;
+  student_decision: StudentAddedChangeMapDecision;
+}
+
+export interface ChangeMapUpdateRequest {
+  updates: ChangeMapItemUpdate[];
+  student_added_items: StudentAddedChangeMapItemRequest[];
+}
+
+export type ChangeMapConfirmationResponse = ChangeMapMutationResult;
+
 export interface WorkflowSections {
   prompt_builder: PromptBuilderArtifact | null;
   review_board: ReviewBoardArtifact | null;
@@ -163,6 +260,7 @@ export interface WorkflowSections {
 export interface WorkflowPhaseState {
   phase: number;
   sections: WorkflowSections;
+  change_map: StoredChangeMap | null;
 }
 
 // --- reconnection / evaluation / gate ---------------------------------------

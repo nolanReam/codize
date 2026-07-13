@@ -3,7 +3,7 @@
 The Codize v3 **AI Workflow Workspace** — a Next.js (App Router) frontend that
 makes the Codize Build Loop visible and usable:
 
-**Plan → Prompt → Generate → Bring Back → Review → Verify → Explain → Commit/Reflect**
+**Plan → Prompt → Generate → Bring Back → Change Map → Review → Verify → Explain → Commit/Reflect**
 
 It is an engineering cockpit, not a roadmap/checklist/quiz app. Design language:
 high-contrast dark, violet accent, mono for technical text (see `app/globals.css`
@@ -54,6 +54,11 @@ app/
                         material (mono textarea, honest 40k counter — never
                         clipped), optional changed files / own summary / tool
                         name, phase-scoped local draft, secret-guarded save
+      change-map/       Review Your Change Map (M15C.2) — explicit draft
+        page.tsx        generation, category-grouped student review, source
+                        disclosures, corrections/rejections/uncertainty,
+                        student-added items, save + confirmation, stale-map
+                        regeneration, and scoped local review drafts
       review/page.tsx   Review Board
       evidence/page.tsx Evidence Panel
       verify/page.tsx   Verification Lab
@@ -74,14 +79,20 @@ lib/                    api client, supabase client, types, prompt builder + tes
                         secret-marker guard, cleared on successful save),
                         implementationImport + test (pure M15B helpers: source-
                         kind labels, form ↔ payload shaping, save-blocking rules,
-                        page copy constants)
+                        page copy constants), changeMap + test (exact types,
+                        labels, grouping, progress, student-only PUT payload,
+                        confirmation readiness, stale state, local drafts, and
+                        phase next-step logic)
 ```
 
 ## Backend routes consumed
 
 Intake (`/intake/*`), roadmap (`/roadmap/generate`, `/roadmap`), phases
 (`/phases*`), workflow artifacts (`GET /workflow/{phase}`,
-`PUT /workflow/{phase}/{section}`), reconnection (`GET /reconnection`,
+`PUT /workflow/{phase}/{section}`), Change Map
+(`POST /workflow/{phase}/change-map/generate`,
+`PUT /workflow/{phase}/change-map`,
+`POST /workflow/{phase}/change-map/confirm`), reconnection (`GET /reconnection`,
 `POST /reconnection/acknowledge`), evaluation (`GET /evaluation`), and the full
 gate flow (`GET /gate/current`, `POST /gate/start`,
 `POST /gate/{id}/turn1|turn2|turn3|evaluate`), plus the metadata-only
@@ -139,8 +150,27 @@ guard (credential-like drafts are not kept locally, with a visible warning;
 the backend's 422 never echoes the value). The Build Loop strip, sidebar,
 phase "Next step" ordering, and cockpit/phase progress ("Workflow: N/5
 captured") all carry the new step; the Prompt Builder hands off to it after a
-save. No LLM call, no analysis, no Change Map (M15C), and raw imports stay
-out of the Defense Context by backend construction.
+save. No automatic LLM call; after save, the explicit next action opens the
+M15C.2 Change Map page. Raw imports stay out of the Defense Context by backend
+construction.
+
+## Status (M15C.2)
+
+The student-facing Change Map is complete at `/app/phase/change-map`. It reads
+the top-level M15C.1 map from the existing workflow fetch, never as a sixth
+artifact. Generation happens only after **Create Change Map**; a safe 502 keeps
+the saved import unchanged and offers retry/import review. The page groups only
+populated categories, labels AI drafts separately from student-added items,
+renders bounded source excerpts as plain text, and supports Looks right,
+correction, rejection, uncertainty, and needs-inspection decisions. Review
+progress saves explicitly through the student-only PUT shape; compatible
+unsaved review state uses the existing secret-guarded, user/phase/map-version
+local draft layer. Confirmation records review—not correctness—and unresolved
+items remain visible. Stale maps remain readable, cannot confirm, and require a
+deliberate `replace_existing=true` regeneration warning. Build Loop/navigation,
+phase next-step logic, and the import handoff include Change Map while workflow
+progress remains **N/5**. Review Board, Evidence, Verification, Project Defense,
+Defense Context, and Defense Report data flow remain unchanged pending M16.
 
 ## Status (M13E.4)
 

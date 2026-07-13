@@ -63,3 +63,12 @@ SECTION_MODELS (generic PUT 404s on it), filtered out of `_stored_sections`
 captured" counts). Its dedicated routes register BEFORE the generic section
 PUT in routers/workflow.py — moving them below breaks
 `PUT /workflow/{n}/change-map`. See [[change-map-conventions]].
+
+M15C.2 frontend rule: `WorkflowPhaseState.change_map` mirrors that top-level
+key and `useWorkflowSection` carries it from the SAME existing GET alongside
+the requested section. `WorkflowSteps` displays Change Map after Bring Back
+with its own not-created/draft/reviewed/stale status, but it has `section=null`
+and can never contribute to `Object.values(sections)`—phase and cockpit remain
+exactly N/5 captured. The Change Map page uses only its three dedicated routes;
+it never calls the generic section PUT and never sends server-owned provenance.
+See [[change-map-ui-conventions]].

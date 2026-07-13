@@ -235,10 +235,16 @@ export default function BringBackPage() {
 
             {justSaved && (
               <div className="notice ok" role="status">
-                Implementation material saved — it&rsquo;s part of this phase&rsquo;s record now.{" "}
-                <Link href="/app/phase" style={{ color: "inherit", fontWeight: 600 }}>
-                  Back to Build Loop →
-                </Link>
+                <strong>Implementation material saved.</strong> It&rsquo;s part of this phase&rsquo;s
+                record now.
+                <div className="row" style={{ marginTop: 8 }}>
+                  <Link href="/app/phase/change-map" style={{ color: "inherit", fontWeight: 700 }}>
+                    Create Change Map →
+                  </Link>
+                  <Link href="/app/phase" style={{ color: "inherit" }}>
+                    Back to Build Loop
+                  </Link>
+                </div>
               </div>
             )}
 

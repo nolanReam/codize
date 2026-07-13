@@ -15,6 +15,7 @@ const NAV = [
   { href: "/app/phase", label: "Phase Workspace", exact: true },
   { href: "/app/phase/prompt", label: "Prompt Builder" },
   { href: "/app/phase/import", label: "Bring Back What Changed" },
+  { href: "/app/phase/change-map", label: "Change Map" },
   { href: "/app/phase/review", label: "Review Board" },
   { href: "/app/phase/evidence", label: "Evidence Panel" },
   { href: "/app/phase/verify", label: "Verification Lab" },
@@ -131,7 +132,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         ))}
         <div className="nav-section">Build Loop</div>
-        {NAV.slice(2, 7).map((item) => (
+        {NAV.slice(2, 8).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -141,7 +142,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         ))}
         <div className="nav-section">Defend</div>
-        {NAV.slice(7).map((item) => (
+        {NAV.slice(8).map((item) => (
           <Link
             key={item.href}
             href={item.href}

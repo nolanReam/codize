@@ -74,3 +74,13 @@ an already-loaded project so it duplicates no ownership logic). The Change
 Map binds to `saved_at` — replacing an import makes the map stale, never
 rewrites it. Raw imports still never enter the defense context; extraction
 applies full M14A redaction to a VIEW and never mutates the stored artifact.
+
+**M15C.2 UI consumer:** the saved import now hands off to
+`/app/phase/change-map` after a successful save, but saving still performs only
+the generic implementation-import PUT—no generation is triggered. The Change
+Map page reads this section plus the top-level `change_map` through the same GET
+and calls extraction only after **Create Change Map**. Replacing this section
+continues to do exactly one thing: stamp a new `saved_at`, which makes an
+existing map stale; the frontend leaves that map visible, blocks confirmation,
+and requires deliberate replacement generation. See
+[[change-map-ui-conventions]].

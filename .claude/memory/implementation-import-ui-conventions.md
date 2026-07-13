@@ -71,13 +71,14 @@ was built.
 "Save changes" plus a plain-language "replacing this phase's previous save"
 draft-hint suffix (full-section replace, no version history/append/merge).
 Success = `.notice ok` (role="status") "Implementation material saved" with
-a secondary "Back to Build Loop →" link to /app/phase — deliberately NOT to
-Review, because M15C becomes the next step later; no auto-redirect. A failed
-save preserves form values and the local draft.
+the M15C.2 next action **"Create Change Map →"** plus the preserved secondary
+"Back to Build Loop" link. It navigates only—no generation or other LLM call
+happens on save. A failed save preserves form values and the local draft.
 
 **Build Loop position:** WorkflowSteps order is Plan + Prompt → Generate →
-**Bring Back** → Review → Verify → Prove → Explain → Commit/Reflect (8
-steps); phase-page WORKFLOW_ORDER inserts it after prompt_builder; the
+**Bring Back** → **Change Map** → Review → Verify → Prove → Explain →
+Commit/Reflect (9 steps since M15C.2); phase next-step logic inserts Change Map
+between the saved import and Review; the
 "Workflow: N/**5** captured" counts on the phase page and cockpit were the
 easy-to-miss change (the backend returns five keys, so the old /4 display
 would have shown 5/4). Artifact saves still never tick a build task. The
@@ -89,10 +90,10 @@ gated), no import content in the report or Defense Context (report stays
 untouched; the M14 pack excludes raw imports by backend construction —
 live-checked that /gate/context-summary is 8 sources before and after
 imports), no file upload/GitHub fetch, no per-question source attribution.
-**M15C UI seam:** the future Change Map surface reads the same stored
-section via `GET /workflow/{phase}` (key `implementation_import`) and the
-backend seam `workflow_service.get_implementation_import` — the page itself
-needs no change to feed M15C.
+**M15C UI seam (built):** `/app/phase/change-map` reads the same stored section
+and top-level `change_map` through `GET /workflow/{phase}`. The import page
+changed only its post-save handoff; its storage payload, draft, and replacement
+semantics are unchanged. See [[change-map-ui-conventions]].
 
 See [[implementation-import-conventions]] (backend contract),
 [[workflow-artifact-conventions]], [[frontend-conventions]],

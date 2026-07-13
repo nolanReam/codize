@@ -67,12 +67,14 @@ export function clearDraft(storage: StorageLike, key: string): void {
 // page doesn't know its scope yet (e.g. phase still loading).
 export function useDraft<T>(surface: string | null) {
   const [key, setKey] = useState<string | null>(null);
+  const [loadedSurface, setLoadedSurface] = useState<string | null>(null);
   const [restored, setRestored] = useState<T | null>(null);
   const [ready, setReady] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setKey(null);
+    setLoadedSurface(null);
     setRestored(null);
     setReady(false);
     if (!surface) return;
@@ -83,15 +85,20 @@ export function useDraft<T>(surface: string | null) {
         if (cancelled) return;
         const uid = data.session?.user?.id;
         if (!uid) {
+          setLoadedSurface(surface);
           setReady(true); // signed out — no draft scope, but don't block pages
           return;
         }
         const k = draftKey(uid, surface);
         setKey(k);
         setRestored(readDraft<T>(window.localStorage, k));
+        setLoadedSurface(surface);
         setReady(true);
       })
-      .catch(() => setReady(true));
+      .catch(() => {
+        setLoadedSurface(surface);
+        setReady(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -113,5 +120,5 @@ export function useDraft<T>(surface: string | null) {
     if (key) clearDraft(window.localStorage, key);
   }, [key]);
 
-  return { restored, ready, save, clear };
+  return { restored, ready, loadedSurface, save, clear };
 }
