@@ -91,11 +91,13 @@ live model must, so `LLM_PROVIDER=stub` smokes the whole pipeline with zero
 model calls.
 
 **Seams:** M15C.2 UI reads `GET /workflow/{phase}` → `change_map` (+`stale`)
-and drives the PUT/confirm routes above. M16 downstream:
-`workflow_service.get_change_map(project, phase) → StoredChangeMap | None`
-then `change_map_service.confirmed_items(map)` (facts the student reviewed)
-/ `unresolved_items(map)` (cautious context) — Review/Verification/Defense/
-Report integration deliberately NOT wired (spec-guardian change later).
+and drives the PUT/confirm routes above. M16A.1 now consumes the exact typed
+backend seam: `workflow_service.get_change_map(project, phase) →
+StoredChangeMap | None`, then `change_map_service.confirmed_items(map)`
+(reviewed effective statements) / `unresolved_items(map)` (cautious context)
+to create a separate linked Review draft. This does NOT make Change Map
+confirmation implementation approval: every Review target begins `pending`.
+Verification/Defense/Report integration remains unwired.
 Adversarial matrix: `docs/testing/m15c_change_map_adversarial.md`. See
 [[implementation-import-conventions]], [[workflow-artifact-conventions]],
 [[defense-context-conventions]], [[grounded-defense-conventions]].
@@ -113,5 +115,18 @@ authoritative. Stale/confirmed maps stay visible; replacing a map is explicit
 and destructive-review wording is mandatory. Local review drafts reuse the
 existing secret-guarded system with a generated-map timestamp in the surface
 key, so replacement maps cannot consume old decisions. Build Loop status is
-separate from N/5. No M16 consumer is wired. Full conventions:
+separate from N/5. M16A.1 consumes the confirmed map only through the backend
+seam above; the M15C.2 frontend itself remains unchanged. Full conventions:
 [[change-map-ui-conventions]].
+
+**M16A.1 Review consumer (built 2026-07-13):** only six categories become
+Review decision targets, in this priority order: behavior_change,
+implementation_decision, out_of_scope_change, security_sensitive_area,
+unresolved_risk, unverified_behavior. changed_file and
+question_to_understand remain context; rejected/pending never enter; uncertain
+and needs_inspection enter with `source_resolution=unresolved`. Review stores
+the bounded effective-text snapshot + item/category/origin/student-decision
+snapshot and binds to this map's generated_at + confirmed_at. A later map
+edit/reconfirmation/regeneration or import staleness makes the Review stale on
+read without rewriting either record. Raw import and source references are
+never copied. See [[change-map-review-integration-conventions]].

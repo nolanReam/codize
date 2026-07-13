@@ -19,7 +19,13 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import CurrentUser, require_user
 from app.schemas.change_map import ChangeMapGenerateRequest
-from app.services import change_map_service, phase_service, workflow_service
+from app.schemas.workflow import ReviewFromChangeMapRequest
+from app.services import (
+    change_map_service,
+    phase_service,
+    review_service,
+    workflow_service,
+)
 from app.services.llm_service import LLMService, get_llm_service
 from app.services.project_repository import ProjectRepository, get_project_repository
 
@@ -32,6 +38,8 @@ def _http_error(exc: Exception) -> HTTPException:
     ):
         status = 404
     elif isinstance(exc, workflow_service.InvalidArtifactError):
+        status = 422
+    elif isinstance(exc, review_service.InvalidReviewUpdateError):
         status = 422
     else:  # workspace not ready
         status = 409
@@ -49,6 +57,16 @@ def _change_map_http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=502, detail=str(exc))
     # workspace not ready / import required / already exists / stale /
     # pending items / already confirmed
+    return HTTPException(status_code=409, detail=str(exc))
+
+
+def _review_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, phase_service.PhaseNotFoundError):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, review_service.InvalidReviewUpdateError):
+        return HTTPException(status_code=422, detail=str(exc))
+    # Workspace not ready / no current confirmed map / stale map / existing
+    # Review are workflow-state conflicts.
     return HTTPException(status_code=409, detail=str(exc))
 
 
@@ -110,6 +128,29 @@ async def confirm_change_map(
         raise _change_map_http_error(exc)
 
 
+@router.post("/{phase_number}/review/from-change-map")
+async def create_review_from_change_map(
+    phase_number: int,
+    body: ReviewFromChangeMapRequest | None = None,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    """Initialize Review deterministically from server-owned Change Map data.
+
+    The request can express replacement intent only; it cannot carry targets,
+    source text, provenance, ids, timestamps, or stale state.
+    """
+    try:
+        return await review_service.create_from_change_map(
+            repo,
+            user.user_id,
+            phase_number,
+            replace_existing=bool(body and body.replace_existing),
+        )
+    except (phase_service.PhaseWorkspaceError, review_service.ReviewError) as exc:
+        raise _review_http_error(exc)
+
+
 @router.put("/{phase_number}/{section}")
 async def put_section(
     phase_number: int,
@@ -122,5 +163,9 @@ async def put_section(
         return await workflow_service.save_section(
             repo, user.user_id, phase_number, section, body
         )
-    except (phase_service.PhaseWorkspaceError, workflow_service.WorkflowError) as exc:
+    except (
+        phase_service.PhaseWorkspaceError,
+        workflow_service.WorkflowError,
+        review_service.ReviewError,
+    ) as exc:
         raise _http_error(exc)

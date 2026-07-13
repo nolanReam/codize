@@ -32,7 +32,7 @@ from pydantic import ValidationError
 
 from app.schemas.change_map import StoredChangeMap
 from app.schemas.workflow import SECTION_MODELS, StoredImplementationImport
-from app.services import phase_service
+from app.services import phase_service, review_service
 from app.services.project_repository import ProjectRepository
 
 SECTIONS = tuple(SECTION_MODELS)
@@ -86,6 +86,13 @@ def _stored_sections(project: dict, phase_number: int) -> dict:
 
 def _phase_view(project: dict, phase_number: int) -> dict:
     stored = _stored_sections(project, phase_number)
+    # Review is the one additive section with a server-derived read view:
+    # linked Change Map bindings/snapshots are persisted, while initialized /
+    # stale are computed on read and can never be client-controlled.
+    if "review_board" in stored:
+        stored["review_board"] = review_service.review_board_view(
+            project, phase_number
+        )
     return {
         "phase": phase_number,
         "sections": {name: stored.get(name) for name in SECTIONS},
@@ -189,6 +196,26 @@ async def store_change_map(
     )
 
 
+async def store_review_board(
+    repo: ProjectRepository, user_id: str, project: dict, phase_number: int, data: dict
+) -> dict:
+    """Persist a validated manual or linked Review Board artifact.
+
+    Same one-column merge discipline as every workflow write: sibling
+    sections and the Change Map remain untouched. Review lifecycle/provenance
+    validation lives in review_service; this function is storage only.
+    """
+    existing = project.get("workflow_artifacts")
+    artifacts = dict(existing) if isinstance(existing, dict) else {}
+    phase_map = artifacts.get(str(phase_number))
+    phase_map = dict(phase_map) if isinstance(phase_map, dict) else {}
+    phase_map["review_board"] = copy.deepcopy(data)
+    artifacts[str(phase_number)] = phase_map
+    return await repo.update_project(
+        user_id, project["id"], {"workflow_artifacts": artifacts}
+    )
+
+
 async def get_phase_artifacts(
     repo: ProjectRepository, user_id: str, phase_number: int
 ) -> dict:
@@ -224,6 +251,21 @@ async def save_section(
             f"This section is too large to save (max {limit // 1000} KB) — "
             "trim pasted output and try again."
         )
+
+    # M16A.1 keeps the generic Review route for compatibility, but linked
+    # Review provenance cannot use generic full-replace validation. The
+    # dedicated service accepts the old payload unchanged plus student-only
+    # target_updates and copies every server-owned field from storage.
+    if section == "review_board":
+        try:
+            return await review_service.save_review_board(
+                repo, user_id, project, phase_number, payload
+            )
+        except review_service.InvalidReviewUpdateError as exc:
+            # Preserve the M13B service contract: invalid generic section PUTs
+            # raise InvalidArtifactError, including the additive target path.
+            raise InvalidArtifactError(str(exc))
+
     try:
         artifact = model.model_validate(payload)
     except ValidationError as exc:

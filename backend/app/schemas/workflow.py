@@ -78,6 +78,165 @@ class ReviewBoardArtifact(_Artifact):
     out_of_scope_changes: MedText | None = None
 
 
+# --- linked Review model (M16A.1) -----------------------------------------
+
+# Review decisions are intentionally separate from Change Map decisions.
+# Change Map confirmation says a description is accurate enough to carry
+# forward; these values record the student's later implementation judgment.
+ReviewDecision = Literal[
+    "pending",
+    "keep",
+    "revise",
+    "remove",
+    "needs_verification",
+    "uncertain",
+]
+
+ReviewSourceResolution = Literal["confirmed", "unresolved"]
+
+# Snapshot aliases mirror the exact M15C values. They are stored on each
+# target so a Review remains understandable even after its Change Map changes.
+ReviewChangeMapCategory = Literal[
+    "changed_file",
+    "behavior_change",
+    "implementation_decision",
+    "out_of_scope_change",
+    "security_sensitive_area",
+    "unresolved_risk",
+    "unverified_behavior",
+    "question_to_understand",
+]
+ReviewChangeMapOrigin = Literal["ai_inferred", "student_added"]
+ReviewChangeMapStudentDecision = Literal[
+    "pending_review",
+    "confirmed",
+    "edited",
+    "rejected",
+    "uncertain",
+    "needs_inspection",
+]
+
+REVIEW_TARGET_MAX = 60  # the Change Map's 40 AI + 20 student-item ceiling
+ReviewSnapshotText = Annotated[
+    str, Field(min_length=1, max_length=600), AfterValidator(_reject_secret_like)
+]
+ReviewTimestamp = Annotated[str, Field(min_length=1, max_length=64)]
+
+
+def _normalize_review_judgment(model):
+    """Normalize student-owned optional text and enforce the one decision
+    that needs an explanation. Kept shared by stored targets and updates so
+    the API boundary and persisted shape cannot drift."""
+    for name in ("student_rationale", "student_revision"):
+        value = getattr(model, name)
+        normalized = (value.strip() or None) if value is not None else None
+        setattr(model, name, normalized)
+    if model.review_decision == "revise" and not (
+        model.student_rationale or model.student_revision
+    ):
+        raise ValueError(
+            "a revise decision needs a student rationale or proposed revision"
+        )
+    return model
+
+
+class ReviewTarget(_Artifact):
+    """One server-derived Change Map snapshot plus student-owned Review state.
+
+    Every field above `review_decision` is server-owned after initialization.
+    The generic Review PUT accepts only ReviewTargetUpdate, never this shape.
+    """
+
+    review_target_id: Annotated[str, Field(pattern=r"^rv-[0-9a-f]{12}$")]
+    change_map_item_id: Annotated[str, Field(min_length=1, max_length=64)]
+    change_map_category: ReviewChangeMapCategory
+    change_map_origin: ReviewChangeMapOrigin
+    change_map_student_decision: ReviewChangeMapStudentDecision
+    change_text: ReviewSnapshotText
+    source_resolution: ReviewSourceResolution
+    review_decision: ReviewDecision = "pending"
+    student_rationale: MedText | None = None
+    student_revision: MedText | None = None
+
+    @model_validator(mode="after")
+    def _judgment_rules(self) -> "ReviewTarget":
+        return _normalize_review_judgment(self)
+
+
+class StoredReviewBoardArtifact(ReviewBoardArtifact):
+    """Backward-compatible stored/read Review shape.
+
+    Legacy/manual artifacts contain only the inherited M13B fields plus
+    saved_at. A linked artifact additionally binds to one confirmed Change Map
+    version and carries bounded review targets. The computed `stale` and
+    `initialized_from_change_map` flags are read-view fields, never persisted.
+    """
+
+    saved_at: str | None = None
+    source_change_map_confirmed_at: ReviewTimestamp | None = None
+    source_change_map_generated_at: ReviewTimestamp | None = None
+    review_targets: list[ReviewTarget] = Field(
+        default_factory=list, max_length=REVIEW_TARGET_MAX
+    )
+
+    @model_validator(mode="after")
+    def _binding_integrity(self) -> "StoredReviewBoardArtifact":
+        confirmed = self.source_change_map_confirmed_at is not None
+        generated = self.source_change_map_generated_at is not None
+        if confirmed != generated:
+            raise ValueError("a linked Review needs both Change Map timestamps")
+        if self.review_targets and not confirmed:
+            raise ValueError("review targets need a linked Change Map")
+        target_ids = [target.review_target_id for target in self.review_targets]
+        item_ids = [target.change_map_item_id for target in self.review_targets]
+        if len(target_ids) != len(set(target_ids)):
+            raise ValueError("duplicate review target ids")
+        if len(item_ids) != len(set(item_ids)):
+            raise ValueError("duplicate linked Change Map item ids")
+        return self
+
+
+class ReviewTargetUpdate(_Artifact):
+    """Student-owned fields for one server-issued Review target."""
+
+    review_target_id: Annotated[str, Field(pattern=r"^rv-[0-9a-f]{12}$")]
+    review_decision: ReviewDecision
+    student_rationale: MedText | None = None
+    student_revision: MedText | None = None
+
+    @model_validator(mode="after")
+    def _judgment_rules(self) -> "ReviewTargetUpdate":
+        return _normalize_review_judgment(self)
+
+
+class ReviewBoardSaveRequest(ReviewBoardArtifact):
+    """Existing Review PUT payload plus additive student-only target updates.
+
+    Source bindings, snapshots, target ids, provenance, and stale state are
+    deliberately absent and therefore rejected by extra="forbid".
+    """
+
+    target_updates: list[ReviewTargetUpdate] = Field(
+        default_factory=list, max_length=REVIEW_TARGET_MAX
+    )
+
+
+class ReviewFromChangeMapRequest(_Artifact):
+    """Explicit linked-draft initialization. All source data is server-derived."""
+
+    replace_existing: bool = False
+
+
+class NeedsVerificationReviewTarget(_Artifact):
+    """Typed M16B handoff only; it creates no Verification records."""
+
+    review_target_id: str
+    change_map_item_id: str
+    reviewed_text: str
+    student_rationale: str | None = None
+    change_map_category: ReviewChangeMapCategory
+
+
 EvidenceKind = Literal[
     "repo_url",
     "commit_hash",

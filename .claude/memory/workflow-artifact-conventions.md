@@ -72,3 +72,21 @@ and can never contribute to `Object.values(sections)`—phase and cockpit remain
 exactly N/5 captured. The Change Map page uses only its three dedicated routes;
 it never calls the generic section PUT and never sends server-owned provenance.
 See [[change-map-ui-conventions]].
+
+M16A.1 keeps Review in the SAME existing section key and JSONB column — no
+table, migration, parallel persistence system, or duplicate GET. A linked
+Review is a backward-compatible `review_board` artifact with additive
+`source_change_map_generated_at`, `source_change_map_confirmed_at`, and
+bounded `review_targets`. `GET /workflow/{phase}` runs only this section
+through `review_service.review_board_view` so linked artifacts gain computed
+`initialized_from_change_map=true` + `stale`; legacy/manual artifacts retain
+their exact M13B read shape. `POST /workflow/{phase}/review/from-change-map`
+is the explicit deterministic initializer. The existing generic Review PUT
+still accepts its old payload, plus `target_updates`; review_service patches
+only student decision/rationale/revision and copies every source field from
+storage. The PUT remains full-replace for legacy manual fields. Review writes
+still merge one phase key and touch only `workflow_artifacts`; sibling
+sections + Change Map survive. No linked target/source text enters the
+Defense Context output — the existing Review normalizer continues to select
+only its legacy student-authored fields from `stored_sections`. See
+[[change-map-review-integration-conventions]].

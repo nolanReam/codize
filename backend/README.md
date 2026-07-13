@@ -35,7 +35,9 @@ app/
 │                  unlock_service.py: hidden-threshold functional unlocks, M10;
 │                  reconnection_service.py: Yeager reconnection engine, M11;
 │                  evaluation_service.py: deterministic progress evaluation, M12;
-│                  workflow_service.py: workflow artifact store, M13B)
+│                  workflow_service.py: workflow artifact store, M13B;
+│                  change_map_service.py: reviewed Change Map lifecycle, M15C;
+│                  review_service.py: confirmed-map Review integration, M16A.1)
 ├── schemas/       request/response models (intake.py, phases.py, gate.py, workflow.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
@@ -212,7 +214,7 @@ Evaluation is a pure read — it never mutates the roadmap, task progress,
 gates, or unlocks, never advances phases, and never touches reconnection's
 `last_login_at`.
 
-## Workflow artifacts (M13B; implementation import added in M15A; Change Map added in M15C.1)
+## Workflow artifacts (M13B; implementation import M15A; Change Map M15C; linked Review M16A.1)
 
 `services/workflow_service.py` stores the student-authored v3 Build Loop
 sections — `prompt_builder`, `review_board`, `evidence`, `verification`, and
@@ -303,12 +305,57 @@ schema and any successful update returns the map to draft.
 staleness, allows rejected/uncertain/needs-inspection honestly, and stamps
 `confirmed_at` server-side; confirmation means "reviewed", never "correct".
 An existing map (draft or confirmed) is only replaced with an explicit
-`{"replace_existing": true}`. Future M16 seams (deliberately not consumed
-yet): `workflow_service.get_change_map` →
-`change_map_service.confirmed_items` / `unresolved_items` (deterministic
-effective text: confirmed→draft_text, edited/student_added→student_text,
-rejected→excluded). Adversarial matrix:
+`{"replace_existing": true}`. The M16A.1 Review integration consumes the
+typed `workflow_service.get_change_map` →
+`change_map_service.confirmed_items` / `unresolved_items` seams only
+(deterministic effective text: confirmed→draft_text,
+edited/student_added→student_text, rejected→excluded). Adversarial matrix:
 `docs/testing/m15c_change_map_adversarial.md`.
+
+### Confirmed Change Map → Review (M16A.1)
+
+`services/review_service.py` deterministically initializes the existing
+`review_board` section from an owned phase's current, confirmed, non-stale
+Change Map. The distinction is permanent: Change Map confirmation records
+that a description of the apparent change was reviewed; Review records the
+student's separate implementation judgment. Initialization never decides for
+the student and makes no Gemini, OpenRouter, or stub-provider call.
+
+`POST /workflow/{phase}/review/from-change-map` accepts no body or only
+`{"replace_existing": bool}`. The server filters, in fixed priority order,
+`behavior_change`, `implementation_decision`, `out_of_scope_change`,
+`security_sensitive_area`, `unresolved_risk`, and `unverified_behavior`;
+`changed_file` and `question_to_understand` remain context. Rejected/pending
+items never become targets. Uncertain/needs-inspection items become cautious
+targets with `source_resolution=unresolved`, never confirmed facts.
+
+Each target stores a deterministic `rv-...` id, the Change Map item id,
+category/origin/student-decision snapshot, bounded effective-text snapshot,
+and an initial student decision of `pending`. The Review binds to the exact
+Change Map `generated_at` + `confirmed_at`; `GET /workflow/{phase}` exposes
+the linked artifact through `sections.review_board` with server-computed
+`initialized_from_change_map=true` and `stale`. Staleness covers a missing,
+draft, regenerated, reconfirmed, or import-stale Change Map and is never
+persisted or client-controlled. Manual/legacy Review artifacts keep their
+original read/write shape.
+
+The existing `PUT /workflow/{phase}/review_board` remains the only update
+route. Its old payload is still accepted; linked Reviews additionally accept
+`target_updates` containing only server-issued target id + student-owned
+`review_decision` (`pending`/`keep`/`revise`/`remove`/
+`needs_verification`/`uncertain`), rationale, and revision. Source ids,
+snapshots, provenance, timestamps, and stale state are absent from the write
+schema and copied from storage. `revise` requires rationale or a proposed
+revision. Existing Review work returns 409 during initialization unless the
+caller deliberately sends `replace_existing=true`; replacement resets the
+single active linked draft and creates no history. Same JSONB column, same
+owner-scoped project repository, same phase validation, **no migration**.
+
+Future seams: M16A.2 uses the POST above, the existing workflow GET, and
+Review PUT `target_updates`. M16B uses
+`review_service.needs_verification_targets(review)`; M16A.1 creates no
+Verification or Evidence records and does not feed linked target data into
+Defense Context, Project Defense, the evaluator, or the report.
 
 ## Defense context pack (M14A)
 
