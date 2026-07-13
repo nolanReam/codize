@@ -41,7 +41,13 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from app.services import llm_service, phase_service, unlock_service
+from app.services import (
+    defense_context_service,
+    grounding_service,
+    llm_service,
+    phase_service,
+    unlock_service,
+)
 from app.services.llm_service import LLMService
 from app.services.project_repository import (
     GateSessionRepository,
@@ -57,6 +63,28 @@ PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 # Fixed by prompts/README.md — gate turns at 0.3, evaluation at 0.
 TURN_TEMPERATURE = 0.3
 EVAL_TEMPERATURE = 0.0
+
+# M14B: per-turn grounding preference carried in the artifact-context block
+# (composition only — the prompt .md files are unchanged). Artifacts guide
+# the questions; the evaluator never sees them and is untouched.
+_TURN_HINTS = {
+    1: (
+        "prefer the student's anchor, then the Prompt Builder artifact, then "
+        "the Review Board notes."
+    ),
+    2: (
+        "prefer the student's previous answer, then the Review Board notes, "
+        "then the phase goal and any relevant recorded artifact."
+    ),
+    3: (
+        "prefer the student's previous answers, then recorded Verification "
+        "results (especially checks recorded as skipped, failed, or "
+        "not_applicable) and Evidence entries."
+    ),
+}
+# One corrective regeneration after a grounding rejection, then the existing
+# retryable failure — bounded LLM spend (at most 2 calls per turn).
+_MAX_GROUNDING_ATTEMPTS = 2
 
 COOLDOWN = timedelta(minutes=30)  # spec: no immediate retry after a failed gate
 
@@ -190,7 +218,9 @@ def _history(project: dict) -> str:
     return project.get("gate_history_summary") or _NO_HISTORY
 
 
-def _turn1_prompt(project: dict, phase: dict, anchor: str, strong: bool) -> str:
+def _turn1_prompt(
+    project: dict, phase: dict, anchor: str, strong: bool, context_block: str
+) -> str:
     base = _fill(_load_prompt("gate_turn_1.md"), {
         "GATE_TARGETS": json.dumps(phase["explanation_gate_targets"]),
         "GATE_DEPTH": phase["gate_depth"],
@@ -198,6 +228,7 @@ def _turn1_prompt(project: dict, phase: dict, anchor: str, strong: bool) -> str:
         "STUDENT_STACK": project["intake_stack"],
         "GATE_HISTORY_SUMMARY": _history(project),
     })
+    base = f"{base}{context_block}"
     # Composition tails live-tuned in M9 (docs/prebuild/adversarial_tests.md);
     # "respond with ONLY the text of the one question" is load-bearing.
     if strong:
@@ -225,16 +256,16 @@ def _turn1_prompt(project: dict, phase: dict, anchor: str, strong: bool) -> str:
     )
 
 
-def _turn2_prompt(session: dict, answer: str) -> str:
+def _turn2_prompt(session: dict, answer: str, context_block: str) -> str:
     base = _fill(_load_prompt("gate_turn_2.md"), {
         "ANCHOR_STATEMENT": session["anchor_statement"],
         "TURN_1_QUESTION": session["turns"][0]["question"],
         "TURN_1_RESPONSE": answer,
     })
-    return f"{base}\n\nRespond with ONLY the text of the one follow-up question."
+    return f"{base}{context_block}\n\nRespond with ONLY the text of the one follow-up question."
 
 
-def _turn3_prompt(project: dict, session: dict, answer: str) -> str:
+def _turn3_prompt(project: dict, session: dict, answer: str, context_block: str) -> str:
     turns = session["turns"]
     base = _fill(_load_prompt("gate_turn_3.md"), {
         "ANCHOR_STATEMENT": session["anchor_statement"],
@@ -244,7 +275,7 @@ def _turn3_prompt(project: dict, session: dict, answer: str) -> str:
         "TURN_2_RESPONSE": answer,
         "GATE_HISTORY_SUMMARY": _history(project),
     })
-    return f"{base}\n\nRespond with ONLY the text of the one hypothetical question."
+    return f"{base}{context_block}\n\nRespond with ONLY the text of the one hypothetical question."
 
 
 def _evaluation_prompt(session: dict, answer: str) -> str:
@@ -341,6 +372,9 @@ _HARD_LEAK = re.compile(
     r"gate\s+targets?|gate\s+depth|\brubric\b|\bevaluator\b|"
     r"\bspecificity\b|\bpersonalization\b|"
     r"now,?\s+i\s+need\s+to|i\s+need\s+to\s+formulate|"
+    # M14B: injected artifact text must never surface as a question about the
+    # internals — no legitimate defense question mentions these.
+    r"system\s+prompt|context\s+pack|"
     r"^#{1,6}\s|\*\*[^*\n]+\*\*\s*:",
     re.IGNORECASE | re.MULTILINE,
 )
@@ -436,6 +470,74 @@ async def _complete(llm: LLMService, prompt: str, temperature: float) -> str:
         raise GateGenerationError(
             "The gate could not generate the next step. Please try again."
         ) from e
+
+
+async def _artifact_context(
+    repo: ProjectRepository, user_id: str, phase: dict, turn: int
+) -> tuple:
+    """The M14A pack + the composed artifact-context block for one turn.
+    Built fresh per call (pure read); missing artifacts never fail — they
+    arrive as missing_sources the prompt is told not to invent."""
+    pack = await defense_context_service.build_defense_context(
+        repo, user_id, phase["phase"]
+    )
+    block = grounding_service.context_block(
+        defense_context_service.render_defense_context(pack), _TURN_HINTS[turn]
+    )
+    return pack, block
+
+
+async def _grounded_question(
+    llm: LLMService,
+    prompt: str,
+    *,
+    pack,
+    anchor: str | None,
+    prior_answers: list[str],
+    prior_questions: list[str],
+    anchor_mode: str | None = None,
+) -> tuple[str, dict]:
+    """Generate one turn question and hold it to the M14B safety order:
+
+        generate → (turn-1 anchor-marker check) → M13E.2 sanitize + hard-leak
+                 → deterministic grounding validation → return for storage
+
+    Grounding is validated on the CLEANED user-facing text (a deliberate,
+    tested deviation from validating the raw output: what is stored is what
+    must be grounded). A grounding rejection triggers exactly one corrective
+    regeneration; a second rejection is the existing retryable failure
+    (nothing stored). Sanitizer failures keep their M13E.2 behavior —
+    immediately retryable, no corrective loop."""
+    corrective = None
+    for attempt in range(_MAX_GROUNDING_ATTEMPTS):
+        composed = prompt if corrective is None else f"{prompt}\n\n{corrective}"
+        raw = (await _complete(llm, composed, TURN_TEMPERATURE)).strip()
+        if anchor_mode is not None and raw.startswith(_ANCHOR_REJECTED):
+            if anchor_mode == "strong":
+                # The anchor names a real identifier and the model was told
+                # not to re-validate — a rejection is the model disobeying,
+                # never the student failing (M13E.2).
+                logger.warning("model rejected a pre-validated strong anchor; retryable")
+                raise GateGenerationError(_GENERIC_RETRY)
+            raise AnchorInvalidError(raw[len(_ANCHOR_REJECTED):].strip() or _ANCHOR_HELP)
+        question = clean_gate_question(raw)
+        try:
+            grounding = grounding_service.validate_question(
+                question,
+                pack=pack,
+                anchor=anchor,
+                prior_answers=prior_answers,
+                prior_questions=prior_questions,
+            )
+        except grounding_service.GroundingRejectedError as exc:
+            if attempt + 1 < _MAX_GROUNDING_ATTEMPTS:
+                corrective = grounding_service.corrective_feedback(exc.issues)
+                continue
+            # Identifier-level issues only — never raw model output.
+            logger.warning("grounded generation rejected twice: %s", exc.issues)
+            raise GateGenerationError(_GENERIC_RETRY)
+        return question, grounding.as_dict()
+    raise GateGenerationError(_GENERIC_RETRY)  # pragma: no cover — loop always returns/raises
 
 
 async def _load_gate_context(repo: ProjectRepository, user_id: str) -> tuple[dict, dict]:
@@ -551,24 +653,25 @@ async def submit_anchor(
         raise AnchorInvalidError(_ANCHOR_HELP)
     strong = anchor_has_strong_element(anchor)
 
-    raw = (await _complete(llm, _turn1_prompt(project, phase, anchor, strong), TURN_TEMPERATURE)).strip()
-    if raw.startswith(_ANCHOR_REJECTED):
-        if strong:
-            # The anchor names a real identifier and the model was told not to
-            # re-validate. A rejection here is the model disobeying, not the
-            # student failing — treat it as a retryable generation failure so
-            # the student is never told a valid anchor is invalid (M13E.2).
-            logger.warning("model rejected a pre-validated strong anchor; retryable")
-            raise GateGenerationError(_GENERIC_RETRY)
-        raise AnchorInvalidError(raw[len(_ANCHOR_REJECTED):].strip() or _ANCHOR_HELP)
-    # Deterministic cleanliness guard: strip any leaked preamble/meta, reject
-    # an all-meta output (retryable — nothing stored below on the raise).
-    question = clean_gate_question(raw)
+    # M14B: ground the question in the recorded workflow context.
+    pack, block = await _artifact_context(project_repo, user_id, phase, 1)
+    question, grounding = await _grounded_question(
+        llm,
+        _turn1_prompt(project, phase, anchor, strong, block),
+        pack=pack,
+        anchor=anchor,
+        prior_answers=[],
+        prior_questions=[],
+        anchor_mode="strong" if strong else "weak",
+    )
 
     # Anchor + question in one write: an LLM failure leaves nothing stored.
+    # The grounding metadata lives inside the turns JSONB but never reaches
+    # the client — _turns_view whitelists turn/question/answer only.
     await gate_repo.update_session(
         user_id, session_id,
-        {"anchor_statement": anchor, "turns": [{"turn": 1, "question": question, "answer": None}]},
+        {"anchor_statement": anchor,
+         "turns": [{"turn": 1, "question": question, "answer": None, "grounding": grounding}]},
     )
     return {"gate_session_id": session_id, "turn": 1, "question": question}
 
@@ -588,17 +691,29 @@ async def generate_followup(
         project_repo, gate_repo, user_id, session_id, f"turn{turn}"
     )
     answer = answer.strip()
-    prompt = (
-        _turn2_prompt(session, answer) if turn == 2
-        else _turn3_prompt(project, session, answer)
-    )
-    # Deterministic cleanliness guard (same as Turn 1): strip leaked
-    # preamble/meta, reject an all-meta output (retryable — nothing stored).
-    question = clean_gate_question(await _complete(llm, prompt, TURN_TEMPERATURE))
 
-    turns = list(session["turns"])
+    # M14B: ground the follow-up in the recorded workflow context plus the
+    # student's own transcript so far (including the answer being submitted).
+    pack, block = await _artifact_context(project_repo, user_id, phase, turn)
+    prompt = (
+        _turn2_prompt(session, answer, block) if turn == 2
+        else _turn3_prompt(project, session, answer, block)
+    )
+    stored_turns = session["turns"]
+    prior_answers = [t["answer"] for t in stored_turns if t.get("answer")] + [answer]
+    prior_questions = [t["question"] for t in stored_turns]
+    question, grounding = await _grounded_question(
+        llm,
+        prompt,
+        pack=pack,
+        anchor=session.get("anchor_statement"),
+        prior_answers=prior_answers,
+        prior_questions=prior_questions,
+    )
+
+    turns = list(stored_turns)
     turns[-1] = {**turns[-1], "answer": answer}
-    turns.append({"turn": turn, "question": question, "answer": None})
+    turns.append({"turn": turn, "question": question, "answer": None, "grounding": grounding})
     await gate_repo.update_session(user_id, session_id, {"turns": turns})
     return {"gate_session_id": session_id, "turn": turn, "question": question}
 

@@ -125,6 +125,22 @@ additionally revokes the column from client roles.
 Errors: not ready / in progress / already passed / out of order / cooldown →
 409 (cooldown adds Retry-After), unknown session → 404, invalid anchor → 422,
 LLM failure or malformed verdict → 502 with nothing stored.
+Since M14B the three turn questions are **grounded in the student's recorded
+workflow**: each turn call builds the M14A context pack and appends a
+delimited artifact-context block (untrusted-data rules + per-turn grounding
+hints) to the composed prompt — the prompt `.md` files are unchanged, and
+the **evaluator prompt carries no artifact context** (artifacts guide
+questions, never PASS/FAIL). Generated questions are held, after the M13E.2
+sanitizer, to deterministic grounding validation
+(`services/grounding_service.py`): every code-shaped identifier must be
+supported by the pack, the anchor, or prior answers; proof-claims about
+self-reported evidence/verification, accusatory framing, and describing a
+skipped/failed/n-a check as "passed" are rejected. A rejection triggers
+exactly one corrective regeneration, then the existing retryable 502 with
+nothing stored. Derived grounding metadata ({source_ids, grounding_terms})
+is stored inside the turns JSONB and never reaches the client (the
+transcript view whitelists turn/question/answer). Adversarial matrix:
+`docs/testing/m14b_grounded_defense_adversarial.md`.
 
 ## Functional unlocks (M10)
 
@@ -211,11 +227,9 @@ data are dropped on read.
 ## Defense context pack (M14A)
 
 `services/defense_context_service.py` (+ `schemas/defense_context.py`) builds
-the deterministic, ownership-safe context pack the future artifact-aware
-Project Defense (M14B) will ground its questions in. **The gate does not
-consume it yet** — the builder is a standalone internal service (no API
-route; nothing raw is exposed to clients) and wiring it into gate prompts is
-a separate spec-guardian-reviewed milestone. The M14B seam is
+the deterministic, ownership-safe context pack the artifact-aware Project
+Defense grounds its questions in (**consumed by the live gate since M14B**;
+still no API route — nothing raw is exposed to clients). The seam is
 `build_defense_context(project_repo, user_id, phase_number)` →
 `DefenseContextPack`, then `render_defense_context(pack)` → the deterministic
 string (untrusted-data header + sorted-key JSON). Properties: read-only

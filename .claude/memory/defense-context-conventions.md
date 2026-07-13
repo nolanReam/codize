@@ -1,10 +1,10 @@
 # Defense context pack conventions (Milestone 14A)
 
 `services/defense_context_service.py` + `schemas/defense_context.py` build
-the artifact-aware defense context — the normalized evidence bundle M14B
-will ground gate questions in. **In M14A the gate does NOT consume it**:
-the builder is standalone, and wiring it into gate prompts stays a separate
-spec-guardian-reviewed change (see [[gate-conventions]]).
+the artifact-aware defense context — the normalized evidence bundle gate
+questions are grounded in. **Consumed by the live gate since M14B** via
+`gate_service._artifact_context` + `grounding_service.context_block` (see
+[[grounded-defense-conventions]]); the evaluator still never sees it.
 
 **The M14B integration seam is exactly:**
 `await build_defense_context(project_repo, user_id, phase_number)` →

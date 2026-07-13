@@ -256,9 +256,13 @@ def test_anchor_stored_with_session_and_turn1_uses_targets_and_anchor():
 
     session = run(gates.get_session(USER, sid))
     assert session["anchor_statement"] == ANCHOR
-    assert session["turns"] == [
-        {"turn": 1, "question": "Why did you put user_id on matches?", "answer": None}
-    ]
+    [stored] = session["turns"]
+    assert stored["turn"] == 1
+    assert stored["question"] == "Why did you put user_id on matches?"
+    assert stored["answer"] is None
+    # M14B: grounding metadata is stored with the turn (backend-internal —
+    # the client transcript view whitelists turn/question/answer only).
+    assert "user_id" in stored["grounding"]["grounding_terms"]
 
 
 # --- turn sequencing -------------------------------------------------------------

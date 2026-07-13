@@ -75,13 +75,20 @@ decision to make). Live-verified against real Gemini + real Supabase in M9:
 one full PASS gate (phase 1→2) and one full FAIL gate (textbook answer
 auto-failed, 30-min cooldown enforced live with Retry-After).
 
-M14A built the standalone defense context pack
-(`defense_context_service.build_defense_context` — see
-[[defense-context-conventions]]) but the gate still does NOT read workflow
-artifacts: nothing in gate_service imports or consumes the pack. Wiring it
-into gate question generation is M14B — a spec-guardian-reviewed change with
-its own adversarial-testing round; until then any "evidence-aware" behavior
-in the gate is a regression.
+Since M14B the three TURN QUESTIONS are artifact-aware: each turn call
+builds the M14A context pack and appends
+`grounding_service.context_block(rendered, turn_hint)` to the composed
+prompt BEFORE the live-tuned tail (prompt .md files unchanged), then the
+cleaned question is held to deterministic grounding validation with one
+corrective regeneration (see [[grounded-defense-conventions]] — safety
+order, retry budget, injection boundary, storage of grounding metadata
+inside the turns JSONB). **The evaluator remains artifact-blind**:
+`_evaluation_prompt` carries no context block, and verdict/score/cooldown
+logic is byte-identical — artifacts guide questions, never PASS/FAIL.
+`_HARD_LEAK` gained `system prompt`/`context pack` (M14B injection
+backstop). Live-verified with real Gemini 2026-07-12 (grounded leak-free
+turns; planted artifact injection ignored);
+docs/testing/m14b_grounded_defense_adversarial.md is the matrix.
 
 Prompt-hole lessons from the live adversarial runs (all in
 `docs/prebuild/adversarial_tests.md`): flash-lite counted generic role
