@@ -15,7 +15,7 @@ const STEPS: { title: string; body: string }[] = [
   { title: "Codize turns it into phases", body: "You get a roadmap sized for your kind of project, one phase at a time." },
   { title: "Plan before you ask AI", body: "For each phase, use the Prompt Builder first. It helps you figure out what to ask — even if you don't know yet." },
   { title: "Generate in your own AI tool", body: "Paste the prompt into Claude, Cursor, ChatGPT, Copilot — whatever you use. Codize doesn't write your code." },
-  { title: "Come back and review", body: "Note what the AI changed: what you accepted, rejected, or edited. This is where you stay in control." },
+  { title: "Bring back what changed", body: "Paste the AI response, diff, or your own notes into Codize, then note what you accepted, rejected, or edited. This is where you stay in control." },
   { title: "Submit evidence", body: "A repo link, a commit, test output — small proof that the work is real." },
   { title: "Verify behavior", body: "Check it actually works, including one way it could fail. Trust what you proved, not what looked done." },
   { title: "Defend what you built", body: "At the end of each phase, explain your work in your own words. Pass the defense, unlock the next phase." },

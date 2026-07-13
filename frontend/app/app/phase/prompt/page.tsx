@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
@@ -427,6 +428,13 @@ export default function PromptBuilderPage() {
                   onSave={save}
                   label="Save to workflow"
                 />
+                {/* The loop's hand-off: prompt out → result back (M15B). */}
+                {wf.savedAt && (
+                  <p className="muted" style={{ marginTop: 12 }}>
+                    Use your prompt in your AI coding tool. Then{" "}
+                    <Link href="/app/phase/import">bring back what changed →</Link>
+                  </p>
+                )}
               </>
             )}
           </div>

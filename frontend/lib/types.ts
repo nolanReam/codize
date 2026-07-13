@@ -64,7 +64,8 @@ export type WorkflowSectionName =
   | "prompt_builder"
   | "review_board"
   | "evidence"
-  | "verification";
+  | "verification"
+  | "implementation_import";
 
 export interface PromptBuilderArtifact {
   inputs: Record<string, string>;
@@ -132,11 +133,31 @@ export interface VerificationArtifact {
   saved_at?: string;
 }
 
+// "Bring Back What AI Changed" (M15A backend / M15B UI). Student-provided,
+// self-reported material — never verified, never proof of correctness.
+export type ImplementationImportSourceKind =
+  | "ai_response"
+  | "git_diff"
+  | "changed_files"
+  | "code_snippet"
+  | "manual_summary"
+  | "other";
+
+export interface ImplementationImportArtifact {
+  source_kind: ImplementationImportSourceKind;
+  content?: string | null;
+  changed_files: string[];
+  student_summary?: string | null;
+  tool_name?: string | null;
+  saved_at?: string;
+}
+
 export interface WorkflowSections {
   prompt_builder: PromptBuilderArtifact | null;
   review_board: ReviewBoardArtifact | null;
   evidence: EvidenceArtifact | null;
   verification: VerificationArtifact | null;
+  implementation_import: ImplementationImportArtifact | null;
 }
 
 export interface WorkflowPhaseState {

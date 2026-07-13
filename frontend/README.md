@@ -3,7 +3,7 @@
 The Codize v3 **AI Workflow Workspace** — a Next.js (App Router) frontend that
 makes the Codize Build Loop visible and usable:
 
-**Plan → Prompt → Generate → Review → Verify → Explain → Commit/Reflect**
+**Plan → Prompt → Generate → Bring Back → Review → Verify → Explain → Commit/Reflect**
 
 It is an engineering cockpit, not a roadmap/checklist/quiz app. Design language:
 high-contrast dark, violet accent, mono for technical text (see `app/globals.css`
@@ -47,7 +47,13 @@ app/
     phase/
       page.tsx          Phase Workflow Board (Build Loop + tasks + gate summary)
       prompt/page.tsx   Prompt Builder (deterministic, client-side; beginner
-                        phase explanation + starter-ask chips via lib/phaseGuide)
+                        phase explanation + starter-ask chips via lib/phaseGuide;
+                        after a save, hands off to "bring back what changed")
+      import/page.tsx   Bring Back What AI Changed (M15B) — the implementation
+                        import: source-kind radio chips, verbatim pasted
+                        material (mono textarea, honest 40k counter — never
+                        clipped), optional changed files / own summary / tool
+                        name, phase-scoped local draft, secret-guarded save
       review/page.tsx   Review Board
       evidence/page.tsx Evidence Panel
       verify/page.tsx   Verification Lab
@@ -65,7 +71,10 @@ lib/                    api client, supabase client, types, prompt builder + tes
                         explanations — no LLM), useWorkflowSection hook, drafts +
                         test (localStorage draft persistence — unsubmitted text
                         survives tab switches; user/phase/section-scoped keys,
-                        secret-marker guard, cleared on successful save)
+                        secret-marker guard, cleared on successful save),
+                        implementationImport + test (pure M15B helpers: source-
+                        kind labels, form ↔ payload shaping, save-blocking rules,
+                        page copy constants)
 ```
 
 ## Backend routes consumed
@@ -108,6 +117,30 @@ npm run typecheck
 npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
+
+## Status (M15B)
+
+The **Bring Back What AI Changed** page (`app/app/phase/import`) completes the
+loop's missing middle: after using their prompt in an external AI tool, the
+student brings the result back — pasted AI response, git diff, code snippet,
+changed-file list, and/or their own summary — before reviewing it.
+Prevention-first framing ("keep track of what changed before moving on", "you
+do not need every item"), with recovery as a quiet rail card ("Already
+stuck?"). One primary card: a semantic radio-chip source picker (six
+plain-language kinds mapped to the M15A enum, never shown raw), the
+kind-relevant main field emphasized, everything else behind "Add more detail
+(optional)". Material is sent **verbatim** (the backend preserves formatting);
+over-limit input blocks the save naming the field — nothing is ever silently
+clipped. Saves go through the existing generic workflow client
+(`PUT /workflow/{phase}/implementation_import`, full-section replace with a
+plain-language "replaces this phase's previous save" note when editing);
+drafts use the existing scoped localStorage layer with the secret-marker
+guard (credential-like drafts are not kept locally, with a visible warning;
+the backend's 422 never echoes the value). The Build Loop strip, sidebar,
+phase "Next step" ordering, and cockpit/phase progress ("Workflow: N/5
+captured") all carry the new step; the Prompt Builder hands off to it after a
+save. No LLM call, no analysis, no Change Map (M15C), and raw imports stay
+out of the Defense Context by backend construction.
 
 ## Status (M13E.4)
 

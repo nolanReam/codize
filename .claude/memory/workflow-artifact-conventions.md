@@ -32,7 +32,9 @@ Sections are `prompt_builder`, `review_board`, `evidence`, `verification`
 reflection section was deliberately not added — smallest useful MVP) plus
 `implementation_import` (M15A — see
 [[implementation-import-conventions]]; registering a new section is ONE
-`SECTION_MODELS` entry, the routes/service/ownership are generic). Unknown
+`SECTION_MODELS` entry, the routes/service/ownership are generic; its M15B
+frontend page is [[implementation-import-ui-conventions]] — frontend counts
+now say "N/5 captured"). Unknown
 section names 404 WITHOUT echoing the submitted name (reflected-input
 caution); unknown keys in stored data are dropped on read (corruption
 defense, like task_progress).

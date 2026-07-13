@@ -328,6 +328,21 @@ your saved artifacts" rail copy corrected (questions draw on recorded work;
 pass/fail stays about the student's own explanation). Refresh = fetch on
 mount; no polling, no query library.
 
+**M15B (2026-07-13) — "Bring Back What AI Changed" page.** The fifth
+workflow-section page (`app/app/phase/import`) — see
+[[implementation-import-ui-conventions]] for the full rules. Frontend-only:
+one `WorkflowSectionName` extension + pure `lib/implementationImport.ts`
+helpers (unit-tested — testable copy/logic lives in the lib because vitest
+is node-only); the page rides the existing useWorkflowSection/drafts/SaveBar
+machinery (SaveBar gained an optional `disabled` prop). New CSS primitives:
+`label.chip` (semantic radio chips with `:has(input:focus-visible)` ring)
+and `textarea.code` (mono pasted-material box). The Build Loop is 8 steps
+("Bring Back" after Generate); phase/cockpit progress reads "Workflow: N/5
+captured" — the backend has returned five section keys since M15A, so any
+hardcoded /4 would display 5/4. Imported material is sent VERBATIM with an
+honest counter and save-blocking over-limit messages, never a maxLength
+clip; secret-like drafts show a visible "not kept on this device" warning.
+
 **M13E.2 (2026-07-06) — pilot bugfix conventions.** (1) **Local drafts**
 (`lib/drafts.ts`): unsubmitted text survives tab/page switches via
 localStorage keys `codize:draft:<user id>:<surface>` (surface = section+phase,

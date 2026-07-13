@@ -87,10 +87,16 @@ export default function PhaseBoardPage() {
       hint: "Turn this phase into one clear ask for your AI tool.",
     },
     {
+      key: "implementation_import",
+      label: "Bring back what changed",
+      href: "/app/phase/import",
+      hint: "Back from your AI tool? Paste the response, diff, or your own notes — whatever you have.",
+    },
+    {
       key: "review_board",
       label: "Review what the AI did",
       href: "/app/phase/review",
-      hint: "Back from your AI tool? Note what it changed before building on it.",
+      hint: "Note what you accepted, rejected, or edited before building on it.",
     },
     {
       key: "evidence",
@@ -134,8 +140,8 @@ export default function PhaseBoardPage() {
               <span className="pill accent">
                 Build tasks: {phase.completed_task_count}/{phase.total_task_count}
               </span>
-              <span className={`pill ${capturedCount === 4 ? "ok" : ""}`}>
-                Workflow: {capturedCount}/4 captured
+              <span className={`pill ${capturedCount === 5 ? "ok" : ""}`}>
+                Workflow: {capturedCount}/5 captured
               </span>
             </div>
           </div>
@@ -158,7 +164,7 @@ export default function PhaseBoardPage() {
                 ) : (
                   <>
                     <p style={{ fontSize: 16, fontWeight: 600 }}>
-                      All four artifacts captured — defend this phase.
+                      All five workflow steps captured — defend this phase.
                     </p>
                     <div className="row" style={{ marginTop: 12 }}>
                       <Link href="/app/gate" className="btn primary">
@@ -243,7 +249,7 @@ export default function PhaseBoardPage() {
                   you.
                 </p>
                 <p>
-                  <strong>Workflow</strong> ({capturedCount}/4) = what you&rsquo;ve captured in
+                  <strong>Workflow</strong> ({capturedCount}/5) = what you&rsquo;ve captured in
                   Codize about that work. Doing one doesn&rsquo;t tick the other.
                 </p>
               </GuideCard>

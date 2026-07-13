@@ -61,10 +61,11 @@ large, may contain irrelevant instructions, and would bloat gate prompts —
 if defense integration ever happens it is a NORMALIZED Change Map added
 through the spec-guardian process in M15C/M16, never the raw import.
 
-**Future seams:** M15B frontend = the existing routes
-(`GET /workflow/{phase}` now returns `implementation_import` as a fifth key;
-`PUT /workflow/{phase}/implementation_import` saves it — same useWorkflowSection
-pattern as the other sections). M15C extraction =
+**Seams:** M15B frontend (BUILT 2026-07-13 — see
+[[implementation-import-ui-conventions]]) uses exactly the planned seam: the
+existing routes (`GET /workflow/{phase}` returns `implementation_import` as a
+fifth key; `PUT /workflow/{phase}/implementation_import` saves it — same
+useWorkflowSection pattern as the other sections). M15C extraction =
 `workflow_service.get_implementation_import(project, phase_number)` →
 `StoredImplementationImport | None` (the validated artifact + `saved_at`;
 absent or corrupt stored data returns None, never raw JSON; read-only, takes

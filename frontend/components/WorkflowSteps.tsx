@@ -14,6 +14,7 @@ const STEPS: {
 }[] = [
   { label: "Plan + Prompt", href: "/app/phase/prompt", section: "prompt_builder" },
   { label: "Generate", href: null, section: null, note: "in your AI tool" },
+  { label: "Bring Back", href: "/app/phase/import", section: "implementation_import" },
   { label: "Review", href: "/app/phase/review", section: "review_board" },
   { label: "Verify", href: "/app/phase/evidence", section: "evidence" },
   { label: "Prove", href: "/app/phase/verify", section: "verification" },

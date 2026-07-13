@@ -66,6 +66,13 @@ const fullSections: WorkflowSections = {
     ],
     explanation: "It shows ownership isolation works.",
   },
+  implementation_import: {
+    source_kind: "git_diff",
+    content: "+    if row.user_id != user_id:\n+        raise PermissionError",
+    changed_files: ["app/routes/tasks.py"],
+    student_summary: "AI added ownership checks.",
+    tool_name: "Claude",
+  },
 };
 
 const gate: GateCurrent = { phase: 2, phase_title: "Data Model", state: "not_started" };
@@ -117,7 +124,7 @@ describe("buildReportMarkdown", () => {
 
   it("marks missing sections honestly instead of inventing evidence", () => {
     const md = buildReportMarkdown(
-      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null } })
+      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null, implementation_import: null } })
     );
     expect(md).toContain("No engineered prompt saved for this phase.");
     expect(md).toContain("No verification checks recorded for this phase.");
@@ -178,7 +185,7 @@ describe("deriveSkills", () => {
 
   it("marks nothing demonstrated when no artifacts exist", () => {
     const skills = deriveSkills(
-      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null } })
+      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null, implementation_import: null } })
     );
     expect(skills.every((s) => !s.demonstrated)).toBe(true);
   });
@@ -187,7 +194,7 @@ describe("deriveSkills", () => {
 describe("deriveWeakSpots", () => {
   it("flags every missing artifact and the un-attempted gate", () => {
     const weak = deriveWeakSpots(
-      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null } })
+      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null, implementation_import: null } })
     );
     expect(weak.join(" ")).toContain("Prompt Builder");
     expect(weak.join(" ")).toContain("Review Board");

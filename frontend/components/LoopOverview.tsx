@@ -10,7 +10,7 @@ export default function LoopOverview({ defaultOpen = false }: { defaultOpen?: bo
         <ol style={{ margin: "6px 0", paddingLeft: 20 }}>
           <li>Build a better prompt (in Codize).</li>
           <li>Use your AI tool — ChatGPT, Claude, Cursor — outside Codize.</li>
-          <li>Bring the result back.</li>
+          <li>Bring back what changed — paste it into Codize.</li>
           <li>Note what the AI changed (Review).</li>
           <li>Save one piece of proof (Evidence).</li>
           <li>Check it actually works (Verify).</li>

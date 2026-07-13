@@ -131,7 +131,7 @@ export default function CockpitPage() {
                 </div>
                 <div className="kv">
                   <span className="k">Workflow</span>
-                  <span>{savedCount} / 4 captured this phase</span>
+                  <span>{savedCount} / 5 captured this phase</span>
                 </div>
                 {evaluation.recent_gate && (
                   <div className="kv">

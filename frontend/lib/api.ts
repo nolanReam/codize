@@ -12,6 +12,7 @@ import type {
   GateEvaluationResult,
   GateStartResult,
   GateTurnResult,
+  ImplementationImportArtifact,
   IntakeCompleteResult,
   IntakeQuestion,
   IntakeStatus,
@@ -122,6 +123,7 @@ type SectionPayloadMap = {
   review_board: Omit<ReviewBoardArtifact, "saved_at">;
   evidence: Omit<EvidenceArtifact, "saved_at">;
   verification: Omit<VerificationArtifact, "saved_at">;
+  implementation_import: Omit<ImplementationImportArtifact, "saved_at">;
 };
 
 export const saveWorkflowSection = <S extends WorkflowSectionName>(

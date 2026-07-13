@@ -7,18 +7,20 @@ export default function SaveBar({
   savedAt,
   onSave,
   label = "Save",
+  disabled = false,
 }: {
   saving: boolean;
   saveError: string | null;
   savedAt: string | null;
   onSave: () => void;
   label?: string;
+  disabled?: boolean;
 }) {
   return (
     <div style={{ marginTop: 16 }}>
       {saveError && <div className="notice error">{saveError}</div>}
       <div className="row">
-        <button className="btn primary" disabled={saving} onClick={onSave}>
+        <button className="btn primary" disabled={saving || disabled} onClick={onSave}>
           {saving ? "Saving…" : label}
         </button>
         {savedAt && (
