@@ -49,23 +49,32 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
 
   const save = useCallback(
     async (payload: Parameters<typeof saveWorkflowSection<S>>[2]) => {
-      if (!phase) return false;
+      if (!phase) return null;
       setSaving(true);
       setSaveError(null);
       try {
         const result = await saveWorkflowSection(phase.phase, section, payload);
         setStored(result.artifact as WorkflowSections[S]);
         setSavedAt(result.artifact.saved_at);
-        return true;
+        return result.artifact as WorkflowSections[S];
       } catch (err) {
         setSaveError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
-        return false;
+        return null;
       } finally {
         setSaving(false);
       }
     },
     [phase, section]
   );
+
+  // Dedicated lifecycle routes (Change Map-linked Review initialization) still
+  // return the same section artifact. Apply that response to this one shared
+  // state machine instead of creating a second workflow fetch/store system.
+  const applyArtifact = useCallback((artifact: WorkflowSections[S]) => {
+    setStored(artifact);
+    setSavedAt((artifact as { saved_at?: string }).saved_at ?? null);
+    setSaveError(null);
+  }, []);
 
   return {
     phase,
@@ -76,6 +85,7 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
     notReady,
     reload: load,
     save,
+    applyArtifact,
     saving,
     saveError,
     savedAt,

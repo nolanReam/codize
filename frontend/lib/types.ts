@@ -75,6 +75,8 @@ export interface PromptBuilderArtifact {
   saved_at?: string;
 }
 
+// Legacy/manual Review fields (M13B). M16A.1 keeps this exact shape valid and
+// adds a linked variant rather than converting or replacing old artifacts.
 export interface ReviewBoardArtifact {
   files_changed: string[];
   ai_generated?: string | null;
@@ -85,6 +87,78 @@ export interface ReviewBoardArtifact {
   least_confident?: string | null;
   out_of_scope_changes?: string | null;
   saved_at?: string;
+}
+
+// Linked Review (M16A.1 backend / M16A.2 UI). Change Map source fields are
+// server-owned snapshots; only the decision, rationale, and revision are
+// writable through ReviewTargetUpdate.
+export type ReviewDecision =
+  | "pending"
+  | "keep"
+  | "revise"
+  | "remove"
+  | "needs_verification"
+  | "uncertain";
+
+export type ReviewSourceCategory = ChangeMapCategory;
+export type ReviewSourceOrigin = ChangeMapOrigin;
+export type ReviewSourceChangeMapDecision = ChangeMapStudentDecision;
+export type ReviewSourceResolution = "confirmed" | "unresolved";
+
+export interface ReviewSourceBinding {
+  source_change_map_confirmed_at: string;
+  source_change_map_generated_at: string;
+}
+
+export interface ReviewServerState {
+  initialized_from_change_map: true;
+  stale: boolean;
+}
+
+export interface LinkedReviewTarget {
+  review_target_id: string;
+  change_map_item_id: string;
+  change_map_category: ReviewSourceCategory;
+  change_map_origin: ReviewSourceOrigin;
+  change_map_student_decision: ReviewSourceChangeMapDecision;
+  change_text: string;
+  source_resolution: ReviewSourceResolution;
+  review_decision: ReviewDecision;
+  student_rationale: string | null;
+  student_revision: string | null;
+}
+
+export interface LinkedReviewBoardArtifact
+  extends ReviewBoardArtifact,
+    ReviewSourceBinding,
+    ReviewServerState {
+  review_targets: LinkedReviewTarget[];
+}
+
+export type StoredReviewBoardArtifact = ReviewBoardArtifact | LinkedReviewBoardArtifact;
+
+export interface ReviewInitializationRequest {
+  replace_existing?: true;
+}
+
+export interface ReviewTargetUpdate {
+  review_target_id: string;
+  review_decision: ReviewDecision;
+  student_rationale: string | null;
+  student_revision: string | null;
+}
+
+// Every manual field has a backend default. Linked saves normally send only
+// target_updates; manual Review continues to send its established fields.
+export interface ReviewBoardSaveRequest
+  extends Partial<Omit<ReviewBoardArtifact, "saved_at">> {
+  target_updates?: ReviewTargetUpdate[];
+}
+
+export interface ReviewInitializationResponse {
+  phase: number;
+  section: "review_board";
+  artifact: LinkedReviewBoardArtifact;
 }
 
 export type EvidenceKind =
@@ -251,7 +325,7 @@ export type ChangeMapConfirmationResponse = ChangeMapMutationResult;
 
 export interface WorkflowSections {
   prompt_builder: PromptBuilderArtifact | null;
-  review_board: ReviewBoardArtifact | null;
+  review_board: StoredReviewBoardArtifact | null;
   evidence: EvidenceArtifact | null;
   verification: VerificationArtifact | null;
   implementation_import: ImplementationImportArtifact | null;

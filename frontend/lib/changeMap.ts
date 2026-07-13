@@ -15,6 +15,11 @@ import type {
   StudentAddedChangeMapDecision,
   WorkflowSections,
 } from "./types";
+import {
+  isLinkedReviewArtifact,
+  linkedReviewAllowsVerification,
+  targetFormFromReview,
+} from "./review";
 
 export const CHANGE_MAP_TEXT_MAX = 600;
 export const CHANGE_MAP_NOTE_MAX = 1_000;
@@ -529,11 +534,43 @@ export function derivePhaseNextStep(
   }
   if (!sections.review_board) {
     return {
-      label: "Review implementation decisions",
+      label: "Start Review",
       href: "/app/phase/review",
-      hint: "Record what you accepted, rejected, or edited before building on it.",
+      hint: "Carry the confirmed implementation items forward and make your own decisions.",
     };
   }
+  if (isLinkedReviewArtifact(sections.review_board)) {
+    if (sections.review_board.stale) {
+      return {
+        label: "Rebuild Review",
+        href: "/app/phase/review",
+        hint: "Your Change Map changed—deliberately rebuild Review before continuing.",
+      };
+    }
+    const reviewState = targetFormFromReview(sections.review_board);
+    if (!linkedReviewAllowsVerification(sections.review_board, reviewState)) {
+      return {
+        label: "Continue Review",
+        href: "/app/phase/review",
+        hint: "Record a decision for each implementation item, including honest uncertainty.",
+      };
+    }
+    if (!sections.verification) {
+      return {
+        label: "Continue to Verification",
+        href: "/app/phase/verify",
+        hint: "Review is recorded. Check the behavior without creating tests automatically.",
+      };
+    }
+    if (!sections.evidence) {
+      return {
+        label: "Save one piece of proof",
+        href: "/app/phase/evidence",
+        hint: "A test output, a screenshot note, a commit—one is enough.",
+      };
+    }
+  }
+  // Legacy/manual Review keeps its established evidence-first continuation.
   if (!sections.evidence) {
     return {
       label: "Save one piece of proof",

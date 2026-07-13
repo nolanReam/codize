@@ -389,3 +389,23 @@ decisions, status/error announcements use live regions, long paths/excerpts
 wrap or scroll, and controls stack at 640px. Change Map is top-level workflow
 state with its own not-created/draft/reviewed/stale status and is excluded from
 the five-section count. See [[change-map-ui-conventions]].
+
+**M16A.2 (2026-07-13) — linked implementation Review UI.** The existing
+`app/app/phase/review/page.tsx` now branches only after the shared workflow GET:
+strict `initialized_from_change_map=true` data uses the linked UI; an existing
+manual artifact keeps the original fields/draft/save UI; no artifact uses the
+Change Map prerequisite/explicit Start Review states. Initialization never runs
+on mount and only deliberate replacement sends `replace_existing=true`.
+`lib/review.ts` is the pure contract layer (exact labels/category order,
+source-resolution copy, form initialization, Unicode-safe validation, canonical
+target-only PUT, dirty/progress/completion, source-binding fingerprint, draft
+restore, stale/replacement and Build Loop status), with React source safety in
+`components/LinkedReviewTarget.tsx`. Linked drafts reuse `useDraft`; surface is
+`linked_review:active-project:<phase>:<safe fingerprint>` and the existing hook
+adds authenticated-user scope. The current one-project account contract makes
+`active-project` the project scope until multi-project exposes a safe id. Stale
+Review is readable/disabled and rebuilt only after an inline warning. Needs
+testing and uncertainty count as honest decisions; zero targets stay neutral.
+Continue to Verification is a link only. Workflow N/5, build tasks, Change Map,
+Evidence, Verification records, Defense, evaluator, and report data flows are
+unchanged. Full rules: [[linked-review-ui-conventions]].

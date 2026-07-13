@@ -5,6 +5,7 @@
 
 import { getAccessToken } from "./supabase";
 import { generationRequestBody } from "./changeMap";
+import { reviewInitializationBody } from "./review";
 import type {
   ChangeMapConfirmationResponse,
   ChangeMapMutationResult,
@@ -24,7 +25,8 @@ import type {
   PhaseView,
   PromptBuilderArtifact,
   ReconnectionState,
-  ReviewBoardArtifact,
+  ReviewBoardSaveRequest,
+  ReviewInitializationResponse,
   VerificationArtifact,
   WorkflowPhaseState,
   WorkflowSectionName,
@@ -124,7 +126,7 @@ export const getWorkflow = (phase: number) =>
 
 type SectionPayloadMap = {
   prompt_builder: Omit<PromptBuilderArtifact, "saved_at">;
-  review_board: Omit<ReviewBoardArtifact, "saved_at">;
+  review_board: ReviewBoardSaveRequest;
   evidence: Omit<EvidenceArtifact, "saved_at">;
   verification: Omit<VerificationArtifact, "saved_at">;
   implementation_import: Omit<ImplementationImportArtifact, "saved_at">;
@@ -162,6 +164,19 @@ export const confirmChangeMap = (phase: number) =>
   request<ChangeMapConfirmationResponse>(`/workflow/${phase}/change-map/confirm`, {
     method: "POST",
   });
+
+// --- linked Review (M16A.1 backend / M16A.2 UI) -----------------------------
+
+// Initialization is always an explicit student action. Normal initialization
+// sends no body; only the deliberate replacement path sends the destructive
+// replace_existing flag.
+export const initializeReviewFromChangeMap = (phase: number, replaceExisting = false) => {
+  const body = reviewInitializationBody(replaceExisting);
+  return request<ReviewInitializationResponse>(
+    `/workflow/${phase}/review/from-change-map`,
+    { method: "POST", ...(body ? { body } : {}) }
+  );
+};
 
 // --- reconnection / evaluation / gate --------------------------------------------
 

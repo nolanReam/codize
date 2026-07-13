@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { changeMapStepStatus } from "@/lib/changeMap";
+import { reviewStepStatus } from "@/lib/review";
 import type { StoredChangeMap, WorkflowSections } from "@/lib/types";
 
 // The Codize Build Loop as navigable steps. "Generate" is deliberately not a
@@ -12,15 +13,16 @@ const STEPS: {
   href: string | null;
   section: keyof WorkflowSections | null;
   changeMap?: boolean;
+  review?: boolean;
   note?: string;
 }[] = [
   { label: "Plan + Prompt", href: "/app/phase/prompt", section: "prompt_builder" },
   { label: "Generate", href: null, section: null, note: "in your AI tool" },
   { label: "Bring Back", href: "/app/phase/import", section: "implementation_import" },
   { label: "Change Map", href: "/app/phase/change-map", section: null, changeMap: true },
-  { label: "Review", href: "/app/phase/review", section: "review_board" },
-  { label: "Verify", href: "/app/phase/evidence", section: "evidence" },
-  { label: "Prove", href: "/app/phase/verify", section: "verification" },
+  { label: "Review", href: "/app/phase/review", section: "review_board", review: true },
+  { label: "Verify", href: "/app/phase/verify", section: "verification" },
+  { label: "Evidence", href: "/app/phase/evidence", section: "evidence" },
   { label: "Explain", href: "/app/gate", section: null, note: "the gate" },
   { label: "Commit / Reflect", href: "/app/report", section: null, note: "defense report" },
 ];
@@ -38,11 +40,22 @@ export default function WorkflowSteps({
     <div className="loop">
       {STEPS.map((step, idx) => {
         const mapStatus = step.changeMap ? changeMapStepStatus(changeMap ?? null) : null;
+        const linkedReviewStatus = step.review
+          ? reviewStepStatus(sections?.review_board ?? null, changeMap ?? null)
+          : null;
         const done = step.changeMap
           ? mapStatus?.tone === "done"
+          : step.review
+            ? linkedReviewStatus?.tone === "done"
           : step.section != null && sections?.[step.section] != null;
-        const dotTone = step.changeMap ? mapStatus?.tone : done ? "done" : "idle";
-        const note = mapStatus?.label ?? step.note;
+        const dotTone = step.changeMap
+          ? mapStatus?.tone
+          : step.review
+            ? linkedReviewStatus?.tone
+            : done
+              ? "done"
+              : "idle";
+        const note = mapStatus?.label ?? linkedReviewStatus?.label ?? step.note;
         const inner = (
           <>
             <span className={`dot ${dotTone}`} />

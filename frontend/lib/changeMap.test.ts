@@ -39,6 +39,7 @@ import type {
   ChangeMapCategory,
   ChangeMapItem,
   ChangeMapStudentDecision,
+  LinkedReviewBoardArtifact,
   StoredChangeMap,
   WorkflowSections,
 } from "./types";
@@ -117,6 +118,31 @@ function sections(overrides: Partial<WorkflowSections> = {}): WorkflowSections {
     evidence: null,
     verification: null,
     ...overrides,
+  };
+}
+
+function linkedReview(
+  decision: "pending" | "keep" | "uncertain" = "pending",
+  stale = false
+): LinkedReviewBoardArtifact {
+  return {
+    files_changed: [],
+    source_change_map_generated_at: "2026-07-13T10:01:00Z",
+    source_change_map_confirmed_at: "2026-07-13T11:00:00Z",
+    initialized_from_change_map: true,
+    stale,
+    review_targets: [{
+      review_target_id: "rv-0123456789ab",
+      change_map_item_id: "cm-behavior",
+      change_map_category: "behavior_change",
+      change_map_origin: "ai_inferred",
+      change_map_student_decision: "confirmed",
+      change_text: "The route behavior changed.",
+      source_resolution: "confirmed",
+      review_decision: decision,
+      student_rationale: null,
+      student_revision: null,
+    }],
   };
 }
 
@@ -540,10 +566,28 @@ describe("phase next-step logic and N/5 preservation", () => {
         sections(),
         map({ status: "confirmed", confirmed_at: "2026-07-13T11:00:00Z" })
       )
-    ).toMatchObject({ label: "Review implementation decisions", href: "/app/phase/review" });
+    ).toMatchObject({ label: "Start Review", href: "/app/phase/review" });
   });
 
-  it("keeps Prompt first and resumes the five captured artifacts after confirmation", () => {
+  it("routes linked Review through in-progress, stale, complete, Verification, and Evidence", () => {
+    const confirmed = map({ status: "confirmed", confirmed_at: "2026-07-13T11:00:00Z" });
+    expect(derivePhaseNextStep(sections({ review_board: linkedReview() }), confirmed).label).toBe(
+      "Continue Review"
+    );
+    expect(derivePhaseNextStep(sections({ review_board: linkedReview("pending", true) }), confirmed).label).toBe(
+      "Rebuild Review"
+    );
+    expect(derivePhaseNextStep(sections({ review_board: linkedReview("uncertain") }), confirmed)).toMatchObject({
+      label: "Continue to Verification",
+      href: "/app/phase/verify",
+    });
+    expect(derivePhaseNextStep(sections({
+      review_board: linkedReview("keep"),
+      verification: { checks: [] },
+    }), confirmed).label).toBe("Save one piece of proof");
+  });
+
+  it("keeps Prompt first, preserves manual Review continuation, and preserves N/5", () => {
     expect(derivePhaseNextStep(sections({ prompt_builder: null }), null).label).toBe(
       "Plan your prompt"
     );

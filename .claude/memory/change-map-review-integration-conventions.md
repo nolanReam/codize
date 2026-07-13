@@ -105,3 +105,24 @@ call `review_service.needs_verification_targets(review) ->
 list[NeedsVerificationReviewTarget]`. Each result contains review target id,
 Change Map item id, reviewed effective-text snapshot, student rationale, and
 category. M16A.1 creates no Verification checks.
+
+**M16A.2 frontend consumer (built 2026-07-13):** `/app/phase/review` consumes
+the exact additive read shape without converting manual artifacts. No artifact
+shows Change Map prerequisites and an explicit Start Review action; current
+linked artifacts show grouped server snapshots plus student decisions; stale
+linked artifacts remain readable and disabled until an explicitly confirmed
+replacement. `lib/review.ts` canonicalizes the PUT from active student fields,
+so hidden revision/rationale never causes dirty state or reaches the server.
+Draft compatibility uses the source binding plus ordered target ids—never source
+text—and sits inside the existing authenticated-user draft namespace. Progress
+is target decisions only and never changes workflow N/5. Completion navigation
+opens `/app/phase/verify` but creates no suggestions, checks, Evidence, Defense,
+or report data. See [[linked-review-ui-conventions]].
+
+**Exact M16B frontend seam after M16A.2:** the saved, current linked artifact is
+available from the existing workflow GET as `sections.review_board`; the future
+Verification surface may request a server-owned suggestion handoff only after
+explicit student action, keyed by the saved Review target references. It must
+not derive tests from Change Map text in the browser, read raw imports, or treat
+`needs_verification` as a completed check. `/app/phase/verify` currently receives
+navigation only and has no Review-prefill code.

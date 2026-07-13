@@ -90,3 +90,12 @@ sections + Change Map survive. No linked target/source text enters the
 Defense Context output — the existing Review normalizer continues to select
 only its legacy student-authored fields from `stored_sections`. See
 [[change-map-review-integration-conventions]].
+
+M16A.2 is a frontend consumer only. The shared `GET /workflow/{phase}` and
+generic Review PUT remain the sole read/save system; the explicit initializer's
+artifact response is applied back into `useWorkflowSection`, not a second store.
+Frontend linked saves send only changed `target_updates`; manual saves keep the
+M13B shape. The presence of any `review_board` value still contributes exactly
+one captured artifact to `Object.values(sections)`, regardless of target count,
+progress, completion, or stale state. Change Map remains top-level and excluded,
+so cockpit/phase progress stays N/5. See [[linked-review-ui-conventions]].

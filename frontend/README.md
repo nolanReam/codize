@@ -59,7 +59,10 @@ app/
                         disclosures, corrections/rejections/uncertainty,
                         student-added items, save + confirmation, stale-map
                         regeneration, and scoped local review drafts
-      review/page.tsx   Review Board
+      review/page.tsx   Review What Changed (M16A.2) — explicit confirmed-map
+                        initialization, grouped linked targets, student-owned
+                        decisions, scoped drafts, stale rebuild, plus the
+                        preserved legacy/manual Review form
       evidence/page.tsx Evidence Panel
       verify/page.tsx   Verification Lab
     gate/page.tsx       Project Defense — live Interrogation Gate flow
@@ -82,7 +85,9 @@ lib/                    api client, supabase client, types, prompt builder + tes
                         page copy constants), changeMap + test (exact types,
                         labels, grouping, progress, student-only PUT payload,
                         confirmation readiness, stale state, local drafts, and
-                        phase next-step logic)
+                        phase next-step logic), review + test (M16A.2 linked/
+                        legacy detection, labels, grouping, validation,
+                        student-only payloads, dirty state, drafts, progress)
 ```
 
 ## Backend routes consumed
@@ -92,7 +97,9 @@ Intake (`/intake/*`), roadmap (`/roadmap/generate`, `/roadmap`), phases
 `PUT /workflow/{phase}/{section}`), Change Map
 (`POST /workflow/{phase}/change-map/generate`,
 `PUT /workflow/{phase}/change-map`,
-`POST /workflow/{phase}/change-map/confirm`), reconnection (`GET /reconnection`,
+`POST /workflow/{phase}/change-map/confirm`), linked Review
+(`POST /workflow/{phase}/review/from-change-map`, with explicit replacement
+only, plus the existing Review GET/PUT paths), reconnection (`GET /reconnection`,
 `POST /reconnection/acknowledge`), evaluation (`GET /evaluation`), and the full
 gate flow (`GET /gate/current`, `POST /gate/start`,
 `POST /gate/{id}/turn1|turn2|turn3|evaluate`), plus the metadata-only
@@ -128,6 +135,32 @@ npm run typecheck
 npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
+
+## Status (M16A.2)
+
+The existing `/app/phase/review` route now supports both reviewed-contract
+modes. A confirmed, current Change Map shows **Start Review** and initializes
+only after that click; missing, draft, and stale maps get calm prerequisite
+states. Linked Review groups the six backend-selected implementation categories
+in fixed order and keeps each bounded source snapshot visibly separate from the
+student's decision: Keep, Revise, Remove, Needs testing, or I'm not sure.
+Revision/rationale validation mirrors the backend's 2,000-code-point rules;
+the PUT contains only `target_updates` with the server target reference and the
+three student-owned fields. Canonical payload comparison prevents hidden
+revision text from creating false dirty state or contradictory updates.
+
+Progress is `N of M items reviewed`, never correctness. Needs-testing and
+uncertain decisions count honestly; a zero-target Review stays neutral. Local
+drafts reuse the existing secret-guarded system and are scoped by user, active
+project, phase, and a safe Change Map/ordered-target fingerprint. Stale Reviews
+remain readable but not editable; rebuilding requires an inline destructive
+warning and is the only UI path that sends `replace_existing=true`. Existing
+manual Review artifacts keep their original fields, save path, draft key, and
+UI unless the student explicitly starts over. Completion links to Verification
+only—no suggestions, checks, evidence, or downstream records are created.
+Build Loop Review status and phase next actions distinguish ready/in-progress/
+complete/stale while the existing `Object.values(sections)` **N/5** count is
+unchanged. No backend or migration change was needed.
 
 ## Status (M15B)
 
