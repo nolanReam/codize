@@ -26,19 +26,24 @@ plus the existing evaluation/phases/unlocks/gate routes.
 
 API semantics: `PUT /workflow/{phase}/{section}` is an idempotent
 FULL-SECTION REPLACE (no merge); the server stamps `saved_at` on each write;
-`GET /workflow/{phase}` always returns all four section keys (null when
-unset). Sections are exactly the four instruction-pinned names —
-`prompt_builder`, `review_board`, `evidence`, `verification` (the v3 loop's
-plan inputs live inside prompt_builder.inputs; a reflection section was
-deliberately not added — smallest useful MVP). Unknown section names 404
-WITHOUT echoing the submitted name (reflected-input caution); unknown keys in
-stored data are dropped on read (corruption defense, like task_progress).
+`GET /workflow/{phase}` always returns all section keys (null when unset).
+Sections are `prompt_builder`, `review_board`, `evidence`, `verification`
+(M13B; the v3 loop's plan inputs live inside prompt_builder.inputs; a
+reflection section was deliberately not added — smallest useful MVP) plus
+`implementation_import` (M15A — see
+[[implementation-import-conventions]]; registering a new section is ONE
+`SECTION_MODELS` entry, the routes/service/ownership are generic). Unknown
+section names 404 WITHOUT echoing the submitted name (reflected-input
+caution); unknown keys in stored data are dropped on read (corruption
+defense, like task_progress).
 
 Validation is fail-closed at the boundary (`schemas/workflow.py`):
 `extra="forbid"` everywhere, per-string caps (300/2000/8000), list caps,
 URL kinds must be http(s) ≤ 2048, commit_hash must be 7–40 hex, verification
-check ids are a fixed 8-item enum (unique per save), plus a 30 KB
-total-section cap checked before model validation. Every free-text field
+check ids are a fixed 8-item enum (unique per save), plus a per-section
+serialized-body belt checked before model validation (30 KB default;
+100 KB for implementation_import via `_SECTION_CHAR_LIMITS` — per-field caps
+stay authoritative, the belt only rejects grossly oversized bodies). Every free-text field
 rejects secret-looking content (`sb_secret_`, `sk-or-`, `AIza`, `-----BEGIN `)
 — a deliberate short marker list protecting students from persisting a real
 key into their own evidence; don't grow it into a scanner.

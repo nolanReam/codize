@@ -59,11 +59,25 @@ VERIFICATION = {
     "explanation": "The endpoint works, rejects bad input, and no keys are in the repo.",
 }
 
+IMPLEMENTATION_IMPORT = {
+    "source_kind": "git_diff",
+    "content": (
+        "diff --git a/app/routes/matches.py b/app/routes/matches.py\n"
+        "+    @router.post(\"/matches\")\n"
+        "+    async def create_match(body: MatchIn):\n"
+        "+        return await save_match(body)"
+    ),
+    "changed_files": ["app/routes/matches.py"],
+    "student_summary": "The AI added the match-creation route.",
+    "tool_name": "Claude",
+}
+
 SAMPLE = {
     "prompt_builder": PROMPT_BUILDER,
     "review_board": REVIEW_BOARD,
     "evidence": EVIDENCE,
     "verification": VERIFICATION,
+    "implementation_import": IMPLEMENTATION_IMPORT,
 }
 
 
@@ -88,7 +102,7 @@ def test_workflow_refused_without_active_project():
 # --- reads & writes ----------------------------------------------------------------
 
 
-def test_empty_state_has_all_four_sections_null():
+def test_empty_state_has_all_sections_null():
     repo = InMemoryProjectRepository()
     seed_active_project(repo)
     state = run(get_phase_artifacts(repo, USER, 1))

@@ -212,18 +212,17 @@ Evaluation is a pure read — it never mutates the roadmap, task progress,
 gates, or unlocks, never advances phases, and never touches reconnection's
 `last_login_at`.
 
-## Workflow artifacts (M13B)
+## Workflow artifacts (M13B; implementation import added in M15A)
 
-`services/workflow_service.py` stores the four student-authored v3 Build Loop
-sections — `prompt_builder`, `review_board`, `evidence`, `verification` —
-phase-scoped, in the `projects.workflow_artifacts` JSONB column
-(task_progress precedent: outside the roadmap jsonb, so storing artifacts can
-never mutate the fixed structure). Storage only: no LLM call, no gate
-involvement, no report generation — the Interrogation Gate does not read
-these artifacts (wiring them into gate prompts is a future,
-spec-guardian-reviewed change), and the M13C frontend assembles the Project
-Defense Report client-side from this route plus the existing ones. Routes:
-`GET /workflow/{phase}` (all four sections, `null` when unset) and
+`services/workflow_service.py` stores the student-authored v3 Build Loop
+sections — `prompt_builder`, `review_board`, `evidence`, `verification`, and
+since M15A `implementation_import` — phase-scoped, in the
+`projects.workflow_artifacts` JSONB column (task_progress precedent: outside
+the roadmap jsonb, so storing artifacts can never mutate the fixed
+structure). Storage only: no LLM call, no gate involvement, no report
+generation — the M13C frontend assembles the Project Defense Report
+client-side from this route plus the existing ones. Routes:
+`GET /workflow/{phase}` (all five sections, `null` when unset) and
 `PUT /workflow/{phase}/{section}` (idempotent full-section replace; payloads
 validated fail-closed by `schemas/workflow.py` — extra fields forbidden,
 strings/lists capped, URL and commit-hash evidence format-checked, free text
@@ -232,6 +231,34 @@ that looks like an API key rejected, 30 KB total-size cap; the server stamps
 roadmap; unknown phase/section → 404, workspace not ready → 409, invalid
 payload → 422). A write touches exactly one column; unknown keys in stored
 data are dropped on read.
+
+### Implementation import (M15A — "Bring Back What AI Changed")
+
+`implementation_import` is the student's own record of what an external AI
+tool produced: a pasted AI response, git diff, code snippet, changed-file
+list, and/or a plain-language summary. Schema
+(`ImplementationImportArtifact`): required `source_kind` enum (`ai_response`
+/ `git_diff` / `changed_files` / `code_snippet` / `manual_summary` /
+`other`), optional `content` (≤ 40,000 chars), `changed_files` (≤ 100
+entries × 300 chars, deduplicated, empties dropped), `student_summary`
+(≤ 4,000), `tool_name` (≤ 100) — at least one of content / changed_files /
+student_summary must be present. Normalization is edges-only: internal
+indentation, line breaks, diff markers, and Markdown are preserved verbatim
+(leading blank lines and trailing whitespace trimmed; first-line indentation
+kept). The section's serialized-body belt is 100 KB (`MAX_IMPORT_SECTION_CHARS`;
+the other sections keep 30 KB) — the per-field caps stay authoritative and
+nothing is ever silently truncated. The same secret-marker guard applies
+(`sb_secret_` / `sk-or-` / `AIza` / PEM); a rejected save persists nothing
+and never echoes the value. **Untrusted-data boundary:** imports are
+student-provided, self-reported material — never verified, never proof of
+correctness, never an instruction source. M15A stores them inertly (no LLM,
+no extraction, no correctness analysis) and raw imports are deliberately NOT
+part of the M14 Defense Context Pack (its source manifest is fixed; a future
+M15C/M16 may add a *normalized* Change Map via the spec-guardian process).
+Future seams: M15B frontend uses the existing routes; M15C reads through
+`workflow_service.get_implementation_import(project, phase_number)` →
+`StoredImplementationImport | None` (validated + `saved_at`; corrupt data
+returns `None`, never raw JSON).
 
 ## Defense context pack (M14A)
 

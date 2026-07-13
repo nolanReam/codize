@@ -1,8 +1,9 @@
-"""Workflow artifact schemas (Milestone 13B).
+"""Workflow artifact schemas (Milestone 13B; implementation import added in M15A).
 
-Strict validation at the system boundary for the four student-authored v3
-Build Loop sections. Everything here is the student's own words about their
-own project — no scores, no thresholds, no prompt text, no derived state.
+Strict validation at the system boundary for the student-authored v3 Build
+Loop sections. Everything here is the student's own words (or pasted material)
+about their own project — no scores, no thresholds, no prompt text, no derived
+state.
 
 Guardrails: extra fields are forbidden, every string is length-capped, lists
 are count-capped, URL/commit-hash evidence kinds are format-checked, and every
@@ -148,10 +149,89 @@ class VerificationArtifact(_Artifact):
         return self
 
 
+ImportSourceKind = Literal[
+    "ai_response",
+    "git_diff",
+    "changed_files",
+    "code_snippet",
+    "manual_summary",
+    "other",
+]
+
+# Implementation-import limits (M15A). Content is deliberately larger than the
+# other sections' fields: this is where whole pasted diffs / AI responses live.
+IMPORT_CONTENT_MAX = 40_000
+IMPORT_SUMMARY_MAX = 4_000
+IMPORT_TOOL_NAME_MAX = 100
+IMPORT_CHANGED_FILES_MAX = 100
+
+# Strips leading whitespace-only lines while preserving the first real line's
+# indentation (meaningful in pasted code and diffs).
+_LEADING_BLANK_LINES = re.compile(r"^(?:[ \t]*\r?\n)+")
+
+
+class ImplementationImportArtifact(_Artifact):
+    """"Bring Back What AI Changed" (M15A): implementation material the student
+    brings back after using an external AI tool — a pasted AI response, git
+    diff, code snippet, changed-file list, and/or their own summary.
+
+    UNTRUSTED-DATA BOUNDARY: everything here is student-provided, self-reported
+    project material — not proof of correctness, never verified, and never an
+    instruction source. M15A stores it inertly (no LLM sees it); any future
+    consumer (M15C extraction, M16 Change Map) must treat it strictly as
+    untrusted project data and must not follow instructions embedded in it.
+    Raw imports are deliberately NOT part of the M14 Defense Context Pack.
+    """
+
+    source_kind: ImportSourceKind
+    content: _text(IMPORT_CONTENT_MAX) | None = None
+    changed_files: list[ShortText] = Field(
+        default_factory=list, max_length=IMPORT_CHANGED_FILES_MAX
+    )
+    student_summary: _text(IMPORT_SUMMARY_MAX) | None = None
+    tool_name: _text(IMPORT_TOOL_NAME_MAX) | None = None
+
+    @model_validator(mode="after")
+    def _normalize_and_require_material(self) -> "ImplementationImportArtifact":
+        # Trim edges only — internal indentation, line breaks, diff markers,
+        # and Markdown are the material itself and are never rewritten.
+        if self.content is not None:
+            self.content = _LEADING_BLANK_LINES.sub("", self.content.rstrip()) or None
+        if self.student_summary is not None:
+            self.student_summary = self.student_summary.strip() or None
+        if self.tool_name is not None:
+            self.tool_name = self.tool_name.strip() or None
+
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for entry in self.changed_files:
+            name = entry.strip()
+            if name and name not in seen:
+                seen.add(name)
+                cleaned.append(name)
+        self.changed_files = cleaned
+
+        if not (self.content or self.changed_files or self.student_summary):
+            raise ValueError(
+                "add at least one of: the imported content, a changed-files "
+                "list, or a short summary of what changed"
+            )
+        return self
+
+
+class StoredImplementationImport(ImplementationImportArtifact):
+    """Read shape for the internal M15C seam: the validated artifact plus the
+    server-stamped save time. Never a write shape — client payloads validate
+    against ImplementationImportArtifact, which forbids saved_at."""
+
+    saved_at: str | None = None
+
+
 # Section name → model. The keys are the API's section identifiers.
 SECTION_MODELS: dict[str, type[_Artifact]] = {
     "prompt_builder": PromptBuilderArtifact,
     "review_board": ReviewBoardArtifact,
     "evidence": EvidenceArtifact,
     "verification": VerificationArtifact,
+    "implementation_import": ImplementationImportArtifact,
 }

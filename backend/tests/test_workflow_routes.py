@@ -46,7 +46,8 @@ def test_full_workflow_artifact_flow(client):
     assert empty.json() == {
         "phase": 1,
         "sections": {"prompt_builder": None, "review_board": None,
-                     "evidence": None, "verification": None},
+                     "evidence": None, "verification": None,
+                     "implementation_import": None},
     }
 
     for section, payload in SAMPLE.items():

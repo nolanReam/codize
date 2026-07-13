@@ -1,17 +1,21 @@
-"""Workflow artifact store (Milestone 13B).
+"""Workflow artifact store (Milestone 13B; implementation import added in M15A).
 
-Durable storage for the four student-authored v3 Build Loop sections
-(prompt_builder, review_board, evidence, verification), phase-scoped, in the
-projects.workflow_artifacts JSONB column (task_progress precedent: outside the
-roadmap jsonb, so storing artifacts can never mutate the fixed structure).
+Durable storage for the student-authored v3 Build Loop sections
+(prompt_builder, review_board, evidence, verification, and — since M15A —
+implementation_import, the "Bring Back What AI Changed" material), phase-
+scoped, in the projects.workflow_artifacts JSONB column (task_progress
+precedent: outside the roadmap jsonb, so storing artifacts can never mutate
+the fixed structure).
 
 This module is STORAGE ONLY: no LLM call, no gate involvement, no report
 generation. A write touches exactly one column — roadmap, task_progress, gate
 state, unlocks, current_phase, and reconnection timestamps cannot change
 through it (the service takes only the ProjectRepository, so it cannot reach
-the others by construction). The Interrogation Gate does not read these
-artifacts in M13B; wiring them into gate prompts is a future,
-spec-guardian-reviewed change.
+the others by construction). Implementation imports are stored inertly as
+untrusted student-provided material: M15A performs no extraction, no
+summarization, no correctness analysis, and does NOT feed raw imports into
+the M14 Defense Context Pack (a future M15C/M16 milestone may add a
+normalized Change Map through the spec-guardian process — never raw imports).
 
 Eligibility mirrors the phase workspace: active project + roadmap
 (phase_service.load_active_project), artifacts scoped to real roadmap phases
@@ -26,15 +30,22 @@ from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
-from app.schemas.workflow import SECTION_MODELS
+from app.schemas.workflow import SECTION_MODELS, StoredImplementationImport
 from app.services import phase_service
 from app.services.project_repository import ProjectRepository
 
-SECTIONS = tuple(SECTION_MODELS)  # prompt_builder, review_board, evidence, verification
+SECTIONS = tuple(SECTION_MODELS)
+# prompt_builder, review_board, evidence, verification, implementation_import
 
 # Belt over the per-field caps: one section, serialized, must stay small
-# enough to render and to aggregate into a Project Defense Report.
+# enough to render and to aggregate into a Project Defense Report. The
+# implementation import (M15A) carries whole pasted diffs / AI responses, so
+# it gets a larger belt — the per-field caps in schemas/workflow.py remain the
+# authoritative limits; the belt only rejects grossly oversized bodies before
+# validation.
 MAX_SECTION_CHARS = 30_000
+MAX_IMPORT_SECTION_CHARS = 100_000
+_SECTION_CHAR_LIMITS = {"implementation_import": MAX_IMPORT_SECTION_CHARS}
 
 
 class WorkflowError(Exception):
@@ -78,6 +89,27 @@ def stored_sections(project: dict, phase_number: int) -> dict:
     return _stored_sections(project, phase_number)
 
 
+def get_implementation_import(
+    project: dict, phase_number: int
+) -> StoredImplementationImport | None:
+    """Typed read seam for future M15C extraction: the normalized, validated
+    implementation import for one phase from an already-loaded project, or
+    None when absent or corrupt (corruption never surfaces raw stored data).
+
+    The returned material is STUDENT-PROVIDED AND UNTRUSTED — self-reported
+    project material, not verified, not proof of correctness. Any future LLM
+    consumer must treat it as untrusted project data only and must never
+    follow instructions embedded in it. Read-only; never touches the
+    repository."""
+    stored = _stored_sections(project, phase_number).get("implementation_import")
+    if stored is None:
+        return None
+    try:
+        return StoredImplementationImport.model_validate(stored)
+    except ValidationError:
+        return None
+
+
 async def get_phase_artifacts(
     repo: ProjectRepository, user_id: str, phase_number: int
 ) -> dict:
@@ -107,9 +139,11 @@ async def save_section(
             f"Unknown workflow section. Valid sections: {', '.join(SECTIONS)}."
         )
 
-    if len(json.dumps(payload)) > MAX_SECTION_CHARS:
+    limit = _SECTION_CHAR_LIMITS.get(section, MAX_SECTION_CHARS)
+    if len(json.dumps(payload)) > limit:
         raise InvalidArtifactError(
-            "This section is too large to save (max 30 KB) — trim pasted output and try again."
+            f"This section is too large to save (max {limit // 1000} KB) — "
+            "trim pasted output and try again."
         )
     try:
         artifact = model.model_validate(payload)
