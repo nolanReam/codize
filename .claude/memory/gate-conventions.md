@@ -90,6 +90,12 @@ backstop). Live-verified with real Gemini 2026-07-12 (grounded leak-free
 turns; planted artifact injection ignored);
 docs/testing/m14b_grounded_defense_adversarial.md is the matrix.
 
+Since M14C the gate router also serves `GET /gate/context-summary` — the
+metadata-only readiness view of the pack (present/missing sources, labels,
+truncation flags; pure read, no LLM, no gate-session repo). It never carries
+content and never gates the defense: missing artifacts are optional. See
+[[artifact-aware-defense-ui-conventions]].
+
 Prompt-hole lessons from the live adversarial runs (all in
 `docs/prebuild/adversarial_tests.md`): flash-lite counted generic role
 descriptions ("the owner column") as implementation-specific → Condition 3

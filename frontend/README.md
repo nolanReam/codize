@@ -75,8 +75,12 @@ Intake (`/intake/*`), roadmap (`/roadmap/generate`, `/roadmap`), phases
 `PUT /workflow/{phase}/{section}`), reconnection (`GET /reconnection`,
 `POST /reconnection/acknowledge`), evaluation (`GET /evaluation`), and the full
 gate flow (`GET /gate/current`, `POST /gate/start`,
-`POST /gate/{id}/turn1|turn2|turn3|evaluate`). The Project Defense Report is
-assembled client-side from these routes — no dedicated report endpoint.
+`POST /gate/{id}/turn1|turn2|turn3|evaluate`), plus the metadata-only
+`GET /gate/context-summary` (M14C — which sources defense questions can draw
+on: labels + present/missing + truncation flags, **never artifact content**;
+fetched non-blocking on gate-page mount, so it can never gate the defense).
+The Project Defense Report is assembled client-side from these routes — no
+dedicated report endpoint.
 
 ## Environment
 
@@ -173,7 +177,12 @@ loading/empty/error states. The whole Build Loop is now walkable end-to-end;
 this was live-verified in a browser against the real FastAPI backend + Supabase
 (intake → roadmap → phase artifact → full gate PASS → report → export → logout).
 
-The gate is **not evidence-aware** by design (it uses the existing M9 evaluator;
-saved workflow artifacts are the student's own reference and feed only the
-client-assembled report, never the evaluator). Raw gate scores, evaluator
-reasoning, hidden thresholds, and internal prompts never reach the client.
+Since M14B the gate's **questions** draw on the student's recorded workflow
+artifacts (server-side grounding), and since M14C the UI says so: the gate
+ready screen shows compact source chips from `GET /gate/context-summary`
+(missing artifacts are optional, never blocking), active questions carry a
+subtle "Grounded in your project" label, and `lib/defenseContext.ts` derives
+deterministic preparation tips. The **evaluation stays artifact-blind** —
+recorded artifacts never decide pass/fail, and the UI never claims Codize
+verified anything. Raw gate scores, evaluator reasoning, hidden thresholds,
+internal prompts, raw context, and grounding metadata never reach the client.

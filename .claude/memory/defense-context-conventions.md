@@ -24,9 +24,14 @@ ProjectRepository — never gate_service, never llm_service).
   `workflow_service.stored_sections(project, n)` (new public seam). Errors
   reuse WorkspaceNotReadyError / PhaseNotFoundError → existing 409/404
   conventions.
-- **No API route** — deliberate M14A decision: the pack is an internal
-  service contract; nothing raw is exposed to clients. If M14C needs a
-  preview endpoint, expose only manifest metadata, never artifact content.
+- **No raw API route** — the pack itself is an internal service contract;
+  nothing content-bearing is exposed to clients. Since M14C the ONLY
+  pack-derived API shape is `GET /gate/context-summary` →
+  `build_context_summary`/`summarize_defense_context` (manifest metadata:
+  source ids, display labels via `SUMMARY_LABELS`, source types,
+  present/missing, truncation flags — see
+  [[artifact-aware-defense-ui-conventions]]). Never widen it to carry
+  artifact text, intake answers, rendered context, or grounding terms.
 
 **Pack schema (v1.0, `SCHEMA_VERSION`):** project (id/status/archetype),
 phase (number/title/core_concept/gate targets/depth/is_current), progress

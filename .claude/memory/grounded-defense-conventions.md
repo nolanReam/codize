@@ -61,9 +61,10 @@ matrix: `docs/testing/m14b_grounded_defense_adversarial.md`.
 `missing_sources` and must not assume it; sparse context → general
 anchor/phase questions validate fine (no terms = no requirements).
 
-**M14C frontend seam:** nothing new is exposed — the gate API responses are
+**M14C frontend seam (realized 2026-07-12):** the gate API responses stayed
 byte-compatible with M13 (`{gate_session_id, turn, question}`; transcript =
-turn/question/answer). M14C is purely UX around already-grounded questions;
-if it ever wants to SHOW grounding provenance, expose manifest-level labels
-only, never the pack, via a new deliberate route (see
-[[defense-context-conventions]] preview rules).
+turn/question/answer). M14C added exactly the deliberate manifest-metadata
+route this note prescribed: `GET /gate/context-summary` (labels + presence +
+truncation flags only — never the pack, never grounding metadata; see
+[[artifact-aware-defense-ui-conventions]]). Per-question source attribution
+is deliberately NOT exposed and must never be inferred client-side.

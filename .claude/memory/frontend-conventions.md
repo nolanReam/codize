@@ -314,6 +314,20 @@ do" answer — collapsed `details.help`, currently on the cockpit hero; reuse
 it instead of writing new onboarding walls. (8) `button.chip.active` marks a
 selected chip (evidence kind picker).
 
+**M14C (2026-07-12) — artifact-aware Project Defense UI.** The gate page now
+consumes `GET /gate/context-summary` (metadata-only — see
+[[artifact-aware-defense-ui-conventions]] for the full rules): a separate
+non-blocking fetch on mount (never gates the page or the Begin button),
+`lib/defenseContext.ts` pure helpers (grouping, deterministic prep tips,
+missing-note phrasing — unit-tested), compact `span.pill ok` source chips +
+one "Project context" pill, missing artifacts phrased as optional with links,
+truncation as one muted line, two new collapsed `details.help` disclosures on
+ReadyView, a static "Grounded in your project" eyebrow on active questions
+(never per-question source attribution), and the stale "gate doesn't read
+your saved artifacts" rail copy corrected (questions draw on recorded work;
+pass/fail stays about the student's own explanation). Refresh = fetch on
+mount; no polling, no query library.
+
 **M13E.2 (2026-07-06) — pilot bugfix conventions.** (1) **Local drafts**
 (`lib/drafts.ts`): unsubmitted text survives tab/page switches via
 localStorage keys `codize:draft:<user id>:<surface>` (surface = section+phase,

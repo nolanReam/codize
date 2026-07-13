@@ -176,3 +176,31 @@ class DefenseContextPack(_Model):
     source_manifest: list[SourceRecord]
     missing_sources: list[str]
     truncation: dict[str, TruncationRecord] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Context summary (Milestone 14C) — the ONLY pack-derived shape that crosses
+# the API boundary. Metadata about what exists, never what it says: no
+# artifact text, no intake answers, no rendered context, no grounding terms.
+# ---------------------------------------------------------------------------
+
+
+class SummaryIncludedSource(_Model):
+    source_id: str
+    label: str
+    source_type: SourceType
+    truncated: bool = False
+
+
+class SummaryMissingSource(_Model):
+    source_id: str
+    label: str
+
+
+class DefenseContextSummary(_Model):
+    schema_version: str = SCHEMA_VERSION
+    phase_number: int
+    included_sources: list[SummaryIncludedSource]
+    missing_sources: list[SummaryMissingSource]
+    has_truncation: bool
+    artifact_aware: bool = True

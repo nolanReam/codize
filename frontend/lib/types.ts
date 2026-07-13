@@ -197,6 +197,30 @@ export interface Evaluation {
   cooldown_seconds_remaining?: number;
 }
 
+// Metadata-only view of what Project Defense questions can draw on (M14C).
+// Presence + labels + truncation flags ONLY — the backend never sends artifact
+// content, intake answers, rendered context, or grounding terms here.
+export interface ContextSummarySource {
+  source_id: string;
+  label: string;
+  source_type: string;
+  truncated: boolean;
+}
+
+export interface ContextSummaryMissingSource {
+  source_id: string;
+  label: string;
+}
+
+export interface DefenseContextSummary {
+  schema_version: string;
+  phase_number: number;
+  included_sources: ContextSummarySource[];
+  missing_sources: ContextSummaryMissingSource[];
+  has_truncation: boolean;
+  artifact_aware: boolean;
+}
+
 export interface GateTurn {
   turn: number;
   question: string;

@@ -11,12 +11,24 @@ import {
   evaluateGate,
   getCurrentGate,
   getCurrentPhase,
+  getDefenseContextSummary,
   startGate,
   submitGateAnchor,
   submitGateAnswer,
 } from "@/lib/api";
+import {
+  WORKFLOW_PAGE_LINKS,
+  groupSummary,
+  missingNote,
+  preparationTips,
+} from "@/lib/defenseContext";
 import { useDraft } from "@/lib/drafts";
-import type { GateCurrent, GateEvaluationResult, PhaseView } from "@/lib/types";
+import type {
+  DefenseContextSummary,
+  GateCurrent,
+  GateEvaluationResult,
+  PhaseView,
+} from "@/lib/types";
 
 // Cooldown is amber, not red — a study break, not an error (M13E.4).
 const STATE_PILL: Record<GateCurrent["state"], { label: string; cls: string }> = {
@@ -49,6 +61,28 @@ export default function GatePage() {
   const [busy, setBusy] = useState(false);
   const [flowError, setFlowError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<GateEvaluationResult | null>(null);
+
+  // Context summary (M14C): metadata-only "what can questions draw on" —
+  // loaded separately so a slow or failing summary NEVER blocks the gate.
+  // Fetched fresh on every mount, so artifacts saved on other pages are
+  // reflected the next time the student lands here (no polling needed).
+  const [summary, setSummary] = useState<DefenseContextSummary | null>(null);
+  const [summaryState, setSummaryState] = useState<"loading" | "ready" | "error">("loading");
+  useEffect(() => {
+    let cancelled = false;
+    getDefenseContextSummary()
+      .then((s) => {
+        if (cancelled) return;
+        setSummary(s);
+        setSummaryState("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setSummaryState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Unsaved-draft persistence (M13E.2): the typed answer survives switching
   // tabs mid-defense. Scoped per session AND per step, so a restored draft can
@@ -208,6 +242,8 @@ export default function GatePage() {
                     busy={busy}
                     onBegin={handleBegin}
                     flowError={flowError}
+                    summary={summary}
+                    summaryState={summaryState}
                   />
                 )}
               </div>
@@ -230,11 +266,15 @@ function ReadyView({
   busy,
   onBegin,
   flowError,
+  summary,
+  summaryState,
 }: {
   phase: PhaseView | null;
   busy: boolean;
   onBegin: () => void;
   flowError: string | null;
+  summary: DefenseContextSummary | null;
+  summaryState: "loading" | "ready" | "error";
 }) {
   return (
     <div className="card">
@@ -252,6 +292,9 @@ function ReadyView({
         No timer, no trick questions — and <strong>you can keep your code open</strong> while
         you answer.
       </p>
+
+      <ContextSummaryBlock summary={summary} summaryState={summaryState} />
+
       <details className="help">
         <summary>What exactly will happen?</summary>
         <div className="help-body">
@@ -292,6 +335,38 @@ function ReadyView({
           </p>
         </div>
       </details>
+      <details className="help">
+        <summary>How are my questions personalized?</summary>
+        <div className="help-body">
+          <ul>
+            <li>
+              Codize draws on the project context you&rsquo;ve recorded — your prompts, Review
+              Notes, Evidence, and Verification.
+            </li>
+            <li>
+              Recorded notes count as <em>your own</em> self-reported information, never as
+              verified facts.
+            </li>
+            <li>
+              Recording something doesn&rsquo;t prove it&rsquo;s correct — you still explain the
+              implementation yourself.
+            </li>
+            <li>Nothing recorded yet? Questions stay anchored to your project and phase.</li>
+          </ul>
+        </div>
+      </details>
+      {summary && (
+        <details className="help">
+          <summary>Prepare in 30 seconds</summary>
+          <div className="help-body">
+            <ul>
+              {preparationTips(summary).map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          </div>
+        </details>
+      )}
       {flowError && (
         <div className="notice error" style={{ marginTop: 12 }}>
           {flowError}
@@ -305,6 +380,82 @@ function ReadyView({
           Review the phase first
         </Link>
       </div>
+    </div>
+  );
+}
+
+// --- what questions can draw on (metadata only, M14C) --------------------------
+
+// Compact, honest, and never blocking: shows WHICH sources exist — the backend
+// never sends artifact content here, and missing artifacts are optional, not
+// errors. The Begin button is never gated on this block.
+function ContextSummaryBlock({
+  summary,
+  summaryState,
+}: {
+  summary: DefenseContextSummary | null;
+  summaryState: "loading" | "ready" | "error";
+}) {
+  if (summaryState === "loading") {
+    return (
+      <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
+        Checking what you&rsquo;ve recorded this phase…
+      </p>
+    );
+  }
+  if (summaryState === "error" || !summary) {
+    return (
+      <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
+        Project context is unavailable right now. You can still prepare using your phase and
+        implementation.
+      </p>
+    );
+  }
+
+  const grouped = groupSummary(summary);
+  const note = missingNote(grouped.missingWorkflow);
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <p style={{ margin: "0 0 8px" }}>
+        {grouped.hasWorkflowContext ? (
+          <>Your questions will draw from the work you recorded in this phase.</>
+        ) : (
+          <>
+            Codize will use your project, phase, and anchor. Add workflow notes later for more
+            specific questions.
+          </>
+        )}
+      </p>
+      <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <span className="muted" style={{ fontSize: 12 }}>
+          Using:
+        </span>
+        {grouped.workflow.map((s) => (
+          <span className="pill ok" key={s.source_id}>
+            ✓ {s.label}
+          </span>
+        ))}
+        {grouped.hasSystemContext && <span className="pill">Project context</span>}
+      </div>
+      {note && (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+          {note}
+          {grouped.missingWorkflow.map((m) =>
+            WORKFLOW_PAGE_LINKS[m.source_id] ? (
+              <span key={m.source_id}>
+                {" "}
+                <Link href={WORKFLOW_PAGE_LINKS[m.source_id]}>Add {m.label} →</Link>
+              </span>
+            ) : null
+          )}
+        </p>
+      )}
+      {summary.has_truncation && (
+        <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+          Some long notes were shortened for question generation.
+        </p>
+      )}
     </div>
   );
 }
@@ -374,6 +525,20 @@ function ActiveFlow({
           </>
         ) : (
           <>
+            {/* Subtle grounding label (M14C): questions draw on the project and
+                any recorded work — per-question source attribution is never
+                inferred client-side. The question stays the visual focus. */}
+            <p
+              className="muted"
+              style={{
+                fontSize: 11,
+                margin: "0 0 6px",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Grounded in your project
+            </p>
             <h3>Question {turnNo} of 3</h3>
             <p style={{ marginBottom: 10 }}>{pending?.question}</p>
             {isEvaluate && (
@@ -582,8 +747,9 @@ function GateExplainer() {
           <li>Pass → next phase. Fail → short cooldown, then retry.</li>
         </ol>
         <p>
-          Passing this is the only thing that advances a phase. The gate doesn&rsquo;t read your
-          saved artifacts — those feed your Defense Report.
+          Passing this is the only thing that advances a phase. Questions can draw on the work
+          you recorded this phase — but pass / fail is decided only by how well{" "}
+          <em>you</em> explain your own implementation.
         </p>
       </GuideCard>
     </>

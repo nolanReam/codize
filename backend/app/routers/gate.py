@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import CurrentUser, require_user
 from app.schemas.gate import AnchorRequest, AnswerRequest
-from app.services import gate_service
+from app.services import defense_context_service, gate_service, phase_service
 from app.services.llm_service import LLMService, get_llm_service
 from app.services.project_repository import (
     GateSessionRepository,
@@ -54,6 +54,26 @@ async def start_gate(
         return await gate_service.start_gate(project_repo, gate_repo, user.user_id)
     except gate_service.GateError as exc:
         raise _http_error(exc)
+
+
+@router.get("/context-summary")
+async def get_context_summary(
+    user: CurrentUser = Depends(require_user),
+    project_repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    """Metadata-only readiness view of the defense context for the current
+    phase: which sources exist, which are missing (optional, never an error),
+    and whether anything was shortened. Pure read, no LLM call — and never any
+    artifact content, rendered context, or grounding metadata."""
+    try:
+        summary = await defense_context_service.build_context_summary(
+            project_repo, user.user_id
+        )
+    except phase_service.PhaseNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except phase_service.PhaseWorkspaceError as exc:  # workspace not ready
+        raise HTTPException(status_code=409, detail=str(exc))
+    return summary.model_dump(mode="json")
 
 
 @router.get("/current")

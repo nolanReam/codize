@@ -5,6 +5,7 @@
 
 import { getAccessToken } from "./supabase";
 import type {
+  DefenseContextSummary,
   Evaluation,
   EvidenceArtifact,
   GateCurrent,
@@ -140,6 +141,9 @@ export const acknowledgeReconnection = () =>
   request<{ acknowledged: boolean }>("/reconnection/acknowledge", { method: "POST" });
 export const getEvaluation = () => request<Evaluation>("/evaluation");
 export const getCurrentGate = () => request<GateCurrent>("/gate/current");
+// Metadata-only: which sources defense questions can draw on (never content).
+export const getDefenseContextSummary = () =>
+  request<DefenseContextSummary>("/gate/context-summary");
 
 // Interrogation Gate flow (M9 backend). start creates the session; turn1 is the
 // anchor statement; turn2/turn3 submit the prior answer and return the next

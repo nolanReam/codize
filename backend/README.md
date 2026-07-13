@@ -141,6 +141,15 @@ nothing stored. Derived grounding metadata ({source_ids, grounding_terms})
 is stored inside the turns JSONB and never reaches the client (the
 transcript view whitelists turn/question/answer). Adversarial matrix:
 `docs/testing/m14b_grounded_defense_adversarial.md`.
+Since M14C, `GET /gate/context-summary` exposes a **metadata-only** view of
+the same pack for the current phase (`defense_context_service.
+build_context_summary` → `summarize_defense_context`): which sources exist,
+which are missing (optional — never an error), per-source truncation flags,
+and human display labels (`SUMMARY_LABELS`) — never artifact content, intake
+answers, rendered context, or grounding terms. Pure read, no LLM call, no DB
+write; ownership rides the same authenticated-identity path (another user
+gets their own empty workspace → 409, never the owner's data). Workspace not
+ready → 409, corrupt phase → 404.
 
 ## Functional unlocks (M10)
 

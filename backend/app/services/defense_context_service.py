@@ -44,9 +44,12 @@ from app.schemas.defense_context import (
     ContextVerification,
     ContextWorkflow,
     DefenseContextPack,
+    DefenseContextSummary,
     SCHEMA_VERSION,
     SourceRecord,
     SourceType,
+    SummaryIncludedSource,
+    SummaryMissingSource,
     TruncationRecord,
 )
 from app.services import phase_service, template_service, workflow_service
@@ -450,6 +453,69 @@ async def build_defense_context(
         missing_sources=missing,
         truncation=truncation,
     )
+
+
+# ---------------------------------------------------------------------------
+# Context summary (Milestone 14C) — metadata-only, the one pack-derived shape
+# that may cross the API boundary
+# ---------------------------------------------------------------------------
+
+# Human-friendly display labels for the summary UI. Deliberately separate from
+# _SOURCE_DEFS: the manifest labels carry honesty framing for the LLM prompt;
+# these name the same sources the way a student sees them in the app.
+SUMMARY_LABELS = {
+    "project": "Project",
+    "phase": "Current phase",
+    "progress": "Build progress",
+    "intake": "Project intake",
+    "workflow.prompt_builder": "Prompt",
+    "workflow.review_board": "Review Notes",
+    "workflow.evidence": "Evidence",
+    "workflow.verification": "Verification",
+}
+
+
+def summarize_defense_context(pack: DefenseContextPack) -> DefenseContextSummary:
+    """Reduce a pack to presence/truncation metadata. Nothing content-bearing
+    survives: only source ids, display labels, source types, and flags —
+    derived purely from the manifest, in its fixed deterministic order."""
+    included = [
+        SummaryIncludedSource(
+            source_id=record.source_id,
+            label=SUMMARY_LABELS[record.source_id],
+            source_type=record.source_type,
+            truncated=record.truncated,
+        )
+        for record in pack.source_manifest
+        if record.present
+    ]
+    missing = [
+        SummaryMissingSource(
+            source_id=record.source_id, label=SUMMARY_LABELS[record.source_id]
+        )
+        for record in pack.source_manifest
+        if not record.present
+    ]
+    return DefenseContextSummary(
+        phase_number=pack.phase.phase_number,
+        included_sources=included,
+        missing_sources=missing,
+        has_truncation=bool(pack.truncation),
+    )
+
+
+async def build_context_summary(
+    repo: ProjectRepository, user_id: str
+) -> DefenseContextSummary:
+    """The M14C context-summary seam: build the pack for the authenticated
+    user's current phase (the phase the gate would defend) and return only its
+    metadata. Pure read, no LLM; missing artifacts are optional, never an
+    error. Raises the shared WorkspaceNotReadyError / PhaseNotFoundError so
+    routes keep the existing 409/404 conventions."""
+    project = await phase_service.load_active_project(repo, user_id)
+    phase_number = int(project.get("current_phase") or 1)
+    pack = await build_defense_context(repo, user_id, phase_number)
+    return summarize_defense_context(pack)
 
 
 # ---------------------------------------------------------------------------
