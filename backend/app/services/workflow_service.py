@@ -30,12 +30,22 @@ from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
+from app.schemas.change_map import StoredChangeMap
 from app.schemas.workflow import SECTION_MODELS, StoredImplementationImport
 from app.services import phase_service
 from app.services.project_repository import ProjectRepository
 
 SECTIONS = tuple(SECTION_MODELS)
 # prompt_builder, review_board, evidence, verification, implementation_import
+
+# The Change Map (M15C.1) lives as a SIBLING key beside the five student
+# sections inside the same per-phase map — same column, no migration — but it
+# is NOT a workflow section: it is server-generated + lifecycle-managed, so
+# the generic full-replace PUT must never accept it (it is not in
+# SECTION_MODELS → 404 by construction) and _stored_sections filters it out of
+# every section read, which also keeps it out of the M14 defense context
+# (stored_sections is the only artifact feed into the pack builder).
+CHANGE_MAP_KEY = "change_map"
 
 # Belt over the per-field caps: one section, serialized, must stay small
 # enough to render and to aggregate into a Project Defense Report. The
@@ -79,6 +89,10 @@ def _phase_view(project: dict, phase_number: int) -> dict:
     return {
         "phase": phase_number,
         "sections": {name: stored.get(name) for name in SECTIONS},
+        # Top-level, deliberately NOT inside `sections`: the frontend counts
+        # section values for its "N/5 captured" progress, and the change map
+        # is not a student-captured section.
+        "change_map": change_map_view(project, phase_number),
     }
 
 
@@ -108,6 +122,71 @@ def get_implementation_import(
         return StoredImplementationImport.model_validate(stored)
     except ValidationError:
         return None
+
+
+def _raw_change_map(project: dict, phase_number: int):
+    stored = project.get("workflow_artifacts")
+    phase_map = stored.get(str(phase_number)) if isinstance(stored, dict) else None
+    if not isinstance(phase_map, dict):
+        return None
+    raw = phase_map.get(CHANGE_MAP_KEY)
+    return raw if isinstance(raw, dict) else None
+
+
+def get_change_map(project: dict, phase_number: int) -> StoredChangeMap | None:
+    """Typed read seam (M15C.1; future M16 consumers): the validated Change
+    Map for one phase from an already-loaded project, or None when absent or
+    corrupt — corruption never surfaces raw stored data. Read-only."""
+    raw = _raw_change_map(project, phase_number)
+    if raw is None:
+        return None
+    try:
+        return StoredChangeMap.model_validate(raw)
+    except ValidationError:
+        return None
+
+
+def change_map_is_stale(
+    project: dict, phase_number: int, change_map: StoredChangeMap
+) -> bool:
+    """Server-derived, deterministic, never client-controlled: the map is
+    stale when the implementation import it was generated from is no longer
+    the stored one (replaced after generation, or missing/corrupt)."""
+    imported = get_implementation_import(project, phase_number)
+    if imported is None:
+        return True
+    return (change_map.source_import_saved_at or "") != (imported.saved_at or "")
+
+
+def change_map_view(project: dict, phase_number: int) -> dict | None:
+    """The client-facing Change Map shape: the stored map plus the computed
+    stale flag. Contains no raw import, no prompts, no provider output beyond
+    the validated draft items themselves."""
+    change_map = get_change_map(project, phase_number)
+    if change_map is None:
+        return None
+    view = change_map.model_dump(mode="json")
+    view["stale"] = change_map_is_stale(project, phase_number, change_map)
+    return view
+
+
+async def store_change_map(
+    repo: ProjectRepository, user_id: str, project: dict, phase_number: int, data: dict
+) -> dict:
+    """Persist one phase's Change Map (same merge discipline as save_section:
+    the write touches ONLY workflow_artifacts, and every other key in the
+    phase map — the five student sections included — is preserved).
+    Callers (change_map_service) validate `data` against StoredChangeMap
+    before handing it over."""
+    existing = project.get("workflow_artifacts")
+    artifacts = dict(existing) if isinstance(existing, dict) else {}
+    phase_map = artifacts.get(str(phase_number))
+    phase_map = dict(phase_map) if isinstance(phase_map, dict) else {}
+    phase_map[CHANGE_MAP_KEY] = copy.deepcopy(data)
+    artifacts[str(phase_number)] = phase_map
+    return await repo.update_project(
+        user_id, project["id"], {"workflow_artifacts": artifacts}
+    )
 
 
 async def get_phase_artifacts(

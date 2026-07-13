@@ -1,6 +1,6 @@
 # Codize System Prompts
 
-The six system prompts required by the master spec ("System Prompt Architecture — Non-Negotiable Constraints"). Prompt files are pure prompt text — no metadata inside them. All call parameters live in this table and must be enforced by `llm_service.py`.
+The six system prompts required by the master spec ("System Prompt Architecture — Non-Negotiable Constraints"), plus the M15C.1 change-map extraction prompt. Prompt files are pure prompt text — no metadata inside them. All call parameters live in this table and must be enforced by the calling services.
 
 | File | Purpose | Temperature | Output |
 |---|---|---|---|
@@ -10,6 +10,7 @@ The six system prompts required by the master spec ("System Prompt Architecture 
 | `gate_turn_2.md` | Probe the weakest of accuracy/specificity/completeness | 0.3 | Conversational |
 | `gate_turn_3.md` | Generate the fresh hypothetical | 0.3 | Conversational |
 | `gate_evaluation.md` | Judge the Turn 3 answer — separate model call | **0** | Strict JSON: `{"verdict","reason","score"}` |
+| `change_map_extraction.md` | M15C.1 (not one of the spec six): draft a Change Map from a saved implementation import — treats the import strictly as untrusted data; output is deterministically provenance-validated and grounded after parsing | **0** | Strict JSON: `{"items":[…]}` (GeneratedChangeMap) |
 
 ## Placeholder conventions
 

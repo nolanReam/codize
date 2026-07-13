@@ -54,3 +54,12 @@ Eligibility reuses `phase_service.load_active_project` and the M13B-public
 `phase_service.require_phase(project, n)` (the seam-publicizing pattern from
 M11/M12). CORS note: M13B added "PUT" to main.py's allow_methods — the first
 PUT route in the API; removing it breaks browser calls in M13C.
+
+M15C.1: the Change Map lives in the SAME column as a SIBLING key
+(`workflow_artifacts[phase]["change_map"]`) but is NOT a section — not in
+SECTION_MODELS (generic PUT 404s on it), filtered out of `_stored_sections`
+(so it can never reach the defense context), returned TOP-LEVEL by
+`GET /workflow/{phase}` (never inside `sections`, protecting the "N/5
+captured" counts). Its dedicated routes register BEFORE the generic section
+PUT in routers/workflow.py — moving them below breaks
+`PUT /workflow/{n}/change-map`. See [[change-map-conventions]].

@@ -104,16 +104,23 @@ class StubProvider:
     """Deterministic stand-in for tests and local no-key mode — never a silent
     fallback when a live provider is configured but failing.
 
-    Simulates a well-behaved model for the JSON-personalization prompts: it
-    extracts the first JSON object embedded in the prompt (the archetype
-    template), substitutes every `[SINGLE_BRACKET]` personalization slot with
-    fixed text, and adds the `timeline_estimate` field the roadmap prompt
-    requires. Same prompt in, same string out, no network.
+    Simulates a well-behaved model per prompt family: for the change-map
+    extraction prompt (M15C.1) it reads the sanitized import block between the
+    explicit delimiters and returns a small, cautious, fully-grounded draft
+    (excerpts are exact substrings; no invented identifiers — so it passes the
+    same deterministic validation a live model must). For the JSON-
+    personalization prompts it extracts the first JSON object embedded in the
+    prompt (the archetype template), substitutes every `[SINGLE_BRACKET]`
+    personalization slot with fixed text, and adds the `timeline_estimate`
+    field the roadmap prompt requires. Same prompt in, same string out, no
+    network.
     """
 
     name = "stub"
 
     async def complete(self, prompt: str, temperature: float) -> str:
+        if "CODIZE CHANGE MAP EXTRACTION" in prompt:
+            return self._change_map(prompt)
         start = prompt.find("{")
         if start == -1:
             raise LLMError("stub: prompt contains no JSON object to personalize")
@@ -127,6 +134,88 @@ class StubProvider:
             "Stub estimate: phases distributed evenly across your stated deadline."
         )
         return json.dumps(result)
+
+    @staticmethod
+    def _import_section(block: str, header_prefix: str) -> str:
+        for chunk in block.split("\n--- "):
+            if chunk.startswith(header_prefix):
+                body = chunk.split("---\n", 1)
+                return body[1].strip() if len(body) == 2 else ""
+        return ""
+
+    def _change_map(self, prompt: str) -> str:
+        begin = prompt.find("=== BEGIN IMPORT")
+        end = prompt.find("=== END IMPORT ===")
+        if begin == -1 or end == -1:
+            raise LLMError("stub: change-map prompt carries no import block")
+        block = prompt[begin:end]
+        kind_match = re.search(r"^source_kind: (\w+)$", block, flags=re.MULTILINE)
+        kind = kind_match.group(1) if kind_match else "other"
+        none = "(none provided)"
+
+        summary = self._import_section(block, "STUDENT SUMMARY")
+        files_text = self._import_section(block, "CHANGED FILES")
+        content = self._import_section(block, "IMPORTED CONTENT")
+
+        items = []
+        if files_text and files_text != none:
+            first_file = files_text.splitlines()[0].strip()
+            if first_file and not first_file.startswith("(TRUNCATED"):
+                items.append({
+                    "category": "changed_file",
+                    "draft_text": f"The import lists `{first_file}` as a changed file.",
+                    "ai_uncertainty": "supported",
+                    "uncertainty_reason": None,
+                    "source_references": [{
+                        "source_field": "changed_files",
+                        "source_kind": kind,
+                        "file_path": first_file,
+                        "supporting_excerpt": None,
+                    }],
+                })
+        if summary and summary != none:
+            excerpt = summary.splitlines()[0][:200]
+            items.append({
+                "category": "behavior_change",
+                "draft_text": (
+                    "The student summary indicates something changed in this "
+                    "phase; review it before confirming."
+                ),
+                "ai_uncertainty": "ambiguous",
+                "uncertainty_reason": (
+                    "This is based only on the student's own summary."
+                ),
+                "source_references": [{
+                    "source_field": "student_summary",
+                    "source_kind": kind,
+                    "file_path": None,
+                    "supporting_excerpt": excerpt,
+                }],
+            })
+        if content and content != none:
+            first_line = next(
+                (ln for ln in content.splitlines() if ln.strip()), ""
+            )[:200]
+            items.append({
+                "category": "question_to_understand",
+                "draft_text": (
+                    "What does the pasted material change about the way your "
+                    "project behaves?"
+                ),
+                "ai_uncertainty": "needs_inspection",
+                "uncertainty_reason": (
+                    "Only you can check the actual behavior in your project."
+                ),
+                "source_references": [{
+                    "source_field": "content",
+                    "source_kind": kind,
+                    "file_path": None,
+                    "supporting_excerpt": first_line,
+                }],
+            })
+        if not items:
+            raise LLMError("stub: import block carries no material")
+        return json.dumps({"items": items})
 
 
 class LLMService:

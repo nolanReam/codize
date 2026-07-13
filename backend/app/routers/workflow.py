@@ -4,12 +4,23 @@ The user id comes only from the verified JWT and the repository scopes every
 read/write to it, so a user can only ever see or update their own artifacts.
 Controlled errors map to the standard shape: workspace not ready → 409,
 unknown phase or section → 404, invalid or oversized payload → 422.
+
+M15C.1 adds the Change Map lifecycle under the same prefix:
+POST /workflow/{phase}/change-map/generate (the only LLM route here — one
+extraction at temperature 0 with bounded retry; failure → 502, nothing
+stored), PUT /workflow/{phase}/change-map (student decisions only — no LLM),
+POST /workflow/{phase}/change-map/confirm (pure state transition — no LLM).
+The change-map PUT is registered BEFORE the generic section PUT so it matches
+first; "change_map" is additionally not a section name, so the generic
+full-replace path can never write server-owned provenance.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import CurrentUser, require_user
-from app.services import phase_service, workflow_service
+from app.schemas.change_map import ChangeMapGenerateRequest
+from app.services import change_map_service, phase_service, workflow_service
+from app.services.llm_service import LLMService, get_llm_service
 from app.services.project_repository import ProjectRepository, get_project_repository
 
 router = APIRouter(prefix="/workflow")
@@ -27,6 +38,20 @@ def _http_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=status, detail=str(exc))
 
 
+def _change_map_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, phase_service.PhaseNotFoundError) or isinstance(
+        exc, change_map_service.ChangeMapNotFoundError
+    ):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, change_map_service.InvalidChangeMapUpdateError):
+        return HTTPException(status_code=422, detail=str(exc))
+    if isinstance(exc, change_map_service.ChangeMapGenerationError):
+        return HTTPException(status_code=502, detail=str(exc))
+    # workspace not ready / import required / already exists / stale /
+    # pending items / already confirmed
+    return HTTPException(status_code=409, detail=str(exc))
+
+
 @router.get("/{phase_number}")
 async def get_phase_artifacts(
     phase_number: int,
@@ -37,6 +62,52 @@ async def get_phase_artifacts(
         return await workflow_service.get_phase_artifacts(repo, user.user_id, phase_number)
     except (phase_service.PhaseWorkspaceError, workflow_service.WorkflowError) as exc:
         raise _http_error(exc)
+
+
+@router.post("/{phase_number}/change-map/generate")
+async def generate_change_map(
+    phase_number: int,
+    body: ChangeMapGenerateRequest | None = None,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+    llm: LLMService = Depends(get_llm_service),
+) -> dict:
+    try:
+        return await change_map_service.generate_change_map(
+            repo, llm, user.user_id, phase_number,
+            replace_existing=bool(body and body.replace_existing),
+        )
+    except (phase_service.PhaseWorkspaceError, change_map_service.ChangeMapError) as exc:
+        raise _change_map_http_error(exc)
+
+
+@router.put("/{phase_number}/change-map")
+async def update_change_map(
+    phase_number: int,
+    body: dict,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    try:
+        return await change_map_service.update_change_map(
+            repo, user.user_id, phase_number, body
+        )
+    except (phase_service.PhaseWorkspaceError, change_map_service.ChangeMapError) as exc:
+        raise _change_map_http_error(exc)
+
+
+@router.post("/{phase_number}/change-map/confirm")
+async def confirm_change_map(
+    phase_number: int,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    try:
+        return await change_map_service.confirm_change_map(
+            repo, user.user_id, phase_number
+        )
+    except (phase_service.PhaseWorkspaceError, change_map_service.ChangeMapError) as exc:
+        raise _change_map_http_error(exc)
 
 
 @router.put("/{phase_number}/{section}")

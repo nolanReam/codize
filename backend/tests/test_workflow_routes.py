@@ -48,6 +48,9 @@ def test_full_workflow_artifact_flow(client):
         "sections": {"prompt_builder": None, "review_board": None,
                      "evidence": None, "verification": None,
                      "implementation_import": None},
+        # M15C.1: the Change Map rides top-level, never inside `sections`
+        # (frontend progress counts section values).
+        "change_map": None,
     }
 
     for section, payload in SAMPLE.items():

@@ -65,8 +65,12 @@ through the spec-guardian process in M15C/M16, never the raw import.
 [[implementation-import-ui-conventions]]) uses exactly the planned seam: the
 existing routes (`GET /workflow/{phase}` returns `implementation_import` as a
 fifth key; `PUT /workflow/{phase}/implementation_import` saves it — same
-useWorkflowSection pattern as the other sections). M15C extraction =
-`workflow_service.get_implementation_import(project, phase_number)` →
+useWorkflowSection pattern as the other sections). M15C extraction (BUILT
+2026-07-13 — see [[change-map-conventions]]) consumes exactly the planned
+seam: `workflow_service.get_implementation_import(project, phase_number)` →
 `StoredImplementationImport | None` (the validated artifact + `saved_at`;
 absent or corrupt stored data returns None, never raw JSON; read-only, takes
-an already-loaded project so it duplicates no ownership logic).
+an already-loaded project so it duplicates no ownership logic). The Change
+Map binds to `saved_at` — replacing an import makes the map stale, never
+rewrites it. Raw imports still never enter the defense context; extraction
+applies full M14A redaction to a VIEW and never mutates the stored artifact.

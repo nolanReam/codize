@@ -212,7 +212,7 @@ Evaluation is a pure read — it never mutates the roadmap, task progress,
 gates, or unlocks, never advances phases, and never touches reconnection's
 `last_login_at`.
 
-## Workflow artifacts (M13B; implementation import added in M15A)
+## Workflow artifacts (M13B; implementation import added in M15A; Change Map added in M15C.1)
 
 `services/workflow_service.py` stores the student-authored v3 Build Loop
 sections — `prompt_builder`, `review_board`, `evidence`, `verification`, and
@@ -259,6 +259,56 @@ Future seams: M15B frontend uses the existing routes; M15C reads through
 `workflow_service.get_implementation_import(project, phase_number)` →
 `StoredImplementationImport | None` (validated + `saved_at`; corrupt data
 returns `None`, never raw JSON).
+
+### Change Map (M15C.1 — provenance-aware extraction foundation)
+
+`services/change_map_service.py` (+ `schemas/change_map.py` +
+`prompts/change_map_extraction.md`) converts a saved implementation import
+into an AI-generated, editable DRAFT of what *appears* to have changed —
+never a correctness claim. It persists as a SIBLING key beside the five
+student sections (`workflow_artifacts[phase]["change_map"]`, no migration)
+but is NOT a workflow section: the generic section PUT 404s on it,
+`stored_sections` filters it out (so it can never reach the M14 defense
+context — manifest still fixed at 8 sources), and `GET /workflow/{phase}`
+returns it top-level with a server-computed `stale` flag.
+
+Generation (`POST /workflow/{phase}/change-map/generate`, the only LLM path
+here, temperature 0): the typed M15A import is redacted field-by-field with
+the M14A `redact_secrets` patterns BEFORE deterministic truncation (summary
+4k / changed-files 12k whole entries / content 20k head+tail, visible
+`[TRUNCATED…]` markers, cuts never split the redaction marker — the stored
+import is never mutated), rendered inside explicit untrusted-data delimiters,
+then the output is parsed fail-closed (`GeneratedChangeMap`: ≤ 40 items,
+≤ 600-char draft text, ≤ 5 refs × 300-char excerpts, extra fields forbidden)
+and held to deterministic validation the model cannot talk its way past:
+every source reference must target a field the import contains with a
+verbatim excerpt of the sanitized view (whitespace-only excerpts rejected),
+file paths must exist in the material, and every code-shaped identifier in
+draft text must be supported (reusing `grounding_service`
+term extraction — M14B behavior untouched). One corrective regeneration
+(validation categories only — never raw output or import material), then the
+retryable 502 with nothing stored. The server assigns everything the model
+must not control: `item_id` (deterministic hash, no timestamps),
+`origin=ai_inferred`, `student_decision=pending_review`, `generated_at`,
+`status=draft`, `source_import_saved_at` (binds the map to the exact import
+version — replacing the import makes the map stale, derived on read, never
+client-controlled).
+
+Lifecycle (no LLM): `PUT /workflow/{phase}/change-map` edits ONLY
+student-owned state (decisions / edited text / notes on AI items by id;
+`student_added_items` as a full replacement set with `origin=student_added`
+and required student text) — server-owned provenance is not accepted by the
+schema and any successful update returns the map to draft.
+`POST /workflow/{phase}/change-map/confirm` blocks on pending items and
+staleness, allows rejected/uncertain/needs-inspection honestly, and stamps
+`confirmed_at` server-side; confirmation means "reviewed", never "correct".
+An existing map (draft or confirmed) is only replaced with an explicit
+`{"replace_existing": true}`. Future M16 seams (deliberately not consumed
+yet): `workflow_service.get_change_map` →
+`change_map_service.confirmed_items` / `unresolved_items` (deterministic
+effective text: confirmed→draft_text, edited/student_added→student_text,
+rejected→excluded). Adversarial matrix:
+`docs/testing/m15c_change_map_adversarial.md`.
 
 ## Defense context pack (M14A)
 
