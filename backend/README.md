@@ -149,7 +149,8 @@ Since M14C, `GET /gate/context-summary` exposes a **metadata-only** view of
 the same pack for the current phase (`defense_context_service.
 build_context_summary` → `summarize_defense_context`): which sources exist,
 which are missing (optional — never an error), per-source truncation flags,
-and human display labels (`SUMMARY_LABELS`) — never artifact content, intake
+human display labels (`SUMMARY_LABELS`), and M16C's four safe workflow source
+states — never artifact content, intake
 answers, rendered context, or grounding terms. Pure read, no LLM call, no DB
 write; ownership rides the same authenticated-identity path (another user
 gets their own empty workspace → 409, never the owner's data). Workspace not
@@ -224,8 +225,9 @@ since M15A `implementation_import` — phase-scoped, in the
 `projects.workflow_artifacts` JSONB column (task_progress precedent: outside
 the roadmap jsonb, so storing artifacts can never mutate the fixed
 structure). Storage only: no LLM call, no gate involvement, no report
-generation — the M13C frontend assembles the Project Defense Report
-client-side from this route plus the existing ones. Routes:
+generation. The M13C frontend still assembles its current Report client-side;
+M16C.1 adds a separate read-only Report context route without changing this
+storage service. Routes:
 `GET /workflow/{phase}` (all five sections, `null` when unset) and
 `PUT /workflow/{phase}/{section}` (idempotent full-section replace; payloads
 validated fail-closed by `schemas/workflow.py` — extra fields forbidden,
@@ -494,14 +496,14 @@ POST rebuild. No automatic rebuild, merge, deletion, or attachment exists.
 M16B.3B frontend seam: preview with the GET, let the student select only targets
 whose server eligibility is `eligible`, POST the selected Verification target
 ids only after explicit confirmation, then edit per-target student fields
-through the existing Evidence PUT. M16C backend seam: load typed linked Evidence
-with `evidence_service.get_stored_evidence(project, phase)` and consume only
-non-stale student-recorded entries/unavailable reasons through a future
-purpose-built safe normalizer. M16B.3A intentionally leaves the existing
-client-assembled Report reader on legacy top-level `entries + summary`.
-Defense Context explicitly treats linked Evidence as missing until M16C, so
-merely initializing an empty workspace cannot advertise a student-recorded
-Evidence source. Nested linked Evidence is not integrated downstream yet.
+through the existing Evidence PUT. M16C.1 realizes that backend seam:
+`workflow_context_service` loads typed Evidence through
+`evidence_service.get_stored_evidence(...)`, derives currency with
+`evidence_is_stale(...)`, and keeps student entries, explanations, explicit
+unavailable reasons, and Verification result/check context in separate fields.
+Stale linked Evidence remains stored/readable but its entries, explanations,
+and unavailable reasons are omitted from current Defense support. Manual
+top-level `entries + summary` remains compatible.
 
 ## Defense context pack (M14A)
 
@@ -526,6 +528,36 @@ survive); deterministic per-source + total character budgets with visible
 truncation metadata (`…[TRUNCATED]`, priority squeeze order keeps the phase
 identity and the built prompt longest); and zero account-level data (no user
 id, email, tokens, or profile fields — tested).
+
+## Artifact-aware Defense and Report foundation (M16C.1)
+
+`services/workflow_context_service.py` and `schemas/workflow_context.py` are
+the single downstream parser for Change Map, Review, Verification, and
+Evidence. Defense and Report never independently parse raw workflow JSON. The
+typed phase-scoped result uses explicit `missing | manual | current | stale |
+incomplete | malformed` states, preserves provenance layers, and excludes raw
+Implementation Import, internal ids, bindings, fingerprints, timestamps, and
+provider/evaluator data. Counts, fields, aggregate text, and serialized output
+are bounded with Unicode code-point semantics; unsafe controls fail safe and
+the Defense secret redactor is shared.
+
+Turn 1 stores that student-safe context as server-owned metadata on the first
+existing `gate_sessions.turns` item. Turn 2/3 reuse it, so workflow edits do
+not silently change an active attempt. Gate responses still whitelist only
+turn/question/answer. Legacy in-flight attempts gain a snapshot on their next
+successful turn; legacy completed attempts use current workflow state in the
+Report and label that fallback. Questions use the established generator and
+context block. The evaluator remains artifact-blind, strict/fail-closed at
+temperature 0, with unchanged hidden scores/thresholds, cooldowns, retries,
+providers, and provider-call count. Artifact presence or any Verification/
+Evidence status never decides PASS/FAIL.
+
+`GET /report/{phase}` is the authenticated owner/phase-scoped M16C.2 read
+seam. It is deterministic, read-only, provider-free, and unstored. It returns
+the curated context, its `defense_attempt | current_workflow` source, the
+student-safe Defense transcript/outcome, and an honest truth notice. When an
+attempt snapshot exists, later workflow edits do not rewrite what was
+defended. The current M13C frontend Report remains unchanged until M16C.2.
 
 ## Tests
 

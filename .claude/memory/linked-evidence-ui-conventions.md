@@ -94,3 +94,10 @@ new curated backend shape for Defense readiness/context and Report rendering;
 do not parse raw nested Evidence/provenance, keep unavailable distinct from
 Evidence, and mark or exclude stale linked work according to the backend
 contract.
+
+**M16C.1 backend now implemented:** M16C.2 should consume
+`GET /gate/context-summary` for metadata-only workflow source states and
+`GET /report/{phase}` for the bounded curated Report/Defense record. Never
+parse `sections.evidence.evidence_targets` in Defense/Report. The backend
+excludes stale linked support content and labels the stale state; manual
+Evidence remains compatible.

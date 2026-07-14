@@ -15,6 +15,7 @@ from app.routers import (
     health,
     intake,
     phases,
+    report,
     reconnection,
     roadmap,
     unlocks,
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(intake.router)
     app.include_router(roadmap.router)
     app.include_router(phases.router)
+    app.include_router(report.router)
     app.include_router(gate.router)
     app.include_router(unlocks.router)
     app.include_router(reconnection.router)

@@ -242,8 +242,6 @@ def test_change_map_ops_do_not_change_any_other_engine_state(client):
         "gate": lambda: client.get("/gate/current", headers=auth_headers()).json(),
         "unlocks": lambda: client.get("/unlocks", headers=auth_headers()).json(),
         "evaluation": lambda: client.get("/evaluation", headers=auth_headers()).json(),
-        "context_summary": lambda: client.get("/gate/context-summary",
-                                              headers=auth_headers()).json(),
         "sections": lambda: client.get("/workflow/1", headers=auth_headers()).json()["sections"],
     }
     before = {name: read() for name, read in reads.items()}
@@ -252,6 +250,12 @@ def test_change_map_ops_do_not_change_any_other_engine_state(client):
     assert client.post("/workflow/1/change-map/confirm",
                        headers=auth_headers()).status_code == 200
     assert {name: read() for name, read in reads.items()} == before
+    summary = client.get("/gate/context-summary", headers=auth_headers()).json()
+    states = {
+        source["source_id"]: source["state"]
+        for source in summary["workflow_sources"]
+    }
+    assert states["change_map"] == "current"
 
 
 def test_responses_carry_no_secrets_prompts_or_raw_import(client, monkeypatch):

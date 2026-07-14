@@ -106,3 +106,10 @@ unavailable reasons, with their honest source-result context. Exclude internal
 bindings/Review/Change Map ids, do not treat result snapshots as Evidence, and
 do not silently include stale linked work as current. Wire that purpose-built
 view into Defense Context and the Report contract only in M16C.
+
+**Implemented in M16C.1:** `workflow_context_service` is that one bounded
+view. It keeps check/result/notes as Verification context, actual entries and
+explanation as student Evidence, and unavailable reason separate. Stale linked
+Evidence retains source status but omits entries/explanation/unavailable
+content from current support. Manual Evidence remains compatible. Defense and
+Report share the same context and truth rules.

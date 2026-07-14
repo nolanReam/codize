@@ -144,6 +144,7 @@ def _source_texts(pack: DefenseContextPack) -> dict[str, str]:
         "workflow.review_board": dumped.get("workflow", {}).get("review_board"),
         "workflow.evidence": dumped.get("workflow", {}).get("evidence"),
         "workflow.verification": dumped.get("workflow", {}).get("verification"),
+        "workflow.artifact_record": dumped.get("workflow", {}).get("artifact_record"),
     }
     present = {r.source_id for r in pack.source_manifest if r.present}
     return {

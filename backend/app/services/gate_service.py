@@ -47,6 +47,7 @@ from app.services import (
     llm_service,
     phase_service,
     unlock_service,
+    workflow_context_service,
 )
 from app.services.llm_service import LLMService
 from app.services.project_repository import (
@@ -473,13 +474,20 @@ async def _complete(llm: LLMService, prompt: str, temperature: float) -> str:
 
 
 async def _artifact_context(
-    repo: ProjectRepository, user_id: str, phase: dict, turn: int
+    repo: ProjectRepository,
+    user_id: str,
+    phase: dict,
+    turn: int,
+    workflow_context=None,
 ) -> tuple:
     """The M14A pack + the composed artifact-context block for one turn.
     Built fresh per call (pure read); missing artifacts never fail — they
     arrive as missing_sources the prompt is told not to invent."""
     pack = await defense_context_service.build_defense_context(
-        repo, user_id, phase["phase"]
+        repo,
+        user_id,
+        phase["phase"],
+        workflow_context=workflow_context,
     )
     block = grounding_service.context_block(
         defense_context_service.render_defense_context(pack), _TURN_HINTS[turn]
@@ -654,7 +662,12 @@ async def submit_anchor(
     strong = anchor_has_strong_element(anchor)
 
     # M14B: ground the question in the recorded workflow context.
-    pack, block = await _artifact_context(project_repo, user_id, phase, 1)
+    workflow_context = workflow_context_service.build_workflow_context(
+        project, phase["phase"]
+    )
+    pack, block = await _artifact_context(
+        project_repo, user_id, phase, 1, workflow_context
+    )
     question, grounding = await _grounded_question(
         llm,
         _turn1_prompt(project, phase, anchor, strong, block),
@@ -671,7 +684,15 @@ async def submit_anchor(
     await gate_repo.update_session(
         user_id, session_id,
         {"anchor_statement": anchor,
-         "turns": [{"turn": 1, "question": question, "answer": None, "grounding": grounding}]},
+         "turns": [{
+             "turn": 1,
+             "question": question,
+             "answer": None,
+             "grounding": grounding,
+             "workflow_context_snapshot": workflow_context_service.snapshot_payload(
+                 workflow_context
+             ),
+         }]},
     )
     return {"gate_session_id": session_id, "turn": 1, "question": question}
 
@@ -694,7 +715,18 @@ async def generate_followup(
 
     # M14B: ground the follow-up in the recorded workflow context plus the
     # student's own transcript so far (including the answer being submitted).
-    pack, block = await _artifact_context(project_repo, user_id, phase, turn)
+    workflow_context = workflow_context_service.context_from_snapshot(session)
+    snapshot_missing = workflow_context is None
+    if workflow_context is None:
+        # Legacy/in-flight sessions created before M16C.1 gain a stable
+        # snapshot on their next successful turn. Nothing is written until
+        # the answer + next question atomic update succeeds.
+        workflow_context = workflow_context_service.build_workflow_context(
+            project, phase["phase"]
+        )
+    pack, block = await _artifact_context(
+        project_repo, user_id, phase, turn, workflow_context
+    )
     prompt = (
         _turn2_prompt(session, answer, block) if turn == 2
         else _turn3_prompt(project, session, answer, block)
@@ -712,6 +744,13 @@ async def generate_followup(
     )
 
     turns = list(stored_turns)
+    if snapshot_missing:
+        turns[0] = {
+            **turns[0],
+            "workflow_context_snapshot": workflow_context_service.snapshot_payload(
+                workflow_context
+            ),
+        }
     turns[-1] = {**turns[-1], "answer": answer}
     turns.append({"turn": turn, "question": question, "answer": None, "grounding": grounding})
     await gate_repo.update_session(user_id, session_id, {"turns": turns})

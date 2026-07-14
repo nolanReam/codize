@@ -133,7 +133,8 @@ def test_complete_pack_normalizes_all_sources():
     assert results["smoke_test"] == "skipped"
     assert results["auth_boundary_checked"] == "not_applicable"
 
-    assert pack.missing_sources == []
+    assert pack.missing_sources == ["workflow.change_map"]
+    assert wf.artifact_record is not None
     assert pack.truncation == {}
 
 
@@ -168,6 +169,7 @@ def test_manifest_covers_every_source_with_correct_types():
         "project", "phase", "progress", "intake",
         "workflow.prompt_builder", "workflow.review_board",
         "workflow.evidence", "workflow.verification",
+        "workflow.change_map", "workflow.artifact_record",
     }
     assert by_id["phase"].source_type == SourceType.SYSTEM_ROADMAP
     assert by_id["progress"].source_type == SourceType.SYSTEM_PROGRESS
@@ -175,7 +177,13 @@ def test_manifest_covers_every_source_with_correct_types():
     assert by_id["workflow.prompt_builder"].source_type == SourceType.STUDENT_ARTIFACT
     assert by_id["workflow.evidence"].source_type == SourceType.STUDENT_RECORDED_EVIDENCE
     assert by_id["workflow.verification"].source_type == SourceType.STUDENT_RECORDED_VERIFICATION
-    assert all(r.present for r in pack.source_manifest)
+    assert by_id["workflow.change_map"].source_type == SourceType.STUDENT_ARTIFACT
+    assert by_id["workflow.artifact_record"].source_type == SourceType.STUDENT_ARTIFACT
+    assert all(
+        r.present for r in pack.source_manifest
+        if r.source_id != "workflow.change_map"
+    )
+    assert by_id["workflow.change_map"].present is False
     # Student claims stay labeled as student-provided — never as facts.
     assert "student" in by_id["intake"].label.lower()
     assert "not proof" in by_id["workflow.verification"].label.lower()
@@ -194,6 +202,7 @@ def test_partial_and_empty_workflows_still_build():
     assert pack.workflow.review_board is None
     assert pack.missing_sources == [
         "workflow.review_board", "workflow.evidence", "workflow.verification",
+        "workflow.change_map",
     ]
     by_id = {r.source_id: r for r in pack.source_manifest}
     assert by_id["workflow.review_board"].present is False
@@ -203,7 +212,7 @@ def test_partial_and_empty_workflows_still_build():
     bare = InMemoryProjectRepository()
     seed_active_project(bare)
     empty_pack = run(build_defense_context(bare, USER, 1))
-    assert len(empty_pack.missing_sources) == 4
+    assert len(empty_pack.missing_sources) == 5
     assert empty_pack.phase.phase_number == 1
     assert empty_pack.intake.purpose == INTAKE_FIELDS["intake_purpose"]
 
@@ -235,6 +244,7 @@ def test_other_user_cannot_reach_the_owners_pack():
     assert theirs.missing_sources == [
         "workflow.prompt_builder", "workflow.review_board",
         "workflow.evidence", "workflow.verification",
+        "workflow.change_map",
     ]
 
 
@@ -387,6 +397,7 @@ def test_repeated_builds_and_renders_are_identical():
         "project", "phase", "progress", "intake",
         "workflow.prompt_builder", "workflow.review_board",
         "workflow.evidence", "workflow.verification",
+        "workflow.change_map", "workflow.artifact_record",
     ]
 
 

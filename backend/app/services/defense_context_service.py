@@ -30,18 +30,14 @@ eligible for a future prompt.
 """
 
 import json
-import re
 
 from app.schemas.defense_context import (
     CONTENT_NOTICE,
-    ContextEvidence,
     ContextIntake,
     ContextPhase,
     ContextProgress,
     ContextProject,
     ContextPromptBuilder,
-    ContextReviewBoard,
-    ContextVerification,
     ContextWorkflow,
     DefenseContextPack,
     DefenseContextSummary,
@@ -50,14 +46,17 @@ from app.schemas.defense_context import (
     SourceType,
     SummaryIncludedSource,
     SummaryMissingSource,
+    SummaryWorkflowSource,
     TruncationRecord,
 )
+from app.schemas.workflow_context import CuratedWorkflowContext
 from app.services import (
-    evidence_service,
     phase_service,
     template_service,
     workflow_service,
+    workflow_context_service,
 )
+from app.services.content_safety_service import REDACTION_MARKER, redact_secrets
 from app.services.project_repository import ProjectRepository
 
 # ---------------------------------------------------------------------------
@@ -76,6 +75,7 @@ SOURCE_CHAR_LIMITS = {
     "workflow.review_board": 6000,
     "workflow.evidence": 6000,
     "workflow.verification": 4000,
+    "workflow.artifact_record": 9000,
 }
 TOTAL_CONTEXT_CHARS = 18_000
 _MIN_SQUEEZED = 400
@@ -88,28 +88,11 @@ _SQUEEZE_ORDER = (
     "workflow.verification",
     "workflow.review_board",
     "workflow.prompt_builder",
+    "workflow.artifact_record",
     "phase",
 )
 TRUNCATION_MARKER = " …[TRUNCATED]"
 
-REDACTION_MARKER = "[REDACTED_SECRET]"
-
-# Value-shaped secret patterns only — a bare env-var NAME ("set GEMINI_API_KEY
-# in Railway") is ordinary educational text and survives untouched. Covers the
-# key formats this stack actually uses plus generic bearer/JWT-shaped
-# credentials. PEM blocks are redacted whole (including an unterminated tail).
-_SECRET_PATTERNS = (
-    re.compile(r"sb_secret_[A-Za-z0-9_-]{8,}"),
-    re.compile(r"sk-or-[A-Za-z0-9_-]{8,}"),
-    re.compile(r"AIza[0-9A-Za-z_-]{16,}"),
-    re.compile(
-        r"-----BEGIN [A-Z ]*PRIVATE KEY-----"
-        r"(?:.*?-----END [A-Z ]*PRIVATE KEY-----|.*$)",
-        re.DOTALL,
-    ),
-    re.compile(r"Bearer\s+[A-Za-z0-9._~+/-]{16,}=*"),
-    re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}"),
-)
 
 # Fixed manifest order — also the pack's deterministic source ordering.
 _SOURCE_DEFS = (
@@ -141,22 +124,22 @@ _SOURCE_DEFS = (
         "Verification (student-recorded results — not proof of correctness)",
         SourceType.STUDENT_RECORDED_VERIFICATION,
     ),
+    (
+        "workflow.change_map",
+        "Change Map (student-confirmed or unresolved record)",
+        SourceType.STUDENT_ARTIFACT,
+    ),
+    (
+        "workflow.artifact_record",
+        "Curated Workflow Record (student decisions, observations, and Evidence)",
+        SourceType.STUDENT_ARTIFACT,
+    ),
 )
 
 
 # ---------------------------------------------------------------------------
 # Redaction — recursive, value-shaped, never logs or re-raises raw values
 # ---------------------------------------------------------------------------
-
-
-def redact_secrets(text: str) -> tuple[str, bool]:
-    """Replace value-shaped secrets with a stable marker. Returns the cleaned
-    text and whether anything was redacted."""
-    redacted = False
-    for pattern in _SECRET_PATTERNS:
-        text, count = pattern.subn(REDACTION_MARKER, text)
-        redacted = redacted or count > 0
-    return text, redacted
 
 
 def _redact_node(node):
@@ -278,59 +261,8 @@ def _normalize_prompt_builder(stored: dict) -> dict:
     }
 
 
-def _normalize_review_board(stored: dict) -> dict:
-    files = stored.get("files_changed")
-    return {
-        "ai_generated": _opt(stored.get("ai_generated")),
-        "accepted": _opt(stored.get("accepted")),
-        "rejected": _opt(stored.get("rejected")),
-        "edited_manually": _opt(stored.get("edited_manually")),
-        "ai_assumptions": _opt(stored.get("ai_assumptions")),
-        "least_confident": _opt(stored.get("least_confident")),
-        "out_of_scope_changes": _opt(stored.get("out_of_scope_changes")),
-        "files_changed": [f for f in (files if isinstance(files, list) else []) if isinstance(f, str) and f.strip()],
-        "saved_at": _opt(stored.get("saved_at")),
-    }
-
-
-def _normalize_evidence(stored: dict) -> dict:
-    raw_entries = stored.get("entries")
-    entries = []
-    for entry in raw_entries if isinstance(raw_entries, list) else []:
-        if not isinstance(entry, dict):
-            continue
-        kind, content = entry.get("kind"), entry.get("content")
-        if isinstance(kind, str) and isinstance(content, str) and content.strip():
-            entries.append({"kind": kind, "content": content})
-    return {
-        "entries": entries,
-        "summary": _opt(stored.get("summary")),
-        "saved_at": _opt(stored.get("saved_at")),
-    }
-
-
-def _normalize_verification(stored: dict) -> dict:
-    raw_checks = stored.get("checks")
-    checks = []
-    for check in raw_checks if isinstance(raw_checks, list) else []:
-        if not isinstance(check, dict):
-            continue
-        cid, result = check.get("check"), check.get("result")
-        if isinstance(cid, str) and isinstance(result, str):
-            # skipped / not_applicable are preserved exactly as recorded.
-            checks.append({"check": cid, "result": result, "note": _opt(check.get("note"))})
-    return {
-        "checks": checks,
-        "explanation": _opt(stored.get("explanation")),
-        "saved_at": _opt(stored.get("saved_at")),
-    }
-
-
 _WORKFLOW_NORMALIZERS = {
     "workflow.prompt_builder": ("prompt_builder", _normalize_prompt_builder),
-    "workflow.review_board": ("review_board", _normalize_review_board),
-    "workflow.evidence": ("evidence", _normalize_evidence),
-    "workflow.verification": ("verification", _normalize_verification),
 }
 
 
@@ -340,7 +272,11 @@ _WORKFLOW_NORMALIZERS = {
 
 
 async def build_defense_context(
-    repo: ProjectRepository, user_id: str, phase_number: int
+    repo: ProjectRepository,
+    user_id: str,
+    phase_number: int,
+    *,
+    workflow_context: CuratedWorkflowContext | None = None,
 ) -> DefenseContextPack:
     """Build the defense context pack for the authenticated user's owned
     project and the requested phase.
@@ -353,6 +289,9 @@ async def build_defense_context(
     project = await phase_service.load_active_project(repo, user_id)
     view = phase_service.phase_view(project, phase_number)  # PhaseNotFoundError if absent
     sections = workflow_service.stored_sections(project, phase_number)
+    curated = workflow_context or workflow_context_service.build_workflow_context(
+        project, phase_number
+    )
 
     template = template_service.get_template(project["archetype_id"])
 
@@ -391,20 +330,39 @@ async def build_defense_context(
     for source_id, (section_name, normalize) in _WORKFLOW_NORMALIZERS.items():
         stored = sections.get(section_name)
         if isinstance(stored, dict):
-            # M16B.3A stores linked Evidence in a nested target shape that the
-            # Defense contract deliberately does not consume until M16C. Do
-            # not advertise that source as present merely because its empty
-            # workspace was initialized; manual Evidence remains unchanged.
-            if section_name == "evidence":
-                evidence = evidence_service.get_stored_evidence(
-                    project, phase_number
-                )
-                if (
-                    evidence is not None
-                    and evidence_service.initialized_from_verification(evidence)
-                ):
-                    continue
             sources[source_id] = normalize(stored)
+
+    # Compatibility projections come from the one typed context, never from
+    # raw downstream JSON here. Linked records need the richer artifact_record
+    # shape; legacy manual records keep their established pack fields.
+    if curated.review.state == "manual" and curated.review.manual is not None:
+        sources["workflow.review_board"] = curated.review.manual.model_dump(mode="json")
+    if curated.verification.state == "manual":
+        sources["workflow.verification"] = {
+            "checks": [
+                {"check": c.check, "result": c.result, "note": c.result_notes}
+                for c in curated.verification.checks
+            ],
+            "explanation": curated.verification.student_explanation,
+            "saved_at": None,
+        }
+    if curated.evidence.state == "manual":
+        sources["workflow.evidence"] = {
+            "entries": [
+                entry.model_dump(mode="json")
+                for entry in curated.evidence.manual_entries
+            ],
+            "summary": curated.evidence.manual_summary,
+            "saved_at": None,
+        }
+    sources["workflow.artifact_record"] = {
+        "context_json": json.dumps(
+            curated.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    }
 
     # Redaction before truncation: a cut can never expose half a secret,
     # because secrets are gone before anything is cut.
@@ -440,12 +398,18 @@ async def build_defense_context(
             )
             total = sum(_string_leaves(d) for d in sources.values())
 
+    state_presence = {
+        "workflow.change_map": curated.change_map.state not in ("missing", "malformed"),
+        "workflow.review_board": curated.review.state not in ("missing", "malformed"),
+        "workflow.verification": curated.verification.state not in ("missing", "malformed"),
+        "workflow.evidence": curated.evidence.state not in ("missing", "malformed"),
+    }
     manifest = [
         SourceRecord(
             source_id=source_id,
             label=label,
             source_type=source_type,
-            present=source_id in sources,
+            present=state_presence.get(source_id, source_id in sources),
             truncated=source_id in truncation,
             redacted=redacted_flags.get(source_id, False),
         )
@@ -457,7 +421,11 @@ async def build_defense_context(
         **{
             section_name: sources.get(source_id)
             for source_id, (section_name, _) in _WORKFLOW_NORMALIZERS.items()
-        }
+        },
+        review_board=sources.get("workflow.review_board"),
+        evidence=sources.get("workflow.evidence"),
+        verification=sources.get("workflow.verification"),
+        artifact_record=sources["workflow.artifact_record"]["context_json"],
     )
     return DefenseContextPack(
         schema_version=SCHEMA_VERSION,
@@ -490,10 +458,15 @@ SUMMARY_LABELS = {
     "workflow.review_board": "Review Notes",
     "workflow.evidence": "Evidence",
     "workflow.verification": "Verification",
+    "workflow.change_map": "Change Map",
+    "workflow.artifact_record": "Workflow record",
 }
 
 
-def summarize_defense_context(pack: DefenseContextPack) -> DefenseContextSummary:
+def summarize_defense_context(
+    pack: DefenseContextPack,
+    workflow_context: CuratedWorkflowContext | None = None,
+) -> DefenseContextSummary:
     """Reduce a pack to presence/truncation metadata. Nothing content-bearing
     survives: only source ids, display labels, source types, and flags —
     derived purely from the manifest, in its fixed deterministic order."""
@@ -514,10 +487,34 @@ def summarize_defense_context(pack: DefenseContextPack) -> DefenseContextSummary
         for record in pack.source_manifest
         if not record.present
     ]
+    if workflow_context is None and pack.workflow.artifact_record:
+        try:
+            workflow_context = CuratedWorkflowContext.model_validate_json(
+                pack.workflow.artifact_record
+            )
+        except Exception:
+            workflow_context = None
+    workflow_sources = []
+    if workflow_context is not None:
+        for source_id, label, source in (
+            ("change_map", "Change Map", workflow_context.change_map),
+            ("review", "Review", workflow_context.review),
+            ("verification", "Verification", workflow_context.verification),
+            ("evidence", "Evidence", workflow_context.evidence),
+        ):
+            workflow_sources.append(
+                SummaryWorkflowSource(
+                    source_id=source_id,
+                    label=label,
+                    state=source.state,
+                    truncated=source.truncated,
+                )
+            )
     return DefenseContextSummary(
         phase_number=pack.phase.phase_number,
         included_sources=included,
         missing_sources=missing,
+        workflow_sources=workflow_sources,
         has_truncation=bool(pack.truncation),
     )
 
@@ -532,8 +529,13 @@ async def build_context_summary(
     routes keep the existing 409/404 conventions."""
     project = await phase_service.load_active_project(repo, user_id)
     phase_number = int(project.get("current_phase") or 1)
-    pack = await build_defense_context(repo, user_id, phase_number)
-    return summarize_defense_context(pack)
+    workflow_context = workflow_context_service.build_workflow_context(
+        project, phase_number
+    )
+    pack = await build_defense_context(
+        repo, user_id, phase_number, workflow_context=workflow_context
+    )
+    return summarize_defense_context(pack, workflow_context)
 
 
 # ---------------------------------------------------------------------------

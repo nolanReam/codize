@@ -2,10 +2,12 @@
 bounded and non-blank; everything else about it is treated as answer content,
 never as instructions (prompt files enforce that downstream)."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class _NonBlank(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     @field_validator("*", mode="before")
     @classmethod
     def _strip_and_require_content(cls, value):

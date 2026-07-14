@@ -386,7 +386,7 @@ def test_manual_evidence_read_put_completion_and_downstream_compatibility_remain
     assert "Still manual." in rendered
 
 
-def test_linked_target_evidence_is_not_quietly_integrated_into_defense_m16c():
+def test_linked_target_evidence_enters_defense_only_through_m16c_curated_context():
     repo, verification = prepared_verification()
     selected = verification["verification_targets"][0]["verification_target_id"]
     artifact = create_evidence(repo, selected)
@@ -399,21 +399,20 @@ def test_linked_target_evidence_is_not_quietly_integrated_into_defense_m16c():
     }]}))
     pack = run(build_defense_context(repo, USER, 1))
     rendered = render_defense_context(pack)
-    assert "M16C-only nested output" not in rendered
-    assert "M16C-only nested explanation" not in rendered
+    assert "M16C-only nested output" in rendered
+    assert "M16C-only nested explanation" in rendered
+    assert "source_verification_binding" not in rendered
+    assert "source_review_target_id" not in rendered
+    assert "source_change_map_item_id" not in rendered
     evidence_source = next(
         source for source in pack.source_manifest
         if source.source_id == "workflow.evidence"
     )
-    assert evidence_source.present is False
+    assert evidence_source.present is True
     summary = summarize_defense_context(pack).model_dump(mode="json")
-    assert not any(
-        source["source_id"] == "workflow.evidence"
-        for source in summary["included_sources"]
-    )
     assert any(
         source["source_id"] == "workflow.evidence"
-        for source in summary["missing_sources"]
+        for source in summary["included_sources"]
     )
 
 

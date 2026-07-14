@@ -128,6 +128,25 @@ GATE_ROUTES = (
 )
 
 
+def test_report_context_requires_auth_and_is_owner_phase_scoped(client):
+    assert client.get("/report/1").status_code == 401
+    assert client.get("/report/1", headers=auth_headers()).status_code == 409
+
+    activate_project(client, USER_A)
+    response = client.get("/report/1", headers=auth_headers(USER_A))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["phase_number"] == 1
+    assert body["workflow_context_source"] == "current_workflow"
+    serialized = str(body)
+    for forbidden in ("score", "fingerprint", "workflow_context_snapshot", "provider"):
+        assert forbidden not in serialized
+
+    assert client.get("/report/99", headers=auth_headers(USER_A)).status_code == 404
+    # No project/user id is accepted; another identity gets only its own state.
+    assert client.get("/report/1", headers=auth_headers(USER_B)).status_code == 409
+
+
 def test_gate_routes_require_auth(client):
     for method, path in GATE_ROUTES:
         resp = client.request(method, path, json={"anchor_statement": "x", "answer": "x"})
@@ -135,11 +154,34 @@ def test_gate_routes_require_auth(client):
         assert resp.json()["error"]["status"] == 401
 
 
+def test_gate_requests_reject_client_supplied_context_or_evaluator_authority(client):
+    activate_project(client)
+    use_gate_llm(client)
+    sid = client.post("/gate/start", headers=auth_headers()).json()["gate_session_id"]
+    forged = client.post(
+        f"/gate/{sid}/turn1",
+        json={
+            "anchor_statement": ANCHOR,
+            "workflow_context": {"state": "current"},
+            "score": 10,
+            "verdict": "PASS",
+        },
+        headers=auth_headers(),
+    )
+    assert forged.status_code == 422
+    assert client.gate_llm.calls == []
+
+
 def test_gate_before_roadmap_is_controlled_409(client):
     for method, path in GATE_ROUTES:
-        resp = client.request(method, path,
-                              json={"anchor_statement": ANCHOR, "answer": "x"},
-                              headers=auth_headers())
+        payload = (
+            {"anchor_statement": ANCHOR}
+            if path.endswith("/turn1")
+            else {"answer": "x"}
+            if method == "POST" and path != "/gate/start"
+            else None
+        )
+        resp = client.request(method, path, json=payload, headers=auth_headers())
         assert resp.status_code == 409, path
         assert resp.json()["error"]["status"] == 409
 

@@ -107,7 +107,11 @@ anchor_statement, turns jsonb, score 0–10, passed, failed_at, created_at`) plu
 `reason` (the evaluator's one-sentence verdict reason the student is shown) and
 `passed_at` (M9 migration `20260703040000_add_passed_at_to_gate_sessions.sql`;
 granted to `authenticated` — `score` stays revoked). `turns` holds
-`[{"turn": 1|2|3, "question", "answer"}, …]`, written only by the backend.
+`[{"turn": 1|2|3, "question", "answer", ...}, …]`, written only by the backend.
+Since M16C.1 the first turn also carries a bounded student-safe
+`workflow_context_snapshot` for later questions and the Report. It contains no
+internal artifact ids/bindings/fingerprints or evaluator data, and gate API
+views continue to whitelist only turn/question/answer.
 
 **Owner read-only by design.** Only the backend writes gate rows — students
 must not author their own verdicts — so there are no insert/update/delete
@@ -228,6 +232,20 @@ stale state. The trusted repository update remains filtered by both project id
 and JWT-derived `user_id`; phase membership is checked against the owned stored
 roadmap. Linked Evidence therefore needs no new table, policy, grant, trigger,
 view, function, or RLS change.
+
+## M16C.1 Defense-context snapshot and Report contract (2026-07-14)
+
+No migration or database object was added. Existing `gate_sessions.turns`
+JSONB deliberately holds the bounded server-derived context snapshot beside
+the first question, following the existing grounding-metadata precedent.
+Subsequent atomic turn writes preserve it; project workflow edits do not
+rewrite it. `GET /report/{phase}` is computed on read and is not persisted.
+
+The snapshot contains only curated student-safe Change Map/Review/
+Verification/Evidence data. Raw Implementation Import, database ids, source
+bindings, fingerprints, timestamps, prompts, provider data, expected concepts,
+hidden scores, and thresholds are excluded. Ownership, phase isolation,
+backend-only gate writes, score revocation, and M16S.1 remain unchanged.
 
 ## M16S.1 write-boundary hardening (2026-07-14)
 

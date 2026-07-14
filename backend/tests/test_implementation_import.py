@@ -298,7 +298,7 @@ def test_raw_import_never_enters_the_defense_context():
         m.source_id for m in summary.missing_sources}
     assert "workflow.implementation_import" not in ids
     assert "implementation_import" not in ids
-    assert len(ids) == 8  # the manifest is unchanged
+    assert len(ids) == 10  # M16C adds only curated workflow metadata sources
 
 
 # --- M15C read seam ----------------------------------------------------------------

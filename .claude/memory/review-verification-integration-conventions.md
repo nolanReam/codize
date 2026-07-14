@@ -124,3 +124,10 @@ target id, student check, result, and notes. Stale work is readable but not
 editable and replacement is deliberate. Zero targets remain neutral. Evidence
 navigation creates and prefills nothing; the typed M16B.3 backend handoff above
 is still unused.
+
+**M16C.1 downstream use:** linked Review and Verification now enter Defense
+and Report only through `workflow_context_service`. Review decisions/rationale/
+revision and exact Verification result states remain separate; internal ids,
+bindings, and fingerprints never cross. Stale linked records are labeled stale
+rather than rewritten. Verification pass remains a student-recorded result,
+never Evidence or proof.

@@ -429,7 +429,7 @@ def test_review_integration_imports_no_llm_and_accepts_no_provider():
     assert "implementation_import" not in source
 
 
-def test_linked_targets_do_not_enter_the_unchanged_defense_context():
+def test_linked_review_enters_defense_only_through_curated_context():
     repo, _ = seed_map()
     artifact = initialized(repo)
     rendered = render_defense_context(run(build_defense_context(repo, USER, 1)))
@@ -437,4 +437,4 @@ def test_linked_targets_do_not_enter_the_unchanged_defense_context():
     assert "source_change_map_confirmed_at" not in rendered
     for target in artifact["review_targets"]:
         assert target["review_target_id"] not in rendered
-        assert target["change_text"] not in rendered
+        assert target["change_text"] in rendered

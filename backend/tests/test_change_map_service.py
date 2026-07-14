@@ -720,15 +720,16 @@ def test_other_user_cannot_reach_the_map():
         run(generate_change_map(repo, llm_with(VALID_OUTPUT), OTHER_USER, 1))
 
 
-def test_change_map_never_enters_the_defense_context():
+def test_unconfirmed_change_map_enters_only_as_incomplete_metadata():
     from app.services.defense_context_service import build_defense_context, render_defense_context
     repo = seed_with_import()
     generate(repo, llm_with(VALID_OUTPUT))
     pack = run(build_defense_context(repo, USER, 1))
     rendered = render_defense_context(pack)
-    assert "change_map" not in rendered
+    assert "change_map" in rendered
     assert VALID_ITEM["draft_text"] not in rendered
-    assert len(pack.source_manifest) == 8  # fixed manifest, unchanged
+    assert len(pack.source_manifest) == 10
+    assert json.loads(pack.workflow.artifact_record)["change_map"]["state"] == "incomplete"
 
 
 def test_raw_import_is_not_duplicated_into_the_map():

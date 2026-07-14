@@ -126,8 +126,17 @@ def test_owner_summary_covers_current_phase_with_all_sources_present():
     assert summary.schema_version == "1.0"
     assert summary.artifact_aware is True
     assert summary.phase_number == 1  # the current phase — what the gate defends
-    assert [s.source_id for s in summary.included_sources] == ALL_SOURCE_IDS
-    assert summary.missing_sources == []
+    assert [s.source_id for s in summary.included_sources] == [
+        source_id for source_id in ALL_SOURCE_IDS if source_id != "workflow.change_map"
+    ]
+    assert [s.source_id for s in summary.missing_sources] == ["workflow.change_map"]
+    states = {source.source_id: source.state for source in summary.workflow_sources}
+    assert states == {
+        "change_map": "missing",
+        "review": "manual",
+        "verification": "manual",
+        "evidence": "manual",
+    }
     assert summary.has_truncation is False
 
 
@@ -142,7 +151,8 @@ def test_missing_sections_are_first_class_metadata_not_errors():
 
     assert "workflow.prompt_builder" in included
     assert missing == [
-        "workflow.review_board", "workflow.evidence", "workflow.verification"
+        "workflow.review_board", "workflow.evidence", "workflow.verification",
+        "workflow.change_map",
     ]  # manifest order, deterministically
     for m in summary.missing_sources:
         assert m.label == SUMMARY_LABELS[m.source_id]
@@ -315,7 +325,7 @@ def test_route_returns_metadata_only_summary(client):
     assert "workflow.prompt_builder" in included
     missing = [m["source_id"] for m in body["missing_sources"]]
     assert missing == ["workflow.review_board", "workflow.evidence",
-                       "workflow.verification"]
+                       "workflow.verification", "workflow.change_map"]
     for content in CONTENT_STRINGS:
         assert content not in resp.text
 

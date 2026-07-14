@@ -163,6 +163,7 @@ class ContextWorkflow(_Model):
     review_board: ContextReviewBoard | None = None
     evidence: ContextEvidence | None = None
     verification: ContextVerification | None = None
+    artifact_record: str | None = None
 
 
 class DefenseContextPack(_Model):
@@ -197,10 +198,18 @@ class SummaryMissingSource(_Model):
     label: str
 
 
+class SummaryWorkflowSource(_Model):
+    source_id: str
+    label: str
+    state: str
+    truncated: bool = False
+
+
 class DefenseContextSummary(_Model):
     schema_version: str = SCHEMA_VERSION
     phase_number: int
     included_sources: list[SummaryIncludedSource]
     missing_sources: list[SummaryMissingSource]
+    workflow_sources: list[SummaryWorkflowSource] = Field(default_factory=list)
     has_truncation: bool
     artifact_aware: bool = True

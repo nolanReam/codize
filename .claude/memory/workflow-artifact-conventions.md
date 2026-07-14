@@ -160,3 +160,11 @@ completion, or stale state. Result/check/notes snapshots remain read-only
 context and are never copied into an Evidence entry. Linked nested Evidence
 still has no Defense or Report consumer before M16C. See
 [[linked-evidence-ui-conventions]].
+
+M16C.1 adds exactly one downstream reader:
+`workflow_context_service.build_workflow_context(owned_project, phase)`. It
+normalizes Change Map, Review, Verification, and Evidence into bounded typed
+states and is reused by Defense plus `GET /report/{phase}`. Raw Import,
+artifact ids, bindings, fingerprints, and timestamps never enter it. Linked
+Evidence now reaches downstream only through this context; manual artifacts
+remain compatible. See [[artifact-aware-defense-report-conventions]].

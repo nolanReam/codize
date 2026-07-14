@@ -446,15 +446,15 @@ def test_helpers_preserve_result_honesty_and_future_evidence_shape_without_creat
     assert project["workflow_artifacts"]["1"].get("evidence") is None
 
 
-def test_linked_source_and_suggestions_do_not_enter_defense_context():
+def test_linked_verification_enters_defense_only_through_curated_context():
     repo, _ = seed_completed_review()
     artifact = create(repo)
     rendered = render_defense_context(run(build_defense_context(repo, USER, 1)))
     target = artifact["verification_targets"][0]
-    assert target["source_text"] not in rendered
-    assert target["source_rationale"] not in rendered
-    assert target["suggested_check"] not in rendered
+    assert target["suggested_check"] in rendered
     assert target["verification_target_id"] not in rendered
+    assert "source_review_binding" not in rendered
+    assert "review_target_id" not in rendered
 
 
 def test_collision_is_detected_without_persisting(monkeypatch):

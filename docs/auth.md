@@ -116,6 +116,22 @@ submitted URL, or exposes the backend credential. The M16S.1 database grants
 remain the second integrity boundary: authenticated browser clients can read
 their project row through RLS but cannot mutate `workflow_artifacts` directly.
 
+### Artifact-aware Defense and Report reads (M16C.1)
+
+`GET /gate/context-summary` and `GET /report/{phase}` require `require_user`.
+Neither accepts a user id or project id. The repository loads only the JWT
+subject's owned active project, and the requested Report phase must exist in
+that owned roadmap. Gate answer schemas forbid extra context, provenance,
+score, or verdict fields; workflow state and attempt snapshots are derived by
+the server.
+
+The Report returns only bounded student-safe workflow content and the public
+Defense transcript/outcome. It excludes database ids, source bindings,
+fingerprints, provider prompts/responses, hidden scores/thresholds, and
+expected concepts. Both reads are provider-free and perform no write. M16S.1
+and the owner-filtered trusted repository remain unchanged; no migration or
+new browser privilege was added.
+
 ## Verification record (2026-07-02)
 
 Test users are created by `scripts/verify_auth.sql` SETUP (SQL inserts, because
