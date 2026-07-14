@@ -30,6 +30,7 @@ import {
   reviewCategoryLabel,
   reviewFormBlocker,
   reviewPrerequisiteState,
+  showFullReviewInitializationState,
   targetFormFromReview,
   type LinkedReviewDraft,
   type LinkedReviewFormState,
@@ -65,10 +66,12 @@ type ManualFieldKey =
 
 function ReplacementWarning({
   busy,
+  error,
   onConfirm,
   onCancel,
 }: {
   busy: boolean;
+  error: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -79,6 +82,7 @@ function ReplacementWarning({
         Rebuilding replaces the current Review targets and decisions with a fresh draft from the
         latest confirmed Change Map.
       </p>
+      {error && <div className="notice error" role="alert">{error}</div>}
       <div className="row">
         <button className="btn primary" type="button" disabled={busy} onClick={onConfirm}>
           {busy ? "Preparing…" : "Yes, rebuild Review"}
@@ -189,6 +193,7 @@ function LegacyReviewBoard({
   map,
   saving,
   saveError,
+  replacementError,
   savedAt,
   initializing,
   onSave,
@@ -199,6 +204,7 @@ function LegacyReviewBoard({
   map: StoredChangeMap | null;
   saving: boolean;
   saveError: string | null;
+  replacementError: string | null;
   savedAt: string | null;
   initializing: boolean;
   onSave: (payload: ReviewBoardSaveRequest) => Promise<StoredReviewBoardArtifact | null>;
@@ -341,6 +347,7 @@ function LegacyReviewBoard({
                 ) : (
                   <ReplacementWarning
                     busy={initializing}
+                    error={replacementError}
                     onConfirm={() => void replace()}
                     onCancel={() => setReplaceOpen(false)}
                   />
@@ -375,6 +382,7 @@ function LinkedReviewBoard({
   map,
   saving,
   saveError,
+  replacementError,
   initializing,
   onSave,
   onReplace,
@@ -384,6 +392,7 @@ function LinkedReviewBoard({
   map: StoredChangeMap | null;
   saving: boolean;
   saveError: string | null;
+  replacementError: string | null;
   initializing: boolean;
   onSave: (payload: ReviewBoardSaveRequest) => Promise<StoredReviewBoardArtifact | null>;
   onReplace: () => Promise<boolean>;
@@ -470,6 +479,7 @@ function LinkedReviewBoard({
                 ) : (
                   <ReplacementWarning
                     busy={initializing}
+                    error={replacementError}
                     onConfirm={() => void replace()}
                     onCancel={() => setReplaceOpen(false)}
                   />
@@ -612,6 +622,7 @@ function LinkedReviewBoard({
                 ) : (
                   <ReplacementWarning
                     busy={initializing}
+                    error={replacementError}
                     onConfirm={() => void replace()}
                     onCancel={() => setReplaceOpen(false)}
                   />
@@ -664,7 +675,7 @@ export default function ReviewBoardPage() {
       wf.applyArtifact(result.artifact);
       return true;
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError && error.status === 409 && !replaceExisting) {
         // A concurrent click/tab may have initialized Review first. Refetch the
         // single source of truth and display that existing artifact.
         await wf.reload();
@@ -679,7 +690,7 @@ export default function ReviewBoardPage() {
     }
   }
 
-  if (initializing) {
+  if (showFullReviewInitializationState(initializing, Boolean(wf.stored))) {
     return (
       <>
         <h1 className="page-title">{REVIEW_PAGE_TITLE}</h1>
@@ -704,6 +715,7 @@ export default function ReviewBoardPage() {
               map={wf.changeMap}
               saving={wf.saving}
               saveError={wf.saveError}
+              replacementError={initializationError}
               initializing={initializing}
               onSave={wf.save}
               onReplace={() => initialize(true)}
@@ -718,6 +730,7 @@ export default function ReviewBoardPage() {
               map={wf.changeMap}
               saving={wf.saving}
               saveError={wf.saveError}
+              replacementError={initializationError}
               savedAt={wf.savedAt}
               initializing={initializing}
               onSave={wf.save}

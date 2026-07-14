@@ -17,6 +17,9 @@ describe("Review page lifecycle contract", () => {
     expect(source).toContain("Rebuilding replaces the current Review targets and decisions");
     expect(source).toContain("onReplace={() => initialize(true)}");
     expect(source).toContain("Keep current Review");
+    expect(source).toContain('role="alert">{error}');
+    expect(source).toContain("error.status === 409 && !replaceExisting");
+    expect(source).toContain("showFullReviewInitializationState(initializing, Boolean(wf.stored))");
   });
 
   it("navigates to Verification without prefilling or creating downstream records", () => {

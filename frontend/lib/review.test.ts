@@ -26,6 +26,7 @@ import {
   reviewInitializationBody,
   reviewPrerequisiteState,
   reviewStepStatus,
+  showFullReviewInitializationState,
   sourceResolutionLabel,
   targetFormFromReview,
   validateReviewTarget,
@@ -138,6 +139,12 @@ describe("initialization and prerequisites", () => {
   it("omits the normal body and emits replacement intent only deliberately", () => {
     expect(reviewInitializationBody(false)).toBeUndefined();
     expect(reviewInitializationBody(true)).toEqual({ replace_existing: true });
+  });
+
+  it("uses the full preparation screen only when there is no Review to preserve", () => {
+    expect(showFullReviewInitializationState(true, false)).toBe(true);
+    expect(showFullReviewInitializationState(true, true)).toBe(false);
+    expect(showFullReviewInitializationState(false, false)).toBe(false);
   });
 
   it("derives calm missing, draft, stale, and confirmed states", () => {

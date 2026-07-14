@@ -352,6 +352,16 @@ export function reviewInitializationBody(
   return replaceExisting ? { replace_existing: true } : undefined;
 }
 
+// First-time initialization has no Review to preserve, so it may use the
+// stable full-page preparation state. Rebuilds must keep the existing form
+// mounted so a failed replacement cannot discard the newest local edits.
+export function showFullReviewInitializationState(
+  initializing: boolean,
+  hasExistingReview: boolean
+): boolean {
+  return initializing && !hasExistingReview;
+}
+
 function reviewFingerprint(review: LinkedReviewBoardArtifact): string {
   const input = [
     review.source_change_map_generated_at,
