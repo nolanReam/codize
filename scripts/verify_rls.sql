@@ -2,8 +2,8 @@
 -- Re-run after ANY schema change. Expected results are stated per section;
 -- anything else is a security regression.
 --
--- Sections 4-8 are the behavioral tests. They simulate PostgREST roles with
--- `set local role` + request.jwt.claims. Sections 6-8 EXPECT a permission
+-- Sections 4-9 are the behavioral tests. They simulate PostgREST roles with
+-- `set local role` + request.jwt.claims. Sections 6-9 EXPECT a permission
 -- error, so run each section as its own statement batch (an expected error
 -- aborts the batch it runs in).
 
@@ -69,27 +69,34 @@ where user_id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8b
 
 -- ---------------------------------------------------------------------------
 -- 5. Wrong-user isolation as user A
---    (expect: 1, 0, 1, 1, 0, 0 — A sees only own rows, cannot touch B's)
+--    (expect: 1, 0, 1, 1, 0 — A sees only own rows)
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 
-with tamper as (
-  update public.projects set intake_purpose = 'tampered'
-  where id = 'bbbbbbbb-0000-4000-8000-000000000001' returning 1
-)
 select
   (select count(*) from public.projects)                     as projects_visible,       -- 1
   (select count(*) from public.projects
      where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') as b_projects_visible,     -- 0
   (select count(*) from public.profiles)                     as profiles_visible,       -- 1
   (select count(*) from public.gate_sessions)                as gate_sessions_visible,  -- 1
-  (select count(*) from public.unlocks)                      as unlocks_visible,        -- 0
-  (select count(*) from tamper)                              as b_rows_a_could_update;  -- 0
+  (select count(*) from public.unlocks)                      as unlocks_visible;        -- 0
 
 -- ---------------------------------------------------------------------------
--- 6. EXPECT ERROR 42501: student must never read gate scores
+-- 6. EXPECT ERROR 42501: project rows are owner-readable but browser read-only
+--    after M16S.1. This blocks own-row workflow replacement and all project
+--    updates before RLS row filtering is considered.
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+update public.projects
+set workflow_artifacts = '{"forged":true}'::jsonb
+where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+-- ---------------------------------------------------------------------------
+-- 7. EXPECT ERROR 42501: student must never read gate scores
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -97,7 +104,7 @@ select set_config('request.jwt.claims',
 select score from public.gate_sessions;
 
 -- ---------------------------------------------------------------------------
--- 7. EXPECT ERROR 42501: student cannot write gate verdicts or forge unlocks
+-- 8. EXPECT ERROR 42501: student cannot write gate verdicts or forge unlocks
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -109,13 +116,13 @@ values ('aaaaaaaa-0000-4000-8000-000000000001', 2, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaa
 -- values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aaaaaaaa-0000-4000-8000-000000000001', 1, 'forged');
 
 -- ---------------------------------------------------------------------------
--- 8. EXPECT ERROR 42501: anon gets nothing
+-- 9. EXPECT ERROR 42501: anon gets nothing
 -- ---------------------------------------------------------------------------
 set local role anon;
 select count(*) from public.projects;
 
 -- ---------------------------------------------------------------------------
--- 9. Cleanup (cascades to profiles/projects/gate_sessions). Expect all zeros.
+-- 10. Cleanup (cascades to profiles/projects/gate_sessions). Expect all zeros.
 -- ---------------------------------------------------------------------------
 delete from auth.users
 where id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');

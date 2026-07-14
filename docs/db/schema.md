@@ -70,7 +70,36 @@ from `auth.users`).
 | `gate_history_summary` | text | summarized transcripts; calibrates future gates |
 | `status` | 'intake' \| 'active' \| 'completed' | |
 
-Policies: owner select / insert / update / delete.
+RLS policies remain owner select / insert / update / delete, but effective
+Data API access is intentionally narrower after M16S.1: `authenticated` has
+table `SELECT` only. The write policies are inert defense in depth because
+Postgres requires both an object privilege and a matching RLS policy. Project
+creation, updates, and deletion are unavailable directly to browser clients;
+all current product writes are mediated by FastAPI using the trusted backend
+credential. `service_role` access is unchanged.
+
+### `projects` column authority (M16S.1)
+
+Every project column remains owner-readable through the existing select grant
+and owner RLS policy. The classification below records write authority; there
+are **no intentionally client-writable `projects` columns**.
+
+| column | classification | legitimate writer |
+|---|---|---|
+| `id` | system-managed | database UUID default during backend creation |
+| `user_id` | backend-only writable | owner-filtered project repository on creation |
+| `intake_purpose`, `intake_scope`, `intake_stack`, `intake_self_assessment`, `intake_timeline` | backend-only writable | FastAPI intake flow |
+| `intake_completed_at`, `archetype_id` | backend-only writable | FastAPI intake completion |
+| `stack_warning`, `roadmap`, `status` | backend-only writable | FastAPI roadmap flow |
+| `current_phase`, `gate_history_summary` | backend-only writable | FastAPI gate PASS flow |
+| `task_progress` | backend-only writable | FastAPI phase task route |
+| `workflow_artifacts` | backend-only writable | validated FastAPI workflow routes |
+| `created_at`, `updated_at` | system-managed | database defaults / update trigger |
+
+The browser's Supabase client is Auth-only and has no legitimate direct
+project insert, update, upsert, or delete path. Revoking those grants therefore
+preserves all current behavior while preventing direct writes from bypassing
+FastAPI validation.
 
 ### `gate_sessions` — one row per Interrogation Gate attempt
 Shape pinned by the roadmap (`id, project_id, phase_id, user_id,
@@ -182,3 +211,35 @@ users deleted; cascade left zero rows in all four tables.
 - `verify_auth.py` 11/11 PASS (SETUP/CLEANUP via MCP; cleanup left zero rows
   in all four tables and zero test users).
 - Security advisors after the migration: clean (`{"lints": []}`).
+
+## M16S.1 write-boundary hardening (2026-07-14)
+
+Live privilege inspection found that ownership RLS was working but the broad
+`authenticated` table ACL still allowed an owner to update every column on the
+owner's own project, including `workflow_artifacts`. That was an integrity
+failure, not a cross-user disclosure: a browser could bypass FastAPI's
+provenance, lifecycle, source-binding, timestamp, and payload validation.
+
+Forward migration
+`20260714064425_harden_workflow_artifact_write_boundary.sql` revokes all
+`authenticated` table privileges on `projects`, then explicitly grants back
+`SELECT`. It does not change `service_role`, RLS, policies, table ownership,
+triggers, data, or schema shape. No public/api views exist; the only public
+functions are the two trigger functions, and both remain non-executable by
+client roles. The project update trigger changes only `updated_at`.
+
+Durable verification:
+
+- `scripts/verify_workflow_artifact_write_boundary.sql` performs transactional
+  role simulation for owner/cross-user/anon/trusted-backend behavior, JSONB
+  replacement/partial/concat/upsert/insert/delete attempts, alternate paths,
+  neighboring-field preservation, and rollback cleanup.
+- `scripts/verify_workflow_artifact_write_boundary.py` exercises the real Auth,
+  PostgREST, service credential, and a FastAPI Prompt Builder save with
+  temporary users that are deleted in `finally`.
+
+Deployment status at this commit: the linked `Codize` project is the shared
+hosted friend-pilot environment with existing rows, not an identified safe
+development/test branch. The migration was therefore **not applied remotely**
+during implementation. The live boundary remains unchanged until a deliberate
+deployment, followed immediately by both verifiers and security-advisor checks.

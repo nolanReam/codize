@@ -235,6 +235,26 @@ roadmap; unknown phase/section → 404, workspace not ready → 409, invalid
 payload → 422). A write touches exactly one column; unknown keys in stored
 data are dropped on read.
 
+### Database write boundary (M16S.1)
+
+FastAPI is the only product-data writer. The browser uses Supabase directly
+for Auth, then sends its access token to these routes; it never writes
+`projects` through the Data API. The forward migration
+`20260714064425_harden_workflow_artifact_write_boundary.sql` makes that trust
+boundary effective in Postgres: `authenticated` retains owner-scoped project
+reads (`SELECT` plus RLS) but has no project insert/update/upsert/delete
+privilege. The trusted backend credential retains its existing access, and
+every `SupabaseProjectRepository` read/write remains filtered by the
+JWT-derived `user_id` because that credential bypasses RLS.
+
+This database rule protects the complete `workflow_artifacts` JSONB value,
+including Prompt Builder, Implementation Import, Change Map, linked Review,
+linked Verification, Evidence, server timestamps, ids, source bindings, and
+lifecycle state. FastAPI validation remains the semantic layer; database
+grants prevent clients from bypassing it. Verify a deployed migration with
+`scripts/verify_workflow_artifact_write_boundary.sql` and
+`scripts/verify_workflow_artifact_write_boundary.py`.
+
 ### Implementation import (M15A — "Bring Back What AI Changed")
 
 `implementation_import` is the student's own record of what an external AI

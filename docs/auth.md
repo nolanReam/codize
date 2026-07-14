@@ -60,6 +60,41 @@ enforces auth **server-side**.
    every protected route; route handlers stay thin and ownership logic lives
    in `services/` per the architecture rules.
 
+## Project Data API write boundary (M16S.1)
+
+RLS answers "which rows?"; object grants independently answer "which
+operations?". Before M16S.1, owner RLS correctly blocked cross-user access,
+but the inherited `authenticated` table-level `UPDATE` and `INSERT` grants on
+`projects` still allowed an owner to bypass FastAPI and forge the owner's own
+`workflow_artifacts`. That preserved confidentiality but violated integrity.
+
+The M16S.1 forward migration makes `projects` read-only to authenticated Data
+API clients: revoke all table privileges from `authenticated`, then grant back
+only `SELECT`. Owner reads continue through `projects_select_own`; anonymous
+access remains denied; the trusted backend role remains unchanged. Project
+creation is not a browser insert: the first authenticated intake answer calls
+FastAPI, which creates the row through the owner-filtered repository. No
+frontend code uses `.from("projects")`, table writes, RPCs, or product-data
+Supabase calls.
+
+The retained owner insert/update/delete RLS policies are inert without matching
+object privileges and remain defense in depth. A future direct browser write
+must first justify the data ownership model, then add a forward migration for
+only the necessary column privilege or a narrowly reviewed RPC. Broad project
+mutation must not be restored.
+
+Post-deployment verification is mandatory:
+
+1. Run `scripts/verify_workflow_artifact_write_boundary.sql` as one
+   transactional batch.
+2. Run `scripts/verify_workflow_artifact_write_boundary.py` against the same
+   environment with its FastAPI base URL.
+3. Re-run `scripts/verify_auth.py` and Supabase security advisors.
+
+The shared hosted pilot database was inspected read-only during implementation;
+the forward migration was not applied there because it was not identified as a
+safe development/test target.
+
 ## Verification record (2026-07-02)
 
 Test users are created by `scripts/verify_auth.sql` SETUP (SQL inserts, because

@@ -4,10 +4,13 @@ The store is a COLUMN, not a table: `projects.workflow_artifacts` jsonb,
 default `{}`, migration `20260703130000` — the exact `task_progress`
 precedent (see [[phase-workspace-conventions]]). Shape, backend-owned:
 `{"<phase_number>": {"prompt_builder": {…}, "review_board": {…},
-"evidence": {…}, "verification": {…}}}`. Projects grants are table-level for
-`authenticated` and the owner RLS policies cover the row, so the migration
-needed no grant/policy work — verified live in M13B (owner reads the column
-through PostgREST with a real JWT; cross-user reads return zero rows).
+"evidence": {…}, "verification": {…}}}`. M13B originally inherited broad
+table grants for `authenticated`; owner RLS isolated rows but still let an
+owner directly replace the owner's JSONB through PostgREST. M16S.1 corrects
+that integrity gap with forward migration `20260714064425`: authenticated
+clients retain table `SELECT` plus owner RLS and have no project mutation
+privileges; the trusted FastAPI credential and owner-filtered repository retain
+writes. See [[workflow-artifact-write-boundary]].
 
 STORAGE ONLY is the load-bearing constraint: `workflow_service` takes only
 the ProjectRepository (cannot reach gates/unlocks/profiles by construction),

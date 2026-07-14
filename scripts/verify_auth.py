@@ -93,7 +93,12 @@ def main():
 
     s, b = rest("PATCH", f"/projects?id=eq.{PROJECT_B}", token_a,
                 {"intake_purpose": "tampered"}, representation=True)
-    check("A's update of B's project touches 0 rows", s in (200, 204) and (b or []) == [], f"{s} {b}")
+    check(
+        "A cannot update B's project",
+        (s in (200, 204) and (b or []) == [])
+        or (s in (401, 403) and (b or {}).get("code") == "42501"),
+        f"{s} {b}",
+    )
 
     s, b = rest("POST", "/unlocks", token_a,
                 {"user_id": USER_A, "project_id": PROJECT_B,

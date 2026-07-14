@@ -4,9 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-**Latest completed milestone: M16B.1 (2026-07-13).** This supersedes the older
+**Latest completed milestone: M16S.1 (2026-07-14).** This supersedes the older
 M16A.2 current-state label later in this section; historical milestone details
-remain in place below.
+remain in place below. M16S.1 is write-boundary hardening only: the forward
+migration makes `public.projects` authenticated-owner read-only at the Postgres
+grant layer while preserving owner RLS reads and trusted FastAPI writes. The
+shared hosted pilot database was inspected but not migrated because it is not
+an identified safe development/test target; deployment plus effective
+privilege verification remains required. See
+`.claude/memory/workflow-artifact-write-boundary.md`.
 
 Codize is an educational platform that helps students understand the projects they build with AI — it teaches real dev workflows and reasoning about your own code, using AI as a tool rather than a crutch. It is a benign educational product about architecture understanding and project reasoning. It is **not** a cybersecurity, exploit, malware, or offensive-security tool.
 
