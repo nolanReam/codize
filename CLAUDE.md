@@ -24,7 +24,7 @@ Codize is an educational platform that helps students understand the projects th
 
 - `python scripts/validate_prebuild_artifacts.py` — validates templates + prompts against the spec's invariants (run after any edit to either).
 - `backend\.venv\Scripts\python scripts/live_adversarial_tests.py` — re-runs the live adversarial prompt suite (gate turns at 0.3, evaluator at 0) against the configured provider; results log in `docs/prebuild/adversarial_tests.md`. Run from the repo root (needs the gitignored `.env`) after any gate-prompt edit.
-- `scripts/verify_rls.sql` — RLS/ownership audit queries; run via Supabase MCP `execute_sql` after any schema change (sections 6–8 expect permission errors; run per-section).
+- `scripts/verify_rls.sql` — RLS/ownership audit queries; run via Supabase MCP `execute_sql` after any schema change (sections 6–9 expect permission errors; run per-section).
 - `scripts/verify_auth.sql` + `python scripts/verify_auth.py` — end-to-end auth/RLS check over the real Auth+PostgREST APIs with real JWTs: run the SQL SETUP via MCP, run the script with `SUPABASE_URL`/`SUPABASE_ANON_KEY` set, then run the SQL CLEANUP. Run after any auth or RLS change.
 - Backend tests: from `backend/`, `.venv\Scripts\python -m pytest` (venv setup: `python -m venv .venv` then `.venv\Scripts\pip install -r requirements.txt`). Run after any backend change.
 - Backend dev server: from `backend/`, `.venv\Scripts\uvicorn app.main:app --reload`.

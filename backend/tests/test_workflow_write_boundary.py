@@ -118,3 +118,13 @@ def test_durable_verifiers_cover_effective_mutation_paths_and_parse():
     ):
         assert path in http
     ast.parse(http)
+
+
+def test_rls_verifier_cleanup_instructions_match_numbered_sections():
+    sql = _sql(ROOT / "scripts" / "verify_rls.sql")
+    assert "always run section 10 afterwards to clean up." in sql
+    assert "-- 10. cleanup" in sql
+    assert "always run section 9 afterwards to clean up." not in sql
+
+    claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "sections 6–9 expect permission errors" in claude

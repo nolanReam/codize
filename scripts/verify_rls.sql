@@ -40,7 +40,7 @@ where table_schema = 'public' and table_name = 'gate_sessions'
 -- ---------------------------------------------------------------------------
 -- 4. Behavioral setup: two throwaway users + one project and gate row each.
 --    The signup trigger must auto-create both profiles (expect: 2).
---    ALWAYS run section 9 afterwards to clean up.
+--    ALWAYS run section 10 afterwards to clean up.
 -- ---------------------------------------------------------------------------
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
                         email_confirmed_at, created_at, updated_at,
