@@ -64,7 +64,7 @@ app/
                         decisions, scoped drafts, stale rebuild, plus the
                         preserved legacy/manual Review form
       evidence/page.tsx Evidence Panel
-      verify/page.tsx   Verification Lab
+      verify/page.tsx   Linked + legacy/manual Verification
     gate/page.tsx       Project Defense — live Interrogation Gate flow
                         (anchor → 3 turns → evaluate → pass/fail), resume-safe
     report/page.tsx     Project Defense Report — full client-assembled report
@@ -135,6 +135,36 @@ npm run typecheck
 npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
+
+## Status (M16B.2)
+
+The existing `/app/phase/verify` route now supports both M16B.1 linked
+Verification and the original manual Verification Lab. No artifact is created
+on mount: a current, complete saved linked Review presents **Start
+Verification**, while missing, incomplete, and stale Review states point back
+to the exact prerequisite. The explicit initializer uses
+`POST /workflow/{phase}/verification/from-review`; only a confirmed rebuild
+sends `replace_existing=true`.
+
+Linked targets render in the backend's six-category order and visibly separate
+the saved Review snapshot, optional Review rationale, server suggestion,
+editable student check, result, and notes. A suggestion is never shown as a
+performed test. Exact results are Passed, Failed, Skipped, and Not applicable;
+all explicit outcomes count as recorded, but only Passed counts as passed and
+even that applies to one check only. Saves use the existing Verification PUT
+with changed `target_updates` containing only the server target identifier and
+`student_check`, `result`, and `result_notes`. Canonical payload comparison
+prevents hidden notes from causing false dirty state.
+
+Linked drafts reuse the existing secret-guarded local layer, scoped by user,
+active project, phase, and a safe Review-binding/ordered-target fingerprint.
+Stale work stays readable and disabled; rebuilding requires an inline warning
+and clears the incompatible draft only after success. Zero targets stay
+neutral. Recorded completion appears only after every outcome is server-saved,
+then **Continue to Evidence** is navigation only—no Evidence is created or
+prefilled. Build Loop and phase next actions distinguish ready, in progress,
+results recorded, stale, and zero-target states while workflow capture remains
+exactly **N/5**. No backend, provider, prompt, schema, or migration changed.
 
 ## Status (M16A.2)
 

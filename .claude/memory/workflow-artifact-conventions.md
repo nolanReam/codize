@@ -119,3 +119,17 @@ captured section to N/5 regardless of target count or stale state. Linked
 source/suggestion fields are ignored by the existing Defense Context
 normalizer and do not reach Project Defense. See
 [[review-verification-integration-conventions]].
+
+M16B.2 is a frontend consumer only. It adds no persistence route or store:
+normal initialization uses the M16B.1 POST, reads the resulting linked/manual
+mode through the shared workflow GET, and saves changed student fields through
+the existing generic Verification PUT. `useWorkflowSection` now exposes the
+already-fetched `sections` object so Verification can inspect its Review
+prerequisite without a duplicate client or request system; applying/saving an
+artifact keeps that local sections snapshot synchronized. Linked PUT bodies
+contain only `target_updates` with Verification target id + student check,
+result, and notes. Manual payloads remain the M13B full-section shape. Any
+Verification artifact still contributes exactly one of five captured sections,
+independent of target count, recorded progress, or stale state. Continue to
+Evidence is navigation only and creates no downstream record. See
+[[linked-verification-ui-conventions]].

@@ -6,6 +6,7 @@
 import { getAccessToken } from "./supabase";
 import { generationRequestBody } from "./changeMap";
 import { reviewInitializationBody } from "./review";
+import { verificationInitializationBody } from "./verification";
 import type {
   ChangeMapConfirmationResponse,
   ChangeMapMutationResult,
@@ -27,7 +28,10 @@ import type {
   ReconnectionState,
   ReviewBoardSaveRequest,
   ReviewInitializationResponse,
-  VerificationArtifact,
+  StoredReviewBoardArtifact,
+  StoredVerificationArtifact,
+  VerificationInitializationResponse,
+  VerificationSaveRequest,
   WorkflowPhaseState,
   WorkflowSectionName,
 } from "./types";
@@ -128,8 +132,16 @@ type SectionPayloadMap = {
   prompt_builder: Omit<PromptBuilderArtifact, "saved_at">;
   review_board: ReviewBoardSaveRequest;
   evidence: Omit<EvidenceArtifact, "saved_at">;
-  verification: Omit<VerificationArtifact, "saved_at">;
+  verification: VerificationSaveRequest;
   implementation_import: Omit<ImplementationImportArtifact, "saved_at">;
+};
+
+type SectionArtifactMap = {
+  prompt_builder: PromptBuilderArtifact;
+  review_board: StoredReviewBoardArtifact;
+  evidence: EvidenceArtifact;
+  verification: StoredVerificationArtifact;
+  implementation_import: ImplementationImportArtifact;
 };
 
 export const saveWorkflowSection = <S extends WorkflowSectionName>(
@@ -137,7 +149,7 @@ export const saveWorkflowSection = <S extends WorkflowSectionName>(
   section: S,
   payload: SectionPayloadMap[S]
 ) =>
-  request<{ phase: number; section: S; artifact: SectionPayloadMap[S] & { saved_at: string } }>(
+  request<{ phase: number; section: S; artifact: SectionArtifactMap[S] }>(
     `/workflow/${phase}/${section}`,
     { method: "PUT", body: payload }
   );
@@ -174,6 +186,16 @@ export const initializeReviewFromChangeMap = (phase: number, replaceExisting = f
   const body = reviewInitializationBody(replaceExisting);
   return request<ReviewInitializationResponse>(
     `/workflow/${phase}/review/from-change-map`,
+    { method: "POST", ...(body ? { body } : {}) }
+  );
+};
+
+// Linked Verification initialization is likewise explicit. A normal start
+// sends no body; only the deliberate rebuild path sends replace_existing.
+export const initializeVerificationFromReview = (phase: number, replaceExisting = false) => {
+  const body = verificationInitializationBody(replaceExisting);
+  return request<VerificationInitializationResponse>(
+    `/workflow/${phase}/verification/from-review`,
     { method: "POST", ...(body ? { body } : {}) }
   );
 };

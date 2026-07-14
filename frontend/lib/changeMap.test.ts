@@ -40,6 +40,7 @@ import type {
   ChangeMapItem,
   ChangeMapStudentDecision,
   LinkedReviewBoardArtifact,
+  LinkedVerificationArtifact,
   StoredChangeMap,
   WorkflowSections,
 } from "./types";
@@ -142,6 +143,37 @@ function linkedReview(
       review_decision: decision,
       student_rationale: null,
       student_revision: null,
+    }],
+  };
+}
+
+function linkedVerification(
+  result: "pass" | "fail" | "skipped" | "not_applicable" | null = null,
+  stale = false,
+  zeroTargets = false
+): LinkedVerificationArtifact {
+  return {
+    checks: [],
+    initialized_at: "2026-07-13T12:01:00Z",
+    source_review_binding: {
+      source_change_map_generated_at: "2026-07-13T10:01:00Z",
+      source_change_map_confirmed_at: "2026-07-13T11:00:00Z",
+      review_saved_at: "2026-07-13T12:00:00Z",
+      review_target_fingerprint: "a".repeat(64),
+    },
+    initialized_from_review: true,
+    stale,
+    verification_targets: zeroTargets ? [] : [{
+      verification_target_id: "vt-0123456789ab",
+      review_target_id: "rv-0123456789ab",
+      change_map_item_id: "cm-behavior",
+      category: "behavior_change",
+      source_text: "The route behavior changed.",
+      source_rationale: null,
+      suggested_check: "Perform the route flow.",
+      student_check: null,
+      result,
+      result_notes: null,
     }],
   };
 }
@@ -578,13 +610,34 @@ describe("phase next-step logic and N/5 preservation", () => {
       "Rebuild Review"
     );
     expect(derivePhaseNextStep(sections({ review_board: linkedReview("uncertain") }), confirmed)).toMatchObject({
-      label: "Continue to Verification",
+      label: "Start Verification",
       href: "/app/phase/verify",
     });
     expect(derivePhaseNextStep(sections({
       review_board: linkedReview("keep"),
       verification: { checks: [] },
     }), confirmed).label).toBe("Save one piece of proof");
+  });
+
+  it("routes linked Verification through in-progress, stale, recorded, and zero-target states", () => {
+    const confirmed = map({ status: "confirmed", confirmed_at: "2026-07-13T11:00:00Z" });
+    const base = { review_board: linkedReview("keep") };
+    expect(derivePhaseNextStep(sections({
+      ...base,
+      verification: linkedVerification(),
+    }), confirmed).label).toBe("Continue Verification");
+    expect(derivePhaseNextStep(sections({
+      ...base,
+      verification: linkedVerification(null, true),
+    }), confirmed).label).toBe("Rebuild Verification");
+    expect(derivePhaseNextStep(sections({
+      ...base,
+      verification: linkedVerification("fail"),
+    }), confirmed).label).toBe("Continue to Evidence");
+    expect(derivePhaseNextStep(sections({
+      ...base,
+      verification: linkedVerification(null, false, true),
+    }), confirmed).label).toBe("Continue to Evidence");
   });
 
   it("keeps Prompt first, preserves manual Review continuation, and preserves N/5", () => {

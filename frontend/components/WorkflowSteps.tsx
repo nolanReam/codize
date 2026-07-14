@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { changeMapStepStatus } from "@/lib/changeMap";
 import { reviewStepStatus } from "@/lib/review";
+import { verificationStepStatus } from "@/lib/verification";
 import type { StoredChangeMap, WorkflowSections } from "@/lib/types";
 
 // The Codize Build Loop as navigable steps. "Generate" is deliberately not a
@@ -14,6 +15,7 @@ const STEPS: {
   section: keyof WorkflowSections | null;
   changeMap?: boolean;
   review?: boolean;
+  verification?: boolean;
   note?: string;
 }[] = [
   { label: "Plan + Prompt", href: "/app/phase/prompt", section: "prompt_builder" },
@@ -21,7 +23,7 @@ const STEPS: {
   { label: "Bring Back", href: "/app/phase/import", section: "implementation_import" },
   { label: "Change Map", href: "/app/phase/change-map", section: null, changeMap: true },
   { label: "Review", href: "/app/phase/review", section: "review_board", review: true },
-  { label: "Verify", href: "/app/phase/verify", section: "verification" },
+  { label: "Verify", href: "/app/phase/verify", section: "verification", verification: true },
   { label: "Evidence", href: "/app/phase/evidence", section: "evidence" },
   { label: "Explain", href: "/app/gate", section: null, note: "the gate" },
   { label: "Commit / Reflect", href: "/app/report", section: null, note: "defense report" },
@@ -43,19 +45,33 @@ export default function WorkflowSteps({
         const linkedReviewStatus = step.review
           ? reviewStepStatus(sections?.review_board ?? null, changeMap ?? null)
           : null;
+        const linkedVerificationStatus = step.verification
+          ? verificationStepStatus(
+              sections?.verification ?? null,
+              sections?.review_board ?? null
+            )
+          : null;
         const done = step.changeMap
           ? mapStatus?.tone === "done"
           : step.review
             ? linkedReviewStatus?.tone === "done"
-          : step.section != null && sections?.[step.section] != null;
+            : step.verification
+              ? linkedVerificationStatus?.tone === "done"
+              : step.section != null && sections?.[step.section] != null;
         const dotTone = step.changeMap
           ? mapStatus?.tone
           : step.review
             ? linkedReviewStatus?.tone
-            : done
-              ? "done"
-              : "idle";
-        const note = mapStatus?.label ?? linkedReviewStatus?.label ?? step.note;
+            : step.verification
+              ? linkedVerificationStatus?.tone
+              : done
+                ? "done"
+                : "idle";
+        const note =
+          mapStatus?.label ??
+          linkedReviewStatus?.label ??
+          linkedVerificationStatus?.label ??
+          step.note;
         const inner = (
           <>
             <span className={`dot ${dotTone}`} />

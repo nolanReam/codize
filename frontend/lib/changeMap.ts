@@ -20,6 +20,11 @@ import {
   linkedReviewAllowsVerification,
   targetFormFromReview,
 } from "./review";
+import {
+  isLinkedVerificationArtifact,
+  linkedVerificationRecorded,
+  targetFormFromVerification,
+} from "./verification";
 
 export const CHANGE_MAP_TEXT_MAX = 600;
 export const CHANGE_MAP_NOTE_MAX = 1_000;
@@ -557,10 +562,37 @@ export function derivePhaseNextStep(
     }
     if (!sections.verification) {
       return {
-        label: "Continue to Verification",
+        label: "Start Verification",
         href: "/app/phase/verify",
-        hint: "Review is recorded. Check the behavior without creating tests automatically.",
+        hint: "Review is recorded. Explicitly create suggested checks, then perform them yourself.",
       };
+    }
+    if (isLinkedVerificationArtifact(sections.verification)) {
+      if (sections.verification.stale) {
+        return {
+          label: "Rebuild Verification",
+          href: "/app/phase/verify",
+          hint: "Review changed—deliberately rebuild the checks before recording more results.",
+        };
+      }
+      const verificationState = targetFormFromVerification(sections.verification);
+      if (
+        sections.verification.verification_targets.length > 0 &&
+        !linkedVerificationRecorded(sections.verification, verificationState)
+      ) {
+        return {
+          label: "Continue Verification",
+          href: "/app/phase/verify",
+          hint: "Perform each suggested check and record what actually happened.",
+        };
+      }
+      if (!sections.evidence) {
+        return {
+          label: "Continue to Evidence",
+          href: "/app/phase/evidence",
+          hint: "Verification is recorded. Add supporting material without changing those results.",
+        };
+      }
     }
     if (!sections.evidence) {
       return {

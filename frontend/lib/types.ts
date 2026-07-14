@@ -207,6 +207,81 @@ export interface VerificationArtifact {
   saved_at?: string;
 }
 
+// Linked Verification (M16B.1 backend / M16B.2 UI). Review provenance,
+// source snapshots, suggestions, bindings, and stale state are server-owned.
+// The browser may update only student_check, result, and result_notes through
+// VerificationTargetUpdateRequest.
+export type VerificationSourceCategory =
+  | "behavior_change"
+  | "implementation_decision"
+  | "out_of_scope_change"
+  | "security_sensitive_area"
+  | "unresolved_risk"
+  | "unverified_behavior";
+
+export interface VerificationReviewBinding {
+  source_change_map_generated_at: string;
+  source_change_map_confirmed_at: string;
+  review_saved_at: string;
+  review_target_fingerprint: string;
+}
+
+export interface VerificationServerState {
+  initialized_from_review: true;
+  stale: boolean;
+}
+
+export interface LinkedVerificationTarget {
+  verification_target_id: string;
+  review_target_id: string;
+  change_map_item_id: string;
+  category: VerificationSourceCategory;
+  source_text: string;
+  source_rationale: string | null;
+  suggested_check: string;
+  student_check: string | null;
+  result: VerificationResult | null;
+  result_notes: string | null;
+}
+
+export interface LinkedVerificationArtifact
+  extends VerificationArtifact,
+    VerificationServerState {
+  initialized_at: string;
+  source_review_binding: VerificationReviewBinding;
+  verification_targets: LinkedVerificationTarget[];
+}
+
+export type ZeroTargetLinkedVerificationArtifact = LinkedVerificationArtifact & {
+  verification_targets: [];
+};
+
+export type StoredVerificationArtifact = VerificationArtifact | LinkedVerificationArtifact;
+
+export interface VerificationInitializationRequest {
+  replace_existing?: true;
+}
+
+export interface VerificationInitializationResponse {
+  phase: number;
+  section: "verification";
+  artifact: LinkedVerificationArtifact;
+}
+
+export interface VerificationTargetUpdateRequest {
+  verification_target_id: string;
+  student_check: string | null;
+  result: VerificationResult | null;
+  result_notes: string | null;
+}
+
+// Manual Verification keeps its full-section payload. Linked Verification
+// sends target_updates only; every field on each update is student-owned.
+export interface VerificationSaveRequest
+  extends Partial<Omit<VerificationArtifact, "saved_at">> {
+  target_updates?: VerificationTargetUpdateRequest[];
+}
+
 // "Bring Back What AI Changed" (M15A backend / M15B UI). Student-provided,
 // self-reported material — never verified, never proof of correctness.
 export type ImplementationImportSourceKind =
@@ -327,7 +402,7 @@ export interface WorkflowSections {
   prompt_builder: PromptBuilderArtifact | null;
   review_board: StoredReviewBoardArtifact | null;
   evidence: EvidenceArtifact | null;
-  verification: VerificationArtifact | null;
+  verification: StoredVerificationArtifact | null;
   implementation_import: ImplementationImportArtifact | null;
 }
 

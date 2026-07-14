@@ -409,3 +409,24 @@ testing and uncertainty count as honest decisions; zero targets stay neutral.
 Continue to Verification is a link only. Workflow N/5, build tasks, Change Map,
 Evidence, Verification records, Defense, evaluator, and report data flows are
 unchanged. Full rules: [[linked-review-ui-conventions]].
+
+**M16B.2 (2026-07-14) — linked Verification suggestions and student results
+UI.** `/app/phase/verify` branches after the existing workflow GET: strict
+`initialized_from_review=true` data uses linked Verification, an existing
+manual artifact keeps its exact original checklist/explanation/draft/save UI,
+and no artifact inspects the saved Review before offering an explicit start.
+`lib/verification.ts` is the pure contract layer (exact categories/results,
+runtime mode guard, prerequisite state, grouping, Unicode-safe validation,
+canonical student-only target PUT, dirty/progress/summary/recorded completion,
+safe binding fingerprint, draft restore, stale/replacement, zero-target, Build
+Loop status). `components/LinkedVerificationTarget.tsx` keeps Review source and
+server suggestion as escaped plain text, with a student-owned check textarea
+and native result radios. Linked drafts use
+`linked_verification:active-project:<phase>:<safe fingerprint>`; `useDraft`
+adds authenticated-user scope and its existing debounce/storage-failure/secret
+guard. Result changes clear result-specific notes before canonical comparison.
+Stale work is readable and disabled, rebuild is explicit, and saved completion
+links to Evidence only. Phase next actions now distinguish Start/Continue/
+Rebuild Verification and Continue to Evidence. N/5 capture, build tasks,
+manual Verification, Evidence data, Defense, and Report remain separate. Full
+rules: [[linked-verification-ui-conventions]].

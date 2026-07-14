@@ -111,3 +111,16 @@ Verification/Review/Change Map ids, category, actual check wording
 (`student_check` or suggestion), recorded result, and notes. It creates no
 Evidence record; future Evidence work must deliberately decide which performed
 results are eligible and must preserve fail/skipped/N/A honestly.
+
+**M16B.2 frontend consumer (2026-07-14):** the existing
+`/app/phase/verify` route now implements the seam above without changing this
+backend contract. Initialization remains click-only; linked/manual modes remain
+separate; source snapshots, rationale, and suggestions render as escaped plain
+text; and only canonical changed student fields are sent in `target_updates`.
+Null stays unrecorded. Explicit pass/fail/skipped/not_applicable outcomes all
+count toward recorded workflow completion, while the summary and copy preserve
+their distinct meanings. Linked local drafts carry only a safe fingerprint,
+target id, student check, result, and notes. Stale work is readable but not
+editable and replacement is deliberate. Zero targets remain neutral. Evidence
+navigation creates and prefills nothing; the typed M16B.3 backend handoff above
+is still unused.

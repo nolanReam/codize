@@ -13,6 +13,7 @@ import type { PhaseView, StoredChangeMap, WorkflowSectionName, WorkflowSections 
 export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
   const [phase, setPhase] = useState<PhaseView | null>(null);
   const [stored, setStored] = useState<WorkflowSections[S] | null>(null);
+  const [sections, setSections] = useState<WorkflowSections | null>(null);
   const [changeMap, setChangeMap] = useState<StoredChangeMap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
       const workflow = await getWorkflow(current.phase);
       setPhase(current);
       setStored(workflow.sections[section]);
+      setSections(workflow.sections);
       setChangeMap(workflow.change_map);
       setSavedAt((workflow.sections[section] as { saved_at?: string } | null)?.saved_at ?? null);
     } catch (err) {
@@ -55,7 +57,8 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
       try {
         const result = await saveWorkflowSection(phase.phase, section, payload);
         setStored(result.artifact as WorkflowSections[S]);
-        setSavedAt(result.artifact.saved_at);
+        setSections((current) => current ? { ...current, [section]: result.artifact } : current);
+        setSavedAt(result.artifact.saved_at ?? null);
         return result.artifact as WorkflowSections[S];
       } catch (err) {
         setSaveError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
@@ -72,13 +75,15 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
   // state machine instead of creating a second workflow fetch/store system.
   const applyArtifact = useCallback((artifact: WorkflowSections[S]) => {
     setStored(artifact);
+    setSections((current) => current ? { ...current, [section]: artifact } : current);
     setSavedAt((artifact as { saved_at?: string }).saved_at ?? null);
     setSaveError(null);
-  }, []);
+  }, [section]);
 
   return {
     phase,
     stored,
+    sections,
     changeMap,
     loading,
     error,
