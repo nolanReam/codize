@@ -1,3 +1,9 @@
+> [!NOTE]
+> **Archived historical product vision.** This document is superseded for
+> product direction by `docs/context/codize_product_operating_brief_v2.md`.
+> Its historical body is preserved below and must not be treated as current
+> implementation or product authority.
+
 # Codize Product Vision v3
 
 ## Status

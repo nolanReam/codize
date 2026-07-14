@@ -255,7 +255,7 @@ personalized drift. No LLM anywhere; a future AI confusion assistant is a
 separate spec-guardian-gated milestone. (6) **Multi-project is deferred**:
 `get_project` is newest-row-wins, so a second `projects` row would silently
 orphan the first (no error!) — never ship a working "+ New project" until
-`docs/context/multi_project_dashboard_plan.md` is implemented; the disabled
+`docs/plans/deferred/multi_project_dashboard_plan.md` is implemented; the disabled
 affordance + honest rail note is the M13E.1 ceiling.
 
 **M13E.4 (2026-07-12) — UI system polish conventions** (skill-driven pass;

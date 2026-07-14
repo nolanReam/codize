@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Ensure every Codize implementation decision stays aligned with the attached product specification, roadmap, conversation history, and Fable 5 prompting guide.
+Ensure every Codize implementation decision stays aligned with the active product direction, accepted decisions, and still-applicable architecture and safety invariants.
 
 Use this skill before:
 
@@ -15,14 +15,12 @@ Use this skill before:
 
 ## Required Source Files
 
-The durable context files live in:
+Read these before making product, workflow, or major UX decisions:
 
-- `docs/context/codize_master_spec_v2.1.pdf`
-- `docs/context/codize_roadmap_v2.html`
-- `docs/context/conversations.json`
-- `docs/context/fable_5_prompting.md`
+- `docs/context/context_authority.md`
+- `docs/context/codize_product_operating_brief_v2.md`
 
-Read relevant sections before making product decisions.
+Use `docs/context/codize_master_spec_v2.1.md` only for still-applicable architecture and safety invariants. Use code, tests, migrations, Git history, and deployment evidence for implementation state. Do not load archived plans, old product visions, model guides, or chat exports unless historical context is specifically required.
 
 ## Non-Negotiables
 
@@ -58,7 +56,7 @@ Do not add features just because they are interesting.
 
 Before adding anything, ask:
 
-1. Is this explicitly required by the spec?
+1. Is this consistent with the active operating brief and accepted decisions?
 2. Is this required for the current milestone?
 3. Can this be done more simply?
 

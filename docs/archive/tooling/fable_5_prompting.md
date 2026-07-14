@@ -1,3 +1,7 @@
+> [!NOTE]
+> **Archived model-specific prompting guide.** This document is historical
+> tooling context, not active product direction or default agent guidance.
+
 ## `# Prompting Claude Fable 5` 
 
 ```

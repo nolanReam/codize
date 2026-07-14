@@ -1,4 +1,8 @@
-# Codize Product Vision v3 — Durable Memory
+# Codize Product Vision v3 — Historical Memory
+
+> **Status:** Historical context only. Current stable product direction lives in
+> `docs/context/codize_product_operating_brief_v2.md`; source precedence lives in
+> `docs/context/context_authority.md`.
 
 Codize’s product vision shifted on 2026-07-03, after Milestone 12 (backend
 M1–M12 complete at `44442b0`) and before Milestone 13.
@@ -101,7 +105,7 @@ invariants (hidden scores, thresholds, prompt secrecy, RLS, gate mechanics)
 are unchanged by this vision reset.
 
 RESOLVED by the M13A planning session (2026-07-03,
-`docs/context/m13_ai_workflow_workspace_plan.md` — the authoritative M13
+`docs/archive/plans/completed/m13_ai_workflow_workspace_plan.md` — the historical M13
 plan): M13 splits into **M13B** (backend mini-milestone: `workflow_artifacts`
 JSONB column on `projects` following the `task_progress` precedent, plus
 `GET /workflow/{phase}` + `PUT /workflow/{phase}/{section}` — no LLM, no new
@@ -150,12 +154,12 @@ Manual evidence is acceptable for v0.1:
 
 ## Authority
 
-`docs/context/codize_product_vision_v3.md` is the current product-direction source for M13+.
+`docs/archive/product/codize_product_vision_v3.md` preserves the superseded product vision for historical context.
 
 `docs/context/codize_master_spec_v2.1.md` still controls backend invariants, intake, archetypes, security, RLS/auth, and gate safety unless explicitly superseded.
 
-`codize_roadmap_v2.html` is now legacy build/learning context.
+`docs/archive/learning-roadmaps/codize_roadmap_v2.html` is legacy build/learning context.
 
-`conversations.json` is historical archive only.
+The local `conversations.json` export is historical only and must not be loaded by default.
 
 `instructions.md` controls only the active Claude Code task.

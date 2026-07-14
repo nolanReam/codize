@@ -1,3 +1,40 @@
+> [!IMPORTANT]
+> ## Status: Active only for applicable architecture and safety invariants
+>
+> This document is a legacy foundation specification.
+>
+> The following areas are superseded by:
+>
+> `docs/context/codize_product_operating_brief_v2.md`
+>
+> - target audience;
+> - product positioning;
+> - prevention-first, recovery-capable direction;
+> - current shared workflow;
+> - beginner experience;
+> - current UX direction;
+> - Change Map-centered downstream architecture;
+> - guided workflow navigation.
+>
+> This document remains authoritative only for still-applicable and
+> repository-confirmed invariants such as:
+>
+> - the five intake questions;
+> - archetype/template constraints;
+> - server-side secrets;
+> - RLS and ownership;
+> - API-layer authentication;
+> - applicable gate mechanics;
+> - hidden evaluator scores and thresholds;
+> - fail-closed evaluation;
+> - cooldown and retry behavior.
+>
+> Current code, tests, migrations, Git history, accepted decision records,
+> and later security architecture may supersede old implementation details.
+>
+> Do not treat an unimplemented idea in this document as a current requirement
+> without inspecting the repository.
+
 ## Codize — Master Product Specification 
 
 - Version 1.2 | Pre Roadmap Reference Document 

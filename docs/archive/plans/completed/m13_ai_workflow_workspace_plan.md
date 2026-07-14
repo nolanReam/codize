@@ -1,3 +1,8 @@
+> [!NOTE]
+> **Archived completed milestone plan.** Preserve this document for historical
+> rationale only; inspect code, tests, migrations, and Git history for current
+> implementation state.
+
 # M13 — AI Workflow Workspace MVP: Implementation Plan
 
 Planning artifact from the M13A session (2026-07-03). Backend state: M1–M12

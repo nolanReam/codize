@@ -1,3 +1,16 @@
+> [!WARNING]
+> ## Status: Deferred architecture plan
+>
+> This document records the repository architecture as audited during M13E.1.
+>
+> Re-audit all repository, ownership, project-resolution, API, RLS, and
+> frontend assumptions before implementation.
+>
+> This document is not current implementation authority.
+>
+> Current code, tests, migrations, Git history, and accepted architecture
+> decisions override stale details in this plan.
+
 # Multi-Project & Dashboard Plan (audited M13E.1, 2026-07-05)
 
 Status: **multiple projects are DEFERRED.** The M13E.1 dashboard improvement
