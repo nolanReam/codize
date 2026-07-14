@@ -292,7 +292,9 @@ async def save_section(
         )
 
     limit = _SECTION_CHAR_LIMITS.get(section, MAX_SECTION_CHARS)
-    if len(json.dumps(payload)) > limit:
+    # Count the API's established Unicode code-point units, not the ASCII
+    # escape expansion produced by json.dumps' default ensure_ascii=True.
+    if len(json.dumps(payload, ensure_ascii=False)) > limit:
         raise InvalidArtifactError(
             f"This section is too large to save (max {limit // 1000} KB) — "
             "trim pasted output and try again."

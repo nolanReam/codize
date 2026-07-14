@@ -467,10 +467,13 @@ The linked artifact remains at
 identity, a selected-target source binding, and per-target Verification/Review/
 Change Map linkage plus check/result/result-notes snapshots. The client read
 view deliberately omits Review/Change Map ids and internal fingerprints. The
-existing Evidence PUT accepts its legacy full-section payload and additive
-`target_updates` containing only Evidence target id, `evidence_status`, entries,
-student explanation, and unavailable reason. Source linkage/snapshots/binding,
-ids, and stale state are copied from storage and cannot be rewritten.
+existing Evidence PUT keeps its legacy full-section payload only for manual
+artifacts. Once Evidence is linked, the same route accepts `target_updates`
+only, containing Evidence target id, `evidence_status`, entries, student
+explanation, and unavailable reason; legacy top-level `entries + summary` are
+rejected in linked mode so Evidence cannot bypass its selected target. Source
+linkage/snapshots/binding, ids, and stale state are copied from storage and
+cannot be rewritten.
 
 `evidence_status` is exactly `not_addressed`, `evidence_recorded`, or
 `evidence_unavailable`. Recorded requires at least one student-provided entry;
@@ -495,8 +498,10 @@ through the existing Evidence PUT. M16C backend seam: load typed linked Evidence
 with `evidence_service.get_stored_evidence(project, phase)` and consume only
 non-stale student-recorded entries/unavailable reasons through a future
 purpose-built safe normalizer. M16B.3A intentionally leaves the existing
-Defense Context and client-assembled Report readers on legacy top-level
-`entries + summary`; nested linked Evidence is not integrated downstream yet.
+client-assembled Report reader on legacy top-level `entries + summary`.
+Defense Context explicitly treats linked Evidence as missing until M16C, so
+merely initializing an empty workspace cannot advertise a student-recorded
+Evidence source. Nested linked Evidence is not integrated downstream yet.
 
 ## Defense context pack (M14A)
 

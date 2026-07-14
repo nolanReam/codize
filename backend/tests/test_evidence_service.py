@@ -8,7 +8,11 @@ import pytest
 
 from app.schemas.workflow import EvidenceFromVerificationRequest
 from app.services import evidence_service, verification_service
-from app.services.defense_context_service import build_defense_context, render_defense_context
+from app.services.defense_context_service import (
+    build_defense_context,
+    render_defense_context,
+    summarize_defense_context,
+)
 from app.services.evidence_service import (
     EvidenceAlreadyExistsError,
     EvidenceStaleError,
@@ -393,9 +397,24 @@ def test_linked_target_evidence_is_not_quietly_integrated_into_defense_m16c():
         "entries": [{"kind": "test_output", "content": "M16C-only nested output"}],
         "explanation": "M16C-only nested explanation",
     }]}))
-    rendered = render_defense_context(run(build_defense_context(repo, USER, 1)))
+    pack = run(build_defense_context(repo, USER, 1))
+    rendered = render_defense_context(pack)
     assert "M16C-only nested output" not in rendered
     assert "M16C-only nested explanation" not in rendered
+    evidence_source = next(
+        source for source in pack.source_manifest
+        if source.source_id == "workflow.evidence"
+    )
+    assert evidence_source.present is False
+    summary = summarize_defense_context(pack).model_dump(mode="json")
+    assert not any(
+        source["source_id"] == "workflow.evidence"
+        for source in summary["included_sources"]
+    )
+    assert any(
+        source["source_id"] == "workflow.evidence"
+        for source in summary["missing_sources"]
+    )
 
 
 def test_ownership_phase_isolation_and_no_provider_or_downstream_dependency():

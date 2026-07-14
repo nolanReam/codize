@@ -52,7 +52,12 @@ from app.schemas.defense_context import (
     SummaryMissingSource,
     TruncationRecord,
 )
-from app.services import phase_service, template_service, workflow_service
+from app.services import (
+    evidence_service,
+    phase_service,
+    template_service,
+    workflow_service,
+)
 from app.services.project_repository import ProjectRepository
 
 # ---------------------------------------------------------------------------
@@ -386,6 +391,19 @@ async def build_defense_context(
     for source_id, (section_name, normalize) in _WORKFLOW_NORMALIZERS.items():
         stored = sections.get(section_name)
         if isinstance(stored, dict):
+            # M16B.3A stores linked Evidence in a nested target shape that the
+            # Defense contract deliberately does not consume until M16C. Do
+            # not advertise that source as present merely because its empty
+            # workspace was initialized; manual Evidence remains unchanged.
+            if section_name == "evidence":
+                evidence = evidence_service.get_stored_evidence(
+                    project, phase_number
+                )
+                if (
+                    evidence is not None
+                    and evidence_service.initialized_from_verification(evidence)
+                ):
+                    continue
             sources[source_id] = normalize(stored)
 
     # Redaction before truncation: a cut can never expose half a secret,

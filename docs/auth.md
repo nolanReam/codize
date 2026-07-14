@@ -108,8 +108,10 @@ The GET is pure and returns only student-safe handoff context. It does not
 create Evidence. The POST requires explicit server-issued target selection and
 copies provenance only from the current owned linked Verification artifact.
 Normal Evidence PUTs cannot submit source linkage, snapshots, fingerprints,
-timestamps, completion, or stale state. Detected credential-shaped Evidence is
-rejected without echoing or logging it. No route calls a provider, fetches a
+timestamps, completion, or stale state. In linked mode they accept target
+updates only; legacy top-level entries/summary cannot bypass the selected
+target provenance. Detected credential-shaped Evidence is rejected without
+echoing or logging it. No route calls a provider, fetches a
 submitted URL, or exposes the backend credential. The M16S.1 database grants
 remain the second integrity boundary: authenticated browser clients can read
 their project row through RLS but cannot mutate `workflow_artifacts` directly.

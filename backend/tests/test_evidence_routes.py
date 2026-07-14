@@ -228,6 +228,47 @@ def test_linked_student_updates_unavailable_and_secret_errors_are_safe(client):
     assert client.get("/workflow/1", headers=auth_headers()).json() == before
 
 
+def test_linked_put_rejects_legacy_fields_and_counts_unicode_code_points(client):
+    activate_project(client)
+    verification = prepare_linked_verification(client, results=("pass",))
+    source_id = verification["verification_targets"][0]["verification_target_id"]
+    artifact = client.post(PREVIEW_ROUTE, json={
+        "selected_verification_target_ids": [source_id]
+    }, headers=auth_headers()).json()["artifact"]
+    evidence_id = artifact["evidence_targets"][0]["evidence_target_id"]
+    before = client.get("/workflow/1", headers=auth_headers()).json()
+
+    for payload in (
+        {"entries": [{"kind": "note", "content": "Unlinked bypass."}]},
+        {"summary": "Unlinked bypass."},
+        {
+            "entries": [{"kind": "note", "content": "Unlinked bypass."}],
+            "target_updates": [{
+                "evidence_target_id": evidence_id,
+                "evidence_status": "evidence_unavailable",
+                "unavailable_reason": "No retained output.",
+            }],
+        },
+    ):
+        response = client.put(
+            "/workflow/1/evidence", json=payload, headers=auth_headers()
+        )
+        assert response.status_code == 422
+        assert "target updates only" in response.json()["error"]["message"]
+        assert client.get("/workflow/1", headers=auth_headers()).json() == before
+
+    unicode_content = "\U0001f642" * 4_000
+    saved = client.put("/workflow/1/evidence", json={"target_updates": [{
+        "evidence_target_id": evidence_id,
+        "evidence_status": "evidence_recorded",
+        "entries": [{"kind": "test_output", "content": unicode_content}],
+    }]}, headers=auth_headers())
+    assert saved.status_code == 200
+    assert len(
+        saved.json()["artifact"]["evidence_targets"][0]["entries"][0]["content"]
+    ) == 4_000
+
+
 def test_stale_linked_evidence_is_readable_preserved_and_not_editable(client):
     activate_project(client)
     verification = prepare_linked_verification(client)

@@ -127,4 +127,5 @@ Evidence. Existing manual mode remains unchanged.
 purpose-built safe normalizer for student-recorded target entries and explicit
 unavailable reasons. Do not feed internal bindings/ids or promote result
 snapshots into Evidence. M16B.3A intentionally leaves Defense Context and the
-client-assembled Report on legacy top-level `entries + summary`.
+client-assembled Report without linked Evidence: Defense treats linked Evidence
+as missing, while Report remains on legacy top-level `entries + summary`.

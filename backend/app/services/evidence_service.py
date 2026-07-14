@@ -481,6 +481,15 @@ async def save_evidence(
             raise EvidenceStaleError(
                 "Rebuild linked Evidence from current Verification before editing it."
             )
+        legacy_fields = set(EvidenceArtifact.model_fields) & request.model_fields_set
+        if legacy_fields:
+            raise InvalidEvidenceUpdateError(
+                "Invalid Evidence update: linked Evidence accepts target updates only."
+            )
+        if not request.target_updates:
+            raise InvalidEvidenceUpdateError(
+                "Invalid Evidence update: linked Evidence needs at least one target update."
+            )
         targets = {
             target.evidence_target_id: target for target in stored.evidence_targets
         }
@@ -507,12 +516,6 @@ async def save_evidence(
             target_data.append(data)
 
         data = stored.model_dump(mode="json")
-        if not request.target_updates:
-            data.update(manual)
-        else:
-            for field in EvidenceArtifact.model_fields:
-                if field in request.model_fields_set:
-                    data[field] = manual[field]
         data["evidence_targets"] = target_data
         data["saved_at"] = _now_iso()
         try:

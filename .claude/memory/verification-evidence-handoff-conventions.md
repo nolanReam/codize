@@ -54,7 +54,10 @@ updates and duplicate entries fail. The aggregate phase target entry cap remains
 rules, and 30 KB request belt. New Evidence text rejects empty normalized
 content and unsafe controls while retaining tab/newline/CR for logs. The shared
 four-marker secret seatbelt is reused; detected values are rejected without
-echo/logging. Unicode limits are code points, never bytes; nothing truncates.
+echo/logging. Legacy top-level `entries + summary` remain writable only for
+manual artifacts and are rejected once Evidence is linked, preventing content
+from bypassing its selected target. Unicode field and 30 KB belt limits count
+code points, never JSON escape expansion or bytes; nothing truncates.
 
 **Completion:** computed `evidence_record_complete` means at least one selected
 target exists and every selected target is either recorded with an entry or
@@ -76,9 +79,11 @@ single current linked record without merge/history.
 JWT, repository reads/writes remain user-filtered, roadmap phase validation is
 server-side, and M16S.1 prevents direct browser JSONB writes. No content is
 logged. M16B.3A changes no gate, evaluator, Defense, Report, navigation, or
-frontend product code. Existing Defense/Report normalizers continue reading
-only legacy top-level entries/summary; nested linked Evidence is deliberately
-absent until M16C.
+frontend product code. Existing downstream readers continue reading only legacy
+top-level entries/summary. Defense Context treats linked Evidence as missing
+until M16C so empty initialization cannot advertise Evidence as a present
+grounding source; the client Report remains on its legacy reader. Nested linked
+Evidence is deliberately absent until M16C.
 
 **Exact M16B.3B frontend seam:** preview with the GET; trust server eligibility;
 let the student deliberately choose eligible ids; POST selection only after an
