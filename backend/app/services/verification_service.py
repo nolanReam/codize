@@ -461,7 +461,15 @@ async def save_verification(
             target_data.append(data)
 
         data = stored.model_dump(mode="json")
-        data.update(manual)
+        # A legacy/manual save keeps its established full-replace behavior.
+        # When linked targets are being patched, preserve checklist work unless
+        # a manual field was explicitly included in the same request.
+        if not request.target_updates:
+            data.update(manual)
+        else:
+            for field in VerificationArtifact.model_fields:
+                if field in request.model_fields_set:
+                    data[field] = manual[field]
         data["verification_targets"] = target_data
         data["saved_at"] = _now_iso()
         try:

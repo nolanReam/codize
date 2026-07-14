@@ -276,6 +276,33 @@ def test_legacy_save_and_linked_student_updates_preserve_server_fields():
         assert updated[key] == target[key]
 
 
+def test_target_only_update_preserves_existing_legacy_fields_on_linked_artifact():
+    repo, _ = seed_completed_review()
+    created = create(repo)
+    target_id = created["verification_targets"][0]["verification_target_id"]
+    manual = run(save_section(repo, USER, 1, "verification", VERIFICATION))["artifact"]
+
+    updated = run(save_section(repo, USER, 1, "verification", {
+        "target_updates": [{
+            "verification_target_id": target_id,
+            "result": "fail",
+            "result_notes": "The observed behavior did not match.",
+        }],
+    }))["artifact"]
+
+    assert updated["checks"] == manual["checks"]
+    assert updated["explanation"] == manual["explanation"]
+    assert updated["verification_targets"][0]["result"] == "fail"
+
+    # Explicit legacy fields retain the old full-section replacement contract.
+    cleared = run(save_section(repo, USER, 1, "verification", {
+        "checks": [],
+    }))["artifact"]
+    assert cleared["checks"] == []
+    assert cleared["explanation"] is None
+    assert cleared["verification_targets"][0]["result"] == "fail"
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
