@@ -11,7 +11,28 @@ from app.schemas.report import (
     ReportDefenseTurn,
 )
 from app.services import phase_service, workflow_context_service
+from app.services.content_safety_service import has_unsafe_control_chars, redact_secrets
 from app.services.project_repository import GateSessionRepository, ProjectRepository
+
+
+MAX_REPORT_QUESTION_CHARS = 4_000
+MAX_REPORT_ANSWER_CHARS = 8_000
+MAX_REPORT_REASON_CHARS = 2_000
+_TRUNCATION_MARKER = " …[TRUNCATED]"
+
+
+def _safe_report_text(value, limit: int) -> str | None:
+    """Bound and redact historical transcript text without echoing bad rows."""
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or has_unsafe_control_chars(value)
+    ):
+        return None
+    cleaned, _ = redact_secrets(value)
+    if len(cleaned) > limit:
+        cleaned = cleaned[: limit - len(_TRUNCATION_MARKER)] + _TRUNCATION_MARKER
+    return cleaned
 
 
 def _defense_record(session: dict | None) -> ReportDefenseRecord:
@@ -24,22 +45,22 @@ def _defense_record(session: dict | None) -> ReportDefenseRecord:
         if not isinstance(raw, dict):
             continue
         turn = raw.get("turn")
-        question = raw.get("question")
-        answer = raw.get("answer")
-        if turn in (1, 2, 3) and isinstance(question, str):
+        question = _safe_report_text(raw.get("question"), MAX_REPORT_QUESTION_CHARS)
+        answer = _safe_report_text(raw.get("answer"), MAX_REPORT_ANSWER_CHARS)
+        if turn in (1, 2, 3) and question is not None:
             turns.append(
                 ReportDefenseTurn(
                     turn=turn,
                     question=question,
-                    answer=answer if isinstance(answer, str) else None,
+                    answer=answer,
                 )
             )
     return ReportDefenseRecord(
         state=state,
         turns=turns,
         evaluator_outcome=("PASS" if passed is True else "FAIL" if passed is False else None),
-        evaluator_reason=(
-            session.get("reason") if isinstance(session.get("reason"), str) else None
+        evaluator_reason=_safe_report_text(
+            session.get("reason"), MAX_REPORT_REASON_CHARS
         ),
     )
 

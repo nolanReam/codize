@@ -32,12 +32,21 @@ answer. Legacy in-flight sessions acquire a snapshot on their next successful
 turn; legacy completed attempts use a labeled current-state Report fallback.
 No migration was needed.
 
+Provider prompts use a schema-valid projection that drops whole tail records
+and marks truncation; never character-cut the serialized curated JSON. Pass-
+claim validation reads the typed curated snapshot, including linked
+Verification. Snapshot metadata must match the current schema version and the
+session phase. Gate turn/evaluation persistence uses JSONB compare-and-set on
+the previously read turns so duplicate concurrent requests cannot replace the
+attempt's question or snapshot.
+
 `GET /report/{phase}` is deterministic, authenticated, owner/phase-scoped,
 read-only, provider-free, and unstored. It returns the same curated context,
 `defense_attempt | current_workflow` source, public Defense transcript/outcome,
 and truth notice. Snapshot-backed Reports describe what was available for the
 attempt; later edits do not rewrite it. Hidden evaluator/provider/context
-internals remain absent.
+internals remain absent. Report transcript/reason strings use the shared
+secret redactor, unsafe-control rejection, and deterministic field bounds.
 
 Exact M16C.2 frontend seam: Defense reads `GET /gate/context-summary` →
 `workflow_sources[{source_id,label,state,truncated}]` for state display only;

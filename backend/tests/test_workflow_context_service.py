@@ -229,6 +229,7 @@ def test_context_bounds_use_code_points_and_are_applied_before_defense_prompt():
 def test_context_snapshot_round_trip_rejects_client_like_malformed_metadata():
     _, context = linked_context()
     session = {
+        "phase_id": 1,
         "turns": [
             {
                 "turn": 1,
@@ -246,6 +247,58 @@ def test_context_snapshot_round_trip_rejects_client_like_malformed_metadata():
         "workflow_context_snapshot": workflow_context_service.snapshot_payload(context)
     }]}
     assert workflow_context_service.context_from_snapshot(clean) is None
+    missing_phase = {"turns": [{
+        "workflow_context_snapshot": workflow_context_service.snapshot_payload(context)
+    }]}
+    assert workflow_context_service.context_from_snapshot(missing_phase) is None
+    unknown_version = copy.deepcopy(session)
+    unknown_version["turns"][0]["workflow_context_snapshot"]["schema_version"] = "999"
+    assert workflow_context_service.context_from_snapshot(unknown_version) is None
+
+
+def test_prompt_projection_is_valid_json_and_preserves_whole_truth_metadata():
+    repo = InMemoryProjectRepository()
+    seed_active_project(repo)
+    project = run(repo.get_project(USER))
+    artifacts = copy.deepcopy(project["workflow_artifacts"])
+    artifacts.setdefault("1", {})["evidence"] = {
+        "entries": [
+            {"kind": "note", "content": ("🙂" * 1_900) + f" item-{index}"}
+            for index in range(20)
+        ],
+        "summary": "summary " + ("界" * 1_900),
+        "saved_at": "2026-07-14T00:00:00+00:00",
+    }
+    run(repo.update_project(USER, project["id"], {"workflow_artifacts": artifacts}))
+    context = workflow_context_service.build_workflow_context(
+        run(repo.get_project(USER)), 1
+    )
+    projected = workflow_context_service.prompt_context(context)
+    serialized = json.dumps(
+        projected.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    assert len(serialized) <= workflow_context_service.MAX_PROMPT_CONTEXT_CHARS
+    assert json.loads(serialized)["evidence"]["state"] == "manual"
+    assert projected.content_truncated is True
+    assert projected.evidence.truncated is True
+
+    pack = run(build_defense_context(repo, USER, 1, workflow_context=context))
+    assert json.loads(pack.workflow.artifact_record)["evidence"]["state"] == "manual"
+    assert "workflow.artifact_record" in pack.truncation
+
+
+def test_verification_incomplete_state_uses_uncapped_source(monkeypatch):
+    repo, _ = linked_context()
+    monkeypatch.setattr(workflow_context_service, "MAX_VERIFICATION_CHECKS", 4)
+    context = workflow_context_service.build_workflow_context(
+        run(repo.get_project(USER)), 1
+    )
+    assert len(context.verification.checks) == 4
+    assert all(check.result != "unrecorded" for check in context.verification.checks)
+    assert context.verification.state == "incomplete"
 
 
 def test_linked_injection_text_is_delimited_data_in_existing_question_path():
@@ -275,3 +328,23 @@ def test_linked_injection_text_is_delimited_data_in_existing_question_path():
     source = inspect.getsource(workflow_context_service)
     assert "llm_service" not in source
     assert "logging" not in source
+
+
+def test_linked_nonpassing_check_cannot_be_described_as_passed():
+    repo, context = linked_context()
+    pack = run(build_defense_context(repo, USER, 1, workflow_context=context))
+    failed = next(check for check in context.verification.checks if check.result == "fail")
+    question = f"Your check passed: {failed.check} What did it show?"
+    try:
+        gate_service.grounding_service.validate_question(
+            question,
+            pack=pack,
+            anchor=ANCHOR,
+            prior_answers=[],
+            prior_questions=[],
+            workflow_context=context,
+        )
+    except gate_service.grounding_service.GroundingRejectedError as exc:
+        assert "recorded as 'fail'" in str(exc)
+    else:  # pragma: no cover - assertion aid
+        raise AssertionError("linked failed Verification was presented as passed")

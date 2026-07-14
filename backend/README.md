@@ -552,12 +552,25 @@ temperature 0, with unchanged hidden scores/thresholds, cooldowns, retries,
 providers, and provider-call count. Artifact presence or any Verification/
 Evidence status never decides PASS/FAIL.
 
+The provider-facing projection removes whole bounded records when necessary;
+it never cuts the curated JSON through a claim/provenance pair. The grounding
+validator receives the same typed snapshot directly, so linked failed,
+skipped, not-applicable, and unrecorded checks cannot be described as passed.
+Session writes compare the previously read `turns` JSONB value atomically;
+concurrent duplicate requests cannot overwrite a question or snapshot. The
+snapshot reader accepts only the current schema version bound to the session's
+exact phase; malformed historical metadata uses the labeled current-workflow
+fallback.
+
 `GET /report/{phase}` is the authenticated owner/phase-scoped M16C.2 read
 seam. It is deterministic, read-only, provider-free, and unstored. It returns
 the curated context, its `defense_attempt | current_workflow` source, the
 student-safe Defense transcript/outcome, and an honest truth notice. When an
 attempt snapshot exists, later workflow edits do not rewrite what was
-defended. The current M13C frontend Report remains unchanged until M16C.2.
+defended. Transcript questions, answers, and evaluator reasons are bounded,
+unsafe-control filtered, and passed through the shared value-shaped secret
+redactor before the Report response. The current M13C frontend Report remains
+unchanged until M16C.2.
 
 ## Tests
 

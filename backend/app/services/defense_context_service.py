@@ -88,7 +88,6 @@ _SQUEEZE_ORDER = (
     "workflow.verification",
     "workflow.review_board",
     "workflow.prompt_builder",
-    "workflow.artifact_record",
     "phase",
 )
 TRUNCATION_MARKER = " …[TRUNCATED]"
@@ -355,9 +354,18 @@ async def build_defense_context(
             "summary": curated.evidence.manual_summary,
             "saved_at": None,
         }
+    prompt_curated = workflow_context_service.prompt_context(curated)
+    full_curated_chars = len(
+        json.dumps(
+            curated.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
     sources["workflow.artifact_record"] = {
         "context_json": json.dumps(
-            curated.model_dump(mode="json"),
+            prompt_curated.model_dump(mode="json"),
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -377,6 +385,11 @@ async def build_defense_context(
         sources[source_id] = squeezed
         if record is not None:
             truncation[source_id] = record
+    if prompt_curated != curated:
+        truncation["workflow.artifact_record"] = TruncationRecord(
+            limit_chars=SOURCE_CHAR_LIMITS["workflow.artifact_record"],
+            original_chars=full_curated_chars,
+        )
 
     # Total budget: squeeze lowest-value sources first, never below the floor.
     total = sum(_string_leaves(data) for data in sources.values())

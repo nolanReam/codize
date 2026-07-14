@@ -34,7 +34,8 @@ class DefenseReportContext(_Model):
     workflow_context: CuratedWorkflowContext
     defense: ReportDefenseRecord
     truth_notice: str = (
-        "This is a record of student decisions, student-recorded results, "
-        "student-provided Evidence, and Project Defense. Codize does not "
-        "independently verify that the implementation or Evidence is correct."
+        "This report preserves student decisions, student-recorded Verification "
+        "results, student-provided Evidence, and the Project Defense evaluator's "
+        "outcome under Codize's gate contract. These records are not independent "
+        "proof that the implementation or Evidence is correct."
     )

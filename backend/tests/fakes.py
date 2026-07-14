@@ -109,6 +109,21 @@ class InMemoryGateSessionRepository:
                 return copy.deepcopy(row)
         raise RuntimeError("update matched no owned row")
 
+    async def update_session_if_current(
+        self,
+        user_id: str,
+        session_id: str,
+        expected_turns: list,
+        fields: dict,
+    ) -> dict | None:
+        for row in self._rows:
+            if row["id"] == session_id and row["user_id"] == user_id:
+                if row["passed"] is not None or row["turns"] != expected_turns:
+                    return None
+                row.update(fields)
+                return copy.deepcopy(row)
+        return None
+
 
 class InMemoryUnlockRepository:
     """Mirrors the unlocks table, including the unique (project_id, unlock_key)

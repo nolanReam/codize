@@ -128,9 +128,10 @@ the server.
 The Report returns only bounded student-safe workflow content and the public
 Defense transcript/outcome. It excludes database ids, source bindings,
 fingerprints, provider prompts/responses, hidden scores/thresholds, and
-expected concepts. Both reads are provider-free and perform no write. M16S.1
-and the owner-filtered trusted repository remain unchanged; no migration or
-new browser privilege was added.
+expected concepts. Transcript strings are bounded, unsafe-control filtered,
+and passed through the shared value-shaped secret redactor. Both reads are
+provider-free and perform no write. M16S.1 and the owner-filtered trusted
+repository remain unchanged; no migration or new browser privilege was added.
 
 ## Verification record (2026-07-02)
 

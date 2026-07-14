@@ -238,7 +238,8 @@ view, function, or RLS change.
 No migration or database object was added. Existing `gate_sessions.turns`
 JSONB deliberately holds the bounded server-derived context snapshot beside
 the first question, following the existing grounding-metadata precedent.
-Subsequent atomic turn writes preserve it; project workflow edits do not
+Subsequent turn writes compare the previously read JSONB value before updating,
+so a concurrent stale request cannot replace it; project workflow edits do not
 rewrite it. `GET /report/{phase}` is computed on read and is not persisted.
 
 The snapshot contains only curated student-safe Change Map/Review/

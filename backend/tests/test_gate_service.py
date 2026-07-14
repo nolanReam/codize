@@ -78,6 +78,44 @@ def make_repos(user=USER):
     return repo, gates, project
 
 
+def test_duplicate_turn1_requests_cannot_overwrite_the_attempt_snapshot():
+    repo, gates, _ = make_repos()
+    session_id = run(start_gate(repo, gates, USER))["gate_session_id"]
+
+    class RacingLLM:
+        def __init__(self):
+            self.calls = 0
+            self.both_started = asyncio.Event()
+
+        async def complete(self, prompt: str, temperature: float) -> str:
+            self.calls += 1
+            call_number = self.calls
+            if self.calls == 2:
+                self.both_started.set()
+            await self.both_started.wait()
+            if call_number == 1:
+                await asyncio.sleep(0.02)
+            return f"How would your project handle owner choice number {call_number}?"
+
+    async def race():
+        llm = RacingLLM()
+        results = await asyncio.gather(
+            submit_anchor(repo, gates, llm, USER, session_id, ANCHOR),
+            submit_anchor(repo, gates, llm, USER, session_id, ANCHOR),
+            return_exceptions=True,
+        )
+        return llm, results, await gates.get_session(USER, session_id)
+
+    llm, results, session = run(race())
+    successes = [result for result in results if isinstance(result, dict)]
+    conflicts = [result for result in results if isinstance(result, GateOutOfOrderError)]
+    assert len(successes) == 1
+    assert len(conflicts) == 1
+    assert llm.calls == 2
+    assert session["turns"][0]["question"] == successes[0]["question"]
+    assert "workflow_context_snapshot" in session["turns"][0]
+
+
 def run_full_gate(repo, gates, user=USER, verdict=PASS_VERDICT, unlocks=None):
     """Drive one complete gate: anchor → q1/a1 → q2/a2 → q3/a3 → evaluation."""
     started = run(start_gate(repo, gates, user))

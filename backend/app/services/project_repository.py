@@ -12,6 +12,7 @@ roadmap M7, phases M8), gate_sessions (Interrogation Gate M9), unlocks
 (functional unlocks M10), and profiles (reconnection M11).
 """
 
+import json
 from typing import Protocol
 
 import httpx
@@ -43,6 +44,14 @@ class GateSessionRepository(Protocol):
     async def create_session(self, user_id: str, fields: dict) -> dict: ...
 
     async def update_session(self, user_id: str, session_id: str, fields: dict) -> dict: ...
+
+    async def update_session_if_current(
+        self,
+        user_id: str,
+        session_id: str,
+        expected_turns: list,
+        fields: dict,
+    ) -> dict | None: ...
 
 
 class UnlockRepository(Protocol):
@@ -169,6 +178,30 @@ class SupabaseGateSessionRepository(_SupabaseRest):
         if not rows:
             raise RepositoryError("update matched no owned row")
         return rows[0]
+
+    async def update_session_if_current(
+        self,
+        user_id: str,
+        session_id: str,
+        expected_turns: list,
+        fields: dict,
+    ) -> dict | None:
+        """Atomically reject a stale gate write without a new DB object."""
+        expected = json.dumps(
+            expected_turns, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        rows = await self._request(
+            "PATCH",
+            "/gate_sessions",
+            params={
+                "id": f"eq.{session_id}",
+                "user_id": f"eq.{user_id}",
+                "passed": "is.null",
+                "turns": f"eq.{expected}",
+            },
+            json=fields,
+        )
+        return rows[0] if rows else None
 
 
 class SupabaseUnlockRepository(_SupabaseRest):

@@ -30,7 +30,8 @@ def test_report_without_attempt_uses_current_curated_context_without_provider():
     assert report.workflow_context.evidence.state == "manual"
     assert report.defense.state == "not_started"
     assert report.defense.turns == []
-    assert "does not independently verify" in report.truth_notice
+    assert "evaluator's outcome" in report.truth_notice
+    assert "not independent proof" in report.truth_notice
     assert "llm_service" not in inspect.getsource(report_service)
 
 
@@ -114,6 +115,61 @@ def test_legacy_attempt_without_snapshot_uses_documented_current_fallback():
     report = run(report_service.build_report_context(repo, gates, USER, 1))
     assert report.workflow_context_source == "current_workflow"
     assert report.defense.state == "in_progress"
+
+
+def test_malformed_snapshot_metadata_uses_current_workflow_fallback():
+    repo, gates, project = make_repos()
+    current = report_service.workflow_context_service.build_workflow_context(project, 1)
+    snapshot = current.model_dump(mode="json")
+    snapshot["schema_version"] = "999"
+    run(gates.create_session(USER, {
+        "project_id": project["id"],
+        "phase_id": 1,
+        "turns": [{
+            "turn": 1,
+            "question": "Legacy question?",
+            "answer": None,
+            "workflow_context_snapshot": snapshot,
+        }],
+    }))
+    report = run(report_service.build_report_context(repo, gates, USER, 1))
+    assert report.workflow_context_source == "current_workflow"
+    assert report.workflow_context == current
+
+
+def test_report_redacts_and_bounds_hostile_historical_transcript_values():
+    repo, gates, project = make_repos()
+    fake_secret = "sb_secret_FAKEVALUE12345678"
+    fake_bearer = "Bearer abcdefghijklmnopqrstuvwxyz"
+    run(gates.create_session(USER, {
+        "project_id": project["id"],
+        "phase_id": 1,
+        "turns": [
+            {
+                "turn": 1,
+                "question": fake_secret + " " + ("q" * 5_000),
+                "answer": fake_bearer + " " + ("a" * 9_000),
+            },
+            {
+                "turn": 2,
+                "question": "unsafe\x00question",
+                "answer": "unsafe\x00answer",
+            },
+        ],
+        "passed": False,
+        "reason": "AIza12345678901234567890" + " " + ("r" * 3_000),
+    }))
+    report = run(report_service.build_report_context(repo, gates, USER, 1))
+    body = json.dumps(report.model_dump(mode="json"))
+    assert fake_secret not in body
+    assert fake_bearer not in body
+    assert "AIza12345678901234567890" not in body
+    assert body.count("[REDACTED_SECRET]") == 3
+    assert body.count("[TRUNCATED]") == 3
+    assert len(report.defense.turns) == 1
+    assert len(report.defense.turns[0].question) <= report_service.MAX_REPORT_QUESTION_CHARS
+    assert len(report.defense.turns[0].answer) <= report_service.MAX_REPORT_ANSWER_CHARS
+    assert len(report.defense.evaluator_reason) <= report_service.MAX_REPORT_REASON_CHARS
 
 
 def test_report_owner_and_phase_isolation():

@@ -503,6 +503,7 @@ async def _grounded_question(
     anchor: str | None,
     prior_answers: list[str],
     prior_questions: list[str],
+    workflow_context=None,
     anchor_mode: str | None = None,
 ) -> tuple[str, dict]:
     """Generate one turn question and hold it to the M14B safety order:
@@ -536,6 +537,7 @@ async def _grounded_question(
                 anchor=anchor,
                 prior_answers=prior_answers,
                 prior_questions=prior_questions,
+                workflow_context=workflow_context,
             )
         except grounding_service.GroundingRejectedError as exc:
             if attempt + 1 < _MAX_GROUNDING_ATTEMPTS:
@@ -675,14 +677,15 @@ async def submit_anchor(
         anchor=anchor,
         prior_answers=[],
         prior_questions=[],
+        workflow_context=workflow_context,
         anchor_mode="strong" if strong else "weak",
     )
 
     # Anchor + question in one write: an LLM failure leaves nothing stored.
     # The grounding metadata lives inside the turns JSONB but never reaches
     # the client — _turns_view whitelists turn/question/answer only.
-    await gate_repo.update_session(
-        user_id, session_id,
+    updated = await gate_repo.update_session_if_current(
+        user_id, session_id, session.get("turns") or [],
         {"anchor_statement": anchor,
          "turns": [{
              "turn": 1,
@@ -694,6 +697,10 @@ async def submit_anchor(
              ),
          }]},
     )
+    if updated is None:
+        raise GateOutOfOrderError(
+            "This gate session changed while the question was being generated. Resume the current gate."
+        )
     return {"gate_session_id": session_id, "turn": 1, "question": question}
 
 
@@ -741,6 +748,7 @@ async def generate_followup(
         anchor=session.get("anchor_statement"),
         prior_answers=prior_answers,
         prior_questions=prior_questions,
+        workflow_context=workflow_context,
     )
 
     turns = list(stored_turns)
@@ -753,7 +761,13 @@ async def generate_followup(
         }
     turns[-1] = {**turns[-1], "answer": answer}
     turns.append({"turn": turn, "question": question, "answer": None, "grounding": grounding})
-    await gate_repo.update_session(user_id, session_id, {"turns": turns})
+    updated = await gate_repo.update_session_if_current(
+        user_id, session_id, stored_turns, {"turns": turns}
+    )
+    if updated is None:
+        raise GateOutOfOrderError(
+            "This gate session changed while the question was being generated. Resume the current gate."
+        )
     return {"gate_session_id": session_id, "turn": turn, "question": question}
 
 
@@ -791,7 +805,13 @@ async def evaluate_gate(
         "score": verdict["score"],  # stored for M10 unlock thresholds, never returned
         ("passed_at" if passed else "failed_at"): _now().isoformat(),
     }
-    await gate_repo.update_session(user_id, session_id, fields)
+    updated = await gate_repo.update_session_if_current(
+        user_id, session_id, session["turns"], fields
+    )
+    if updated is None:
+        raise GateOutOfOrderError(
+            "This gate session changed while it was being evaluated. Resume the current gate."
+        )
 
     result = {
         "gate_session_id": session_id,

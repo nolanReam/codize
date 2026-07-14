@@ -27,6 +27,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.schemas.defense_context import DefenseContextPack
+from app.schemas.workflow_context import CuratedWorkflowContext
 
 # ---------------------------------------------------------------------------
 # Prompt-side boundary (instructions the composed turn prompts carry)
@@ -174,6 +175,7 @@ def validate_question(
     anchor: str | None,
     prior_answers: list[str],
     prior_questions: list[str],
+    workflow_context: CuratedWorkflowContext | None = None,
 ) -> Grounding:
     """Deterministically validate a cleaned, user-facing question against the
     recorded context. Raises GroundingRejectedError with identifier-level
@@ -203,10 +205,15 @@ def validate_question(
 
     # A check the student recorded as skipped/failed/not-applicable may never
     # be described as passed.
-    verification = pack.workflow.verification
-    if verification is not None and _PASS_WORD.search(question):
+    if workflow_context is not None:
+        verification_checks = workflow_context.verification.checks
+    elif pack.workflow.verification is not None:
+        verification_checks = pack.workflow.verification.checks
+    else:
+        verification_checks = []
+    if verification_checks and _PASS_WORD.search(question):
         lowered = question.lower()
-        for check in verification.checks:
+        for check in verification_checks:
             if check.result != "pass" and check.check.lower() in lowered:
                 issues.append(
                     f"describes check '{check.check}' as passed but it was "

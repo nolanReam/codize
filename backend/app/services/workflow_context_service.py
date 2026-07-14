@@ -9,6 +9,7 @@ import json
 from dataclasses import dataclass, field
 
 from app.schemas.workflow_context import (
+    WORKFLOW_CONTEXT_SCHEMA_VERSION,
     CuratedWorkflowContext,
     WorkflowContextChangeItem,
     WorkflowContextChangeMap,
@@ -41,6 +42,7 @@ MAX_TEXT_CHARS = 1_000
 MAX_ENTRY_CHARS = 2_000
 MAX_TOTAL_TEXT_CHARS = 10_000
 MAX_SERIALIZED_CONTEXT_CHARS = 24_000
+MAX_PROMPT_CONTEXT_CHARS = 9_000
 TRUNCATION_MARKER = " …[TRUNCATED]"
 
 _MISSING = object()
@@ -290,7 +292,13 @@ def _verification(
                     ),
                 )
             )
-        incomplete = any(check.result == "unrecorded" for check in checks) or not verification.saved_at
+        # Currency is derived from the complete stored source, not only the
+        # bounded prefix exposed downstream. Otherwise an unrecorded target
+        # beyond MAX_VERIFICATION_CHECKS could be silently presented as a
+        # current/complete Verification record.
+        incomplete = bool(
+            verification_service.pending_targets(verification)
+        ) or not verification.saved_at
         return WorkflowContextVerification(
             state="stale" if stale else ("incomplete" if incomplete else "current"),
             checks=checks,
@@ -455,7 +463,11 @@ def context_from_snapshot(session: dict) -> CuratedWorkflowContext | None:
     except Exception:
         return None
     session_phase = session.get("phase_id")
-    if isinstance(session_phase, int) and context.phase_number != session_phase:
+    if (
+        context.schema_version != WORKFLOW_CONTEXT_SCHEMA_VERSION
+        or type(session_phase) is not int
+        or context.phase_number != session_phase
+    ):
         return None
     return context
 
@@ -463,3 +475,91 @@ def context_from_snapshot(session: dict) -> CuratedWorkflowContext | None:
 def snapshot_payload(context: CuratedWorkflowContext) -> dict:
     """The exact server-owned JSON stored with the attempt's first question."""
     return context.model_dump(mode="json")
+
+
+def prompt_context(
+    context: CuratedWorkflowContext,
+    max_chars: int = MAX_PROMPT_CONTEXT_CHARS,
+) -> CuratedWorkflowContext:
+    """Return a whole, schema-valid prompt projection within ``max_chars``.
+
+    The attempt snapshot and Report retain the fuller curated context. Defense
+    question prompts need a smaller belt, but must never receive a string cut
+    through the middle of an item where a claim could be separated from its
+    provenance or stale/uncertain state. This projection therefore removes
+    complete tail records deterministically and marks their source truncated.
+    """
+    projected = context.model_copy(deep=True)
+
+    def serialized_len() -> int:
+        return len(
+            json.dumps(
+                projected.model_dump(mode="json"),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+
+    collections = (
+        (projected.change_map, projected.change_map.items),
+        (projected.review, projected.review.items),
+        (projected.verification, projected.verification.checks),
+        (projected.evidence, projected.evidence.records),
+        (projected.evidence, projected.evidence.manual_entries),
+    )
+    while serialized_len() > max_chars:
+        candidates = [
+            (len(json.dumps(items[-1].model_dump(mode="json"), ensure_ascii=False)), index)
+            for index, (_, items) in enumerate(collections)
+            if items
+        ]
+        if not candidates:
+            break
+        _, index = max(candidates)
+        source, items = collections[index]
+        items.pop()
+        source.truncated = True
+        projected.content_truncated = True
+
+    # A context containing only manual optional prose can still exceed the
+    # prompt belt after all list records are removed. Omit optional fields as
+    # whole values, keeping source state/provenance intact and marking the
+    # affected source truncated.
+    optional_fields = (
+        (projected.evidence, "manual_summary"),
+        (projected.verification, "student_explanation"),
+    )
+    for source, field_name in optional_fields:
+        if serialized_len() <= max_chars:
+            break
+        if getattr(source, field_name) is not None:
+            setattr(source, field_name, None)
+            source.truncated = True
+            projected.content_truncated = True
+
+    manual = projected.review.manual
+    if manual is not None:
+        for field_name in (
+            "out_of_scope_changes",
+            "least_confident",
+            "ai_assumptions",
+            "edited_manually",
+            "rejected",
+            "accepted",
+            "ai_generated",
+        ):
+            if serialized_len() <= max_chars:
+                break
+            if getattr(manual, field_name) is not None:
+                setattr(manual, field_name, None)
+                projected.review.truncated = True
+                projected.content_truncated = True
+        while manual.files_changed and serialized_len() > max_chars:
+            manual.files_changed.pop()
+            projected.review.truncated = True
+            projected.content_truncated = True
+
+    if serialized_len() > max_chars:
+        raise RuntimeError("workflow prompt context exceeded its fixed belt")
+    return projected
