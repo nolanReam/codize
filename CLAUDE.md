@@ -4,15 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-**Latest completed milestone: M16S.1 (2026-07-14).** This supersedes the older
-M16A.2 current-state label later in this section; historical milestone details
-remain in place below. M16S.1 is write-boundary hardening only: the forward
-migration makes `public.projects` authenticated-owner read-only at the Postgres
-grant layer while preserving owner RLS reads and trusted FastAPI writes. The
-shared hosted pilot database was inspected but not migrated because it is not
-an identified safe development/test target; deployment plus effective
-privilege verification remains required. See
+**Latest completed milestone: M16B.3B (2026-07-14).** The existing Evidence
+page now exposes the reviewed M16B.3A Verification-to-Evidence handoff while
+preserving legacy/manual Evidence. This is a frontend-only milestone; M16S.1
+write-boundary hardening remains in force. See
+`.claude/memory/linked-evidence-ui-conventions.md` and
 `.claude/memory/workflow-artifact-write-boundary.md`.
+
+M16S.1 is write-boundary hardening only: the forward migration makes
+`public.projects` authenticated-owner read-only at the Postgres grant layer
+while preserving owner RLS reads and trusted FastAPI writes. The shared hosted
+pilot database was inspected but not migrated because it is not an identified
+safe development/test target; deployment plus effective privilege verification
+remains required.
 
 Codize is an educational platform that helps students understand the projects they build with AI — it teaches real dev workflows and reasoning about your own code, using AI as a tool rather than a crutch. It is a benign educational product about architecture understanding and project reasoning. It is **not** a cybersecurity, exploit, malware, or offensive-security tool.
 
@@ -41,6 +45,8 @@ Codize is an educational platform that helps students understand the projects th
 **M16A.2 (2026-07-13) — Confirmed Change Map → Review UI (frontend-only, no migration):** `/app/phase/review` now preserves two compatible modes: linked Review initialized explicitly from a confirmed/current Change Map, and the unchanged legacy/manual form for existing artifacts. No initialization runs on mount. Linked targets render in the backend's six-category order with bounded source snapshots as plain text and honest confirmed/corrected/student-added/unresolved labels; students choose pending/keep/revise/remove/needs_verification/uncertain through semantic radios. `lib/review.ts` owns strict mode detection, labels, grouping, Unicode-safe 2,000-character validation, progress/completion, canonical student-only `target_updates`, dirty comparison, safe source-binding fingerprints, scoped draft restore, stale/replacement readiness, and Build Loop status. Hidden rationale/revision text is excluded from payload and dirty state. Unsaved linked decisions reuse `useDraft` under user + active-project + phase + source-binding/ordered-target scope; stale/rebuilt Reviews reject old drafts. Stale Review remains readable but disabled and replacement requires an inline warning before `replace_existing=true`. Zero targets remain neutral; uncertainty and needs-testing count as reviewed. Completion links to `/app/phase/verify` only—no Verification suggestions/checks, Evidence, Defense, or Report integration. `WorkflowSteps` distinguishes ready/in-progress/complete/stale and phase next-action logic handles Start/Continue/Rebuild/Continue-to-Verification while manual Review keeps its established evidence-first continuation. Workflow capture remains exactly N/5. Backend, database, prompts, providers, and migrations are unchanged. See `.claude/memory/linked-review-ui-conventions.md`.
 
 **M16B.1 (2026-07-13) — Review decisions → Verification suggestion foundation (backend/data-contract only, no frontend change, no migration):** the existing phase-scoped `verification` JSONB section can now be initialized explicitly from the owned phase's saved, complete, current linked Review via `POST /workflow/{phase}/verification/from-review` (no body or `{"replace_existing":true}` only). `verification_service.create_from_review` consumes only `review_service.needs_verification_targets(review)`, preserving its deterministic order and excluding pending/keep/revise/remove/uncertain. Six explicit category templates embed the bounded reviewed effective text and produce beginner-actionable proposed checks with zero Gemini/OpenRouter/stub calls, no prompt, no execution, no invented project details, and no completed result. Each target stores deterministic server `vt-...` identity, Review/Change Map ids, category, bounded source/rationale snapshots, suggestion, and nullable future student check/result/notes; null is unperformed and the existing pass/fail/skipped/not_applicable semantics are unchanged. The binding records source Change Map timestamps, Review saved_at, and an ordered identity/decision fingerprint; `GET /workflow/{phase}` exposes additive linked fields plus server-computed stale when Review changes/disappears/corrupts/rebuilds/stales/rebinds. Stale work remains readable. Existing manual and linked Verification never overwrite without explicit replacement. The generic Verification PUT remains compatible with the current frontend and now protects all server fields while accepting only student-owned `target_updates`. Zero needs-testing targets create an honest empty linked artifact, never completion. Typed pending/performed/failed/unresolved and future Evidence handoff helpers create no Evidence. Linked source/suggestion data remains absent from Defense Context/Project Defense/evaluator/report. 62 focused backend tests include a 43-check authenticated deterministic smoke. See `.claude/memory/review-verification-integration-conventions.md`.
+
+**M16B.3B (2026-07-14) — Verification Results → Student Evidence UI (frontend-only, no migration):** `/app/phase/evidence` now preserves legacy/manual Evidence while consuming M16B.3A linked Evidence through a pure preview GET, explicit zero-default selection, explicit initialization POST, and changed-only student target updates through the generic Evidence PUT. The client trusts server eligibility and completion, never creates Evidence on mount, preselects targets, copies Verification results/notes into entries, or sends provenance. Each linked target separates read-only Verification context from the student's not-addressed/recorded/unavailable decision; recorded and unavailable have mutually exclusive validated fields. Drafts are user/project/phase/fingerprint scoped with no source text. Stale work is readable/disabled and replacement requires a fresh zero-selection preview plus explicit warning. Workflow status/next action now distinguish ready/in-progress/complete/stale without changing N/5. Defense, Report, gate, evaluator, backend, prompts, providers, and schema remain unchanged pending M16C. See `.claude/memory/linked-evidence-ui-conventions.md`.
 
 ## Product and Context Sources
 

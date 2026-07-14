@@ -85,13 +85,18 @@ until M16C so empty initialization cannot advertise Evidence as a present
 grounding source; the client Report remains on its legacy reader. Nested linked
 Evidence is deliberately absent until M16C.
 
-**Exact M16B.3B frontend seam:** preview with the GET; trust server eligibility;
-let the student deliberately choose eligible ids; POST selection only after an
-explicit action; apply the returned artifact; save changed student fields only
-through generic Evidence PUT. Preserve manual mode and every result label.
-Explicit rebuild may send `replace_existing=true` only after warning that old
-linked/manual Evidence is replaced. Never auto-create/prefill, read local
-Verification drafts, derive proof, or echo server provenance.
+**M16B.3B frontend implementation:** the existing Evidence page previews with
+the GET and trusts server eligibility; the student deliberately chooses from a
+zero-selection state, then the POST creates only empty linked targets. The
+returned artifact is applied to the existing workflow snapshot and changed
+student fields save only through generic Evidence PUT. Manual mode and every
+result label are preserved. Explicit rebuild gets a current preview, again
+preselects nothing, and sends `replace_existing=true` only after a warning that
+old linked/manual Evidence is replaced. Local drafts contain only a safe source
+fingerprint, target ids, and student fields. The UI never auto-creates/prefills,
+reads Verification drafts, derives proof, copies result/notes into Evidence, or
+echoes server provenance. Completion trusts only the returned
+`evidence_record_complete` field.
 
 **Exact M16C backend seam:** from an already-owned project call
 `evidence_service.get_stored_evidence(project, phase_number)` and use

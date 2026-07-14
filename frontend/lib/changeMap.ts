@@ -15,6 +15,7 @@ import type {
   StudentAddedChangeMapDecision,
   WorkflowSections,
 } from "./types";
+import { isLinkedEvidenceArtifact } from "./evidence";
 import {
   isLinkedReviewArtifact,
   linkedReviewAllowsVerification,
@@ -588,9 +589,30 @@ export function derivePhaseNextStep(
       }
       if (!sections.evidence) {
         return {
-          label: "Continue to Evidence",
+          label: "Start Evidence",
           href: "/app/phase/evidence",
-          hint: "Verification is recorded. Add supporting material without changing those results.",
+          hint: "Verification is recorded. Deliberately choose performed checks to support.",
+        };
+      }
+      if (isLinkedEvidenceArtifact(sections.evidence)) {
+        if (sections.evidence.stale) {
+          return {
+            label: "Rebuild Evidence",
+            href: "/app/phase/evidence",
+            hint: "Verification changed—keep the old record visible and deliberately rebuild from current results.",
+          };
+        }
+        if (!sections.evidence.evidence_record_complete) {
+          return {
+            label: "Continue Evidence",
+            href: "/app/phase/evidence",
+            hint: "Add supporting material or explain why Evidence is unavailable for each selected check.",
+          };
+        }
+        return {
+          label: "Evidence record complete",
+          href: "/app/phase/evidence",
+          hint: "Every selected result has saved Evidence or an unavailable explanation. This is a record, not proof of total correctness.",
         };
       }
     }

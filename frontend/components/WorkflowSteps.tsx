@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { changeMapStepStatus } from "@/lib/changeMap";
+import { evidenceStepStatus } from "@/lib/evidence";
 import { reviewStepStatus } from "@/lib/review";
 import { verificationStepStatus } from "@/lib/verification";
 import type { StoredChangeMap, WorkflowSections } from "@/lib/types";
@@ -16,6 +17,7 @@ const STEPS: {
   changeMap?: boolean;
   review?: boolean;
   verification?: boolean;
+  evidence?: boolean;
   note?: string;
 }[] = [
   { label: "Plan + Prompt", href: "/app/phase/prompt", section: "prompt_builder" },
@@ -24,7 +26,7 @@ const STEPS: {
   { label: "Change Map", href: "/app/phase/change-map", section: null, changeMap: true },
   { label: "Review", href: "/app/phase/review", section: "review_board", review: true },
   { label: "Verify", href: "/app/phase/verify", section: "verification", verification: true },
-  { label: "Evidence", href: "/app/phase/evidence", section: "evidence" },
+  { label: "Evidence", href: "/app/phase/evidence", section: "evidence", evidence: true },
   { label: "Explain", href: "/app/gate", section: null, note: "the gate" },
   { label: "Commit / Reflect", href: "/app/report", section: null, note: "defense report" },
 ];
@@ -51,12 +53,20 @@ export default function WorkflowSteps({
               sections?.review_board ?? null
             )
           : null;
+        const linkedEvidenceStatus = step.evidence
+          ? evidenceStepStatus(
+              sections?.evidence ?? null,
+              sections?.verification ?? null
+            )
+          : null;
         const done = step.changeMap
           ? mapStatus?.tone === "done"
           : step.review
             ? linkedReviewStatus?.tone === "done"
             : step.verification
               ? linkedVerificationStatus?.tone === "done"
+              : step.evidence
+                ? linkedEvidenceStatus?.tone === "done"
               : step.section != null && sections?.[step.section] != null;
         const dotTone = step.changeMap
           ? mapStatus?.tone
@@ -64,6 +74,8 @@ export default function WorkflowSteps({
             ? linkedReviewStatus?.tone
             : step.verification
               ? linkedVerificationStatus?.tone
+              : step.evidence
+                ? linkedEvidenceStatus?.tone
               : done
                 ? "done"
                 : "idle";
@@ -71,6 +83,7 @@ export default function WorkflowSteps({
           mapStatus?.label ??
           linkedReviewStatus?.label ??
           linkedVerificationStatus?.label ??
+          linkedEvidenceStatus?.label ??
           step.note;
         const inner = (
           <>

@@ -13,7 +13,9 @@ import type {
   ChangeMapUpdateRequest,
   DefenseContextSummary,
   Evaluation,
-  EvidenceArtifact,
+  EvidenceHandoffPreview,
+  EvidenceInitializationResponse,
+  EvidenceSaveRequest,
   GateCurrent,
   GateEvaluationResult,
   GateStartResult,
@@ -29,6 +31,7 @@ import type {
   ReviewBoardSaveRequest,
   ReviewInitializationResponse,
   StoredReviewBoardArtifact,
+  StoredEvidenceArtifact,
   StoredVerificationArtifact,
   VerificationInitializationResponse,
   VerificationSaveRequest,
@@ -131,7 +134,7 @@ export const getWorkflow = (phase: number) =>
 type SectionPayloadMap = {
   prompt_builder: Omit<PromptBuilderArtifact, "saved_at">;
   review_board: ReviewBoardSaveRequest;
-  evidence: Omit<EvidenceArtifact, "saved_at">;
+  evidence: EvidenceSaveRequest;
   verification: VerificationSaveRequest;
   implementation_import: Omit<ImplementationImportArtifact, "saved_at">;
 };
@@ -139,7 +142,7 @@ type SectionPayloadMap = {
 type SectionArtifactMap = {
   prompt_builder: PromptBuilderArtifact;
   review_board: StoredReviewBoardArtifact;
-  evidence: EvidenceArtifact;
+  evidence: StoredEvidenceArtifact;
   verification: StoredVerificationArtifact;
   implementation_import: ImplementationImportArtifact;
 };
@@ -199,6 +202,27 @@ export const initializeVerificationFromReview = (phase: number, replaceExisting 
     { method: "POST", ...(body ? { body } : {}) }
   );
 };
+
+// Evidence handoff preview is a pure read. Initialization happens only after
+// the student explicitly selects server-marked eligible Verification targets.
+export const getEvidenceHandoffPreview = (phase: number) =>
+  request<EvidenceHandoffPreview>(`/workflow/${phase}/evidence/from-verification`);
+
+export const initializeEvidenceFromVerification = (
+  phase: number,
+  selectedVerificationTargetIds: string[],
+  replaceExisting = false
+) =>
+  request<EvidenceInitializationResponse>(
+    `/workflow/${phase}/evidence/from-verification`,
+    {
+      method: "POST",
+      body: {
+        selected_verification_target_ids: selectedVerificationTargetIds,
+        ...(replaceExisting ? { replace_existing: true as const } : {}),
+      },
+    }
+  );
 
 // --- reconnection / evaluation / gate --------------------------------------------
 

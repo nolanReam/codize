@@ -148,3 +148,15 @@ Defense Context explicitly omits linked Evidence until M16C, and the Report
 continues to read only manual top-level entries/summary. Nested linked Evidence
 therefore does not enter either downstream consumer before M16C.
 See [[verification-evidence-handoff-conventions]].
+
+M16B.3B is a frontend consumer only. It adds no store, migration, or backend
+write shape: the pure preview GET supplies prerequisite/eligibility state,
+the explicit initializer POST returns the linked artifact applied to the
+existing workflow snapshot, and the generic Evidence PUT receives changed
+student-only `target_updates`. Manual `entries + summary` retains its original
+full-section path. A linked artifact still contributes exactly one captured
+section to N/5 regardless of selected target count, addressing progress,
+completion, or stale state. Result/check/notes snapshots remain read-only
+context and are never copied into an Evidence entry. Linked nested Evidence
+still has no Defense or Report consumer before M16C. See
+[[linked-evidence-ui-conventions]].

@@ -183,6 +183,105 @@ export interface EvidenceArtifact {
   saved_at?: string;
 }
 
+// Linked Evidence (M16B.3A backend / M16B.3B UI). Verification context and
+// lifecycle fields are server-owned. The browser may send only the immutable
+// Evidence target id and the student-owned fields active for its chosen status.
+export type EvidenceStatus =
+  | "not_addressed"
+  | "evidence_recorded"
+  | "evidence_unavailable";
+
+export type EvidenceHandoffResult = VerificationResult | "unrecorded";
+export type EvidenceEligibility = "eligible" | "ineligible";
+export type EvidenceIneligibilityReason = "verification_stale" | "not_performed" | null;
+export type EvidenceHandoffMode =
+  | "unavailable"
+  | "manual_verification"
+  | "linked_verification";
+export type EvidenceVerificationState =
+  | "verification_required"
+  | "manual_verification"
+  | "current"
+  | "stale";
+
+export interface EvidenceHandoffTarget {
+  verification_target_id: string;
+  category: VerificationSourceCategory;
+  check: string;
+  result: EvidenceHandoffResult;
+  result_notes: string | null;
+  performed: boolean;
+  eligibility: EvidenceEligibility;
+  ineligibility_reason: EvidenceIneligibilityReason;
+}
+
+export interface EvidenceHandoffPreview {
+  mode: EvidenceHandoffMode;
+  verification_state: EvidenceVerificationState;
+  eligible_count: number;
+  targets: EvidenceHandoffTarget[];
+  guidance: string;
+}
+
+export type ZeroEligibleEvidenceHandoffPreview = EvidenceHandoffPreview & {
+  eligible_count: 0;
+};
+
+export interface LinkedEvidenceTarget {
+  evidence_target_id: string;
+  source_verification_target_id: string;
+  category: VerificationSourceCategory;
+  check_snapshot: string;
+  verification_result_snapshot: "pass" | "fail";
+  verification_result_notes_snapshot: string | null;
+  evidence_status: EvidenceStatus;
+  entries: EvidenceEntry[];
+  explanation: string | null;
+  unavailable_reason: string | null;
+}
+
+export interface LinkedEvidenceArtifact extends EvidenceArtifact {
+  initialized_from_verification: true;
+  stale: boolean;
+  evidence_record_complete: boolean;
+  evidence_targets: LinkedEvidenceTarget[];
+}
+
+export type StoredEvidenceArtifact = EvidenceArtifact | LinkedEvidenceArtifact;
+
+export interface EvidenceInitializationRequest {
+  selected_verification_target_ids: string[];
+  replace_existing?: true;
+}
+
+export interface EvidenceInitializationResponse {
+  phase: number;
+  section: "evidence";
+  artifact: LinkedEvidenceArtifact;
+}
+
+export type EvidenceTargetUpdateRequest =
+  | {
+      evidence_target_id: string;
+      evidence_status: "not_addressed";
+    }
+  | {
+      evidence_target_id: string;
+      evidence_status: "evidence_recorded";
+      entries: EvidenceEntry[];
+      explanation: string | null;
+    }
+  | {
+      evidence_target_id: string;
+      evidence_status: "evidence_unavailable";
+      unavailable_reason: string;
+    };
+
+export interface EvidenceSaveRequest
+  extends Partial<Omit<EvidenceArtifact, "saved_at">> {
+  target_updates?: EvidenceTargetUpdateRequest[];
+}
+
 export type VerificationCheckId =
   | "app_runs_locally"
   | "smoke_test"
@@ -401,7 +500,7 @@ export type ChangeMapConfirmationResponse = ChangeMapMutationResult;
 export interface WorkflowSections {
   prompt_builder: PromptBuilderArtifact | null;
   review_board: StoredReviewBoardArtifact | null;
-  evidence: EvidenceArtifact | null;
+  evidence: StoredEvidenceArtifact | null;
   verification: StoredVerificationArtifact | null;
   implementation_import: ImplementationImportArtifact | null;
 }

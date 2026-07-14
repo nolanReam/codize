@@ -136,6 +136,37 @@ npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
 
+## Status (M16B.3B)
+
+The existing `/app/phase/evidence` route now consumes the M16B.3A handoff
+without changing the manual Evidence path. A pure preview GET renders the
+server's prerequisite state and eligibility decisions; nothing is created on
+mount, no result is preselected, and only an explicit student selection is
+posted. Passed and failed Verification results remain source context rather
+than Evidence. Skipped, not-applicable, unrecorded, and otherwise ineligible
+results stay visible in a secondary disclosure and cannot be selected.
+
+Linked Evidence keeps each saved Verification check, result, and notes
+read-only above the student's own choice: not addressed, add supporting
+Evidence, or record why Evidence is unavailable. Recorded targets require at
+least one of the existing nine Evidence entry kinds and may include a bounded
+explanation; unavailable targets require a reason and never masquerade as
+Evidence. Saves send only changed student-owned target updates. Server-owned eligibility,
+source snapshots, bindings, stale state, and completion never echo back in a
+write. Completion copy is driven only by the returned
+`evidence_record_complete` field and means the Evidence record is addressed,
+not that the implementation is correct.
+
+Linked drafts reuse the existing secret-guarded local layer and are scoped by
+authenticated user, active project, phase, and a safe initialization/target
+fingerprint that contains no source text. Stale work stays readable and
+disabled; rebuilding fetches a current preview with nothing selected and sends
+`replace_existing=true` only after an explicit warning. Manual Evidence is
+preserved unless the student deliberately replaces it. Build Loop and phase
+next actions distinguish unavailable, ready, in progress, complete, and stale
+Evidence while workflow capture stays exactly **N/5**. Defense, Report, gate,
+evaluation, backend, schema, prompts, and providers are unchanged pending M16C.
+
 ## Status (M16B.2)
 
 The existing `/app/phase/verify` route now supports both M16B.1 linked

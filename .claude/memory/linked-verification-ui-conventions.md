@@ -107,19 +107,19 @@ rail collapses at 1150px; linked surface padding, result summary, radio grid,
 field actions, and primary buttons stack at 640px; 390px has no page overflow.
 The existing reduced-motion rule applies.
 
-**Exact M16B.3B frontend seam after M16B.3A:** on the existing
-`/app/phase/evidence` surface, explicitly call
-`GET /workflow/{phase}/evidence/from-verification`. Render its server-derived
-missing/manual/current/stale state and all result outcomes; allow selection only
-where `eligibility=eligible`. After an explicit student action, POST
-`{selected_verification_target_ids, replace_existing?}` to the same route.
-Consume the returned curated linked Evidence artifact through the existing
-workflow state and save only changed
-`target_updates: [{evidence_target_id, evidence_status, entries, explanation,
-unavailable_reason}]` via the generic Evidence PUT. Do not derive eligibility,
-send Review/Change Map ids or bindings, auto-run on navigation, read
-Verification drafts, copy result notes into Evidence, or treat unavailable as
-Evidence. Existing manual mode remains unchanged.
+**M16B.3B frontend seam implemented:** the existing `/app/phase/evidence`
+surface explicitly calls `GET /workflow/{phase}/evidence/from-verification`
+only when it needs a preview. It renders the server-derived
+missing/manual/current/stale states and every result outcome, while selecting
+only `eligibility=eligible` targets and defaulting all checkboxes to empty. The
+explicit POST sends selected Verification target ids and replacement intent
+only after confirmation. The returned linked artifact enters the existing
+workflow state; generic Evidence PUT sends only changed student-owned target
+updates. Eligibility is never derived; Review/Change Map ids and bindings are
+never echoed; navigation never auto-initializes; Verification drafts/results/
+notes never become Evidence; unavailable remains a reason, not Evidence. The
+manual mode is unchanged. Full frontend rules live in
+[[linked-evidence-ui-conventions]].
 
 **Exact M16C backend seam:** load typed linked Evidence with
 `evidence_service.get_stored_evidence(project, phase_number)`, require

@@ -40,6 +40,7 @@ import type {
   ChangeMapItem,
   ChangeMapStudentDecision,
   LinkedReviewBoardArtifact,
+  LinkedEvidenceArtifact,
   LinkedVerificationArtifact,
   StoredChangeMap,
   WorkflowSections,
@@ -174,6 +175,32 @@ function linkedVerification(
       student_check: null,
       result,
       result_notes: null,
+    }],
+  };
+}
+
+function linkedEvidence(
+  complete = false,
+  stale = false
+): LinkedEvidenceArtifact {
+  return {
+    entries: [],
+    summary: null,
+    saved_at: "2026-07-14T12:00:00Z",
+    initialized_from_verification: true,
+    stale,
+    evidence_record_complete: complete,
+    evidence_targets: [{
+      evidence_target_id: "ev-0123456789ab",
+      source_verification_target_id: "vt-0123456789ab",
+      category: "behavior_change",
+      check_snapshot: "Perform the route flow.",
+      verification_result_snapshot: "pass",
+      verification_result_notes_snapshot: "The route worked.",
+      evidence_status: complete ? "evidence_recorded" : "not_addressed",
+      entries: complete ? [{ kind: "test_output", content: "1 passed" }] : [],
+      explanation: complete ? "The route test passed." : null,
+      unavailable_reason: null,
     }],
   };
 }
@@ -633,11 +660,22 @@ describe("phase next-step logic and N/5 preservation", () => {
     expect(derivePhaseNextStep(sections({
       ...base,
       verification: linkedVerification("fail"),
-    }), confirmed).label).toBe("Continue to Evidence");
+    }), confirmed).label).toBe("Start Evidence");
     expect(derivePhaseNextStep(sections({
       ...base,
       verification: linkedVerification(null, false, true),
-    }), confirmed).label).toBe("Continue to Evidence");
+    }), confirmed).label).toBe("Start Evidence");
+  });
+
+  it("routes linked Evidence through in-progress, stale, and server-complete states", () => {
+    const confirmed = map({ status: "confirmed", confirmed_at: "2026-07-13T11:00:00Z" });
+    const base = {
+      review_board: linkedReview("keep"),
+      verification: linkedVerification("pass"),
+    };
+    expect(derivePhaseNextStep(sections({ ...base, evidence: linkedEvidence() }), confirmed).label).toBe("Continue Evidence");
+    expect(derivePhaseNextStep(sections({ ...base, evidence: linkedEvidence(false, true) }), confirmed).label).toBe("Rebuild Evidence");
+    expect(derivePhaseNextStep(sections({ ...base, evidence: linkedEvidence(true) }), confirmed).label).toBe("Evidence record complete");
   });
 
   it("keeps Prompt first, preserves manual Review continuation, and preserves N/5", () => {

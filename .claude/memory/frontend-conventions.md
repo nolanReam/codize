@@ -430,3 +430,23 @@ links to Evidence only. Phase next actions now distinguish Start/Continue/
 Rebuild Verification and Continue to Evidence. N/5 capture, build tasks,
 manual Verification, Evidence data, Defense, and Report remain separate. Full
 rules: [[linked-verification-ui-conventions]].
+
+**M16B.3B (2026-07-14) — linked Evidence UI.** The existing Evidence page now
+has a strict third mode in addition to the preserved manual form and its
+prerequisite states. `lib/evidence.ts` is the pure contract layer: strict
+linked/invalid-linked detection; exact backend enums and caps; server-only
+eligibility interpretation; Unicode-code-point and request-belt validation;
+canonical active-field-only target updates; changed-only save shaping;
+server-completion progress; safe-link rendering; binding fingerprint/draft
+scope; stale/rebuild rules; and Workflow/phase next-action status. The page
+does one preview GET only when no linked artifact is mounted, never POSTs on
+mount, starts with zero selected targets, and creates/rebuilds only after
+explicit actions. Read-only Verification context stays visually above the
+student's Evidence controls. Linked drafts use
+`linked_evidence:active-project:<phase>:<safe fingerprint>` and contain target
+ids plus student fields only—never source text or provenance. Stale work is
+readable/disabled; replacement gets a fresh zero-selection preview and a
+destructive warning. Completion trusts only saved
+`evidence_record_complete`. Manual Evidence, N/5 capture, Defense, Report,
+gate, and evaluator behavior are unchanged. Full rules:
+[[linked-evidence-ui-conventions]].
