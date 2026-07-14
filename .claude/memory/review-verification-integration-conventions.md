@@ -104,13 +104,13 @@ server stale. Save only changed
 result_notes}]` through the existing generic Verification PUT. Never derive
 checks in the browser, echo server fields, or equate suggestion with result.
 
-**Exact future M16B.3 Evidence seam:** load typed
-`StoredVerificationArtifact`, then call
-`verification_service.evidence_handoff_targets(verification)`. It returns
-Verification/Review/Change Map ids, category, actual check wording
-(`student_check` or suggestion), recorded result, and notes. It creates no
-Evidence record; future Evidence work must deliberately decide which performed
-results are eligible and must preserve fail/skipped/N/A honestly.
+**Implemented M16B.3A Evidence seam:** the typed helper remains the only
+Verification → Evidence derivation. `evidence_service.handoff_preview` calls it
+and exposes a curated view of every outcome; only current saved pass/fail
+results are eligible. Explicit `create_from_verification` selects helper target
+ids and stores empty linked Evidence records with internal Review/Change Map
+linkage and snapshots—never student Evidence. Skipped/N/A/null remain visible
+but ineligible. See [[verification-evidence-handoff-conventions]].
 
 **M16B.2 frontend consumer (2026-07-14):** the existing
 `/app/phase/verify` route now implements the seam above without changing this

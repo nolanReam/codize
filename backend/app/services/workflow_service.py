@@ -32,7 +32,12 @@ from pydantic import ValidationError
 
 from app.schemas.change_map import StoredChangeMap
 from app.schemas.workflow import SECTION_MODELS, StoredImplementationImport
-from app.services import phase_service, review_service, verification_service
+from app.services import (
+    evidence_service,
+    phase_service,
+    review_service,
+    verification_service,
+)
 from app.services.project_repository import ProjectRepository
 
 SECTIONS = tuple(SECTION_MODELS)
@@ -97,6 +102,8 @@ def _phase_view(project: dict, phase_number: int) -> dict:
         stored["verification"] = verification_service.verification_view(
             project, phase_number
         )
+    if "evidence" in stored:
+        stored["evidence"] = evidence_service.evidence_view(project, phase_number)
     return {
         "phase": phase_number,
         "sections": {name: stored.get(name) for name in SECTIONS},
@@ -240,6 +247,21 @@ async def store_verification(
     )
 
 
+async def store_evidence(
+    repo: ProjectRepository, user_id: str, project: dict, phase_number: int, data: dict
+) -> dict:
+    """Persist validated manual or linked Evidence without touching siblings."""
+    existing = project.get("workflow_artifacts")
+    artifacts = dict(existing) if isinstance(existing, dict) else {}
+    phase_map = artifacts.get(str(phase_number))
+    phase_map = dict(phase_map) if isinstance(phase_map, dict) else {}
+    phase_map["evidence"] = copy.deepcopy(data)
+    artifacts[str(phase_number)] = phase_map
+    return await repo.update_project(
+        user_id, project["id"], {"workflow_artifacts": artifacts}
+    )
+
+
 async def get_phase_artifacts(
     repo: ProjectRepository, user_id: str, phase_number: int
 ) -> dict:
@@ -300,6 +322,17 @@ async def save_section(
                 repo, user_id, project, phase_number, payload
             )
         except verification_service.InvalidVerificationUpdateError as exc:
+            raise InvalidArtifactError(str(exc))
+
+    # M16B.3A applies the same additive pattern to Evidence. Manual payloads
+    # remain full-section replacements; linked target updates can mutate only
+    # student Evidence fields while source snapshots/bindings stay in storage.
+    if section == "evidence":
+        try:
+            return await evidence_service.save_evidence(
+                repo, user_id, project, phase_number, payload
+            )
+        except evidence_service.InvalidEvidenceUpdateError as exc:
             raise InvalidArtifactError(str(exc))
 
     try:

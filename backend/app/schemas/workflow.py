@@ -12,6 +12,7 @@ free-text field rejects values that look like pasted API keys or secrets
 """
 
 import re
+import unicodedata
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
@@ -36,6 +37,33 @@ def _text(max_length: int):
     return Annotated[
         str, Field(max_length=max_length), AfterValidator(_reject_secret_like)
     ]
+
+
+def _reject_unsafe_control_chars(value: str) -> str:
+    """Evidence may contain multiline logs, so allow tab/newline/CR only."""
+    if any(
+        unicodedata.category(char) == "Cc" and char not in "\t\n\r"
+        for char in value
+    ):
+        raise ValueError("evidence text contains an unsupported control character")
+    return value
+
+
+def _require_visible_text(value: str) -> str:
+    if not value.strip():
+        raise ValueError("evidence content cannot be empty")
+    return value
+
+
+def _evidence_text(max_length: int, *, required: bool = False):
+    validators = [
+        Field(max_length=max_length),
+        AfterValidator(_reject_secret_like),
+        AfterValidator(_reject_unsafe_control_chars),
+    ]
+    if required:
+        validators.append(AfterValidator(_require_visible_text))
+    return Annotated[str, *validators]
 
 
 ShortText = _text(300)
@@ -250,11 +278,15 @@ EvidenceKind = Literal[
 ]
 
 _COMMIT_HASH = re.compile(r"[0-9a-fA-F]{7,40}")
+EvidenceContent = _evidence_text(8000, required=True)
+EvidenceText = _evidence_text(2000)
+EVIDENCE_ENTRY_MAX = 20
+EVIDENCE_TARGET_MAX = 20
 
 
 class EvidenceEntry(_Artifact):
     kind: EvidenceKind
-    content: Annotated[LongText, Field(min_length=1)]
+    content: EvidenceContent
 
     @model_validator(mode="after")
     def _check_kind_format(self) -> "EvidenceEntry":
@@ -271,8 +303,180 @@ class EvidenceArtifact(_Artifact):
     """Step 5 input: manual, self-reported evidence (v0.1 — no GitHub
     fetching, no automatic URL verification)."""
 
-    entries: list[EvidenceEntry] = Field(default_factory=list, max_length=20)
-    summary: MedText | None = None
+    entries: list[EvidenceEntry] = Field(
+        default_factory=list, max_length=EVIDENCE_ENTRY_MAX
+    )
+    summary: EvidenceText | None = None
+
+
+# The six categories that can flow Review -> Verification -> linked Evidence.
+# Defined here because linked Evidence snapshots use the same exact vocabulary.
+VerificationSourceCategory = Literal[
+    "behavior_change",
+    "implementation_decision",
+    "out_of_scope_change",
+    "security_sensitive_area",
+    "unresolved_risk",
+    "unverified_behavior",
+]
+
+
+# --- linked Evidence model (M16B.3A) --------------------------------------
+
+EvidenceStatus = Literal[
+    "not_addressed",
+    "evidence_recorded",
+    "evidence_unavailable",
+]
+
+
+class EvidenceVerificationBinding(_Artifact):
+    """Server-owned identity of the selected saved Verification context.
+
+    ``verification_initialized_at`` makes an explicit Verification rebuild a
+    new source version. The two fingerprints bind the upstream Review version
+    and the selected effective checks/results without using raw text as an id.
+    """
+
+    verification_initialized_at: ReviewTimestamp
+    verification_review_binding_fingerprint: Annotated[
+        str, Field(pattern=r"^[0-9a-f]{64}$")
+    ]
+    selected_target_fingerprint: Annotated[
+        str, Field(pattern=r"^[0-9a-f]{64}$")
+    ]
+
+
+class LinkedEvidenceTarget(_Artifact):
+    """One server-snapshotted performed result plus student Evidence state."""
+
+    evidence_target_id: Annotated[str, Field(pattern=r"^ev-[0-9a-f]{12}$")]
+    source_verification_target_id: Annotated[
+        str, Field(pattern=r"^vt-[0-9a-f]{12}$")
+    ]
+    source_review_target_id: Annotated[str, Field(pattern=r"^rv-[0-9a-f]{12}$")]
+    source_change_map_item_id: Annotated[str, Field(min_length=1, max_length=64)]
+    category: VerificationSourceCategory
+    check_snapshot: EvidenceText
+    verification_result_snapshot: Literal["pass", "fail"]
+    verification_result_notes_snapshot: EvidenceText | None = None
+    evidence_status: EvidenceStatus = "not_addressed"
+    entries: list[EvidenceEntry] = Field(
+        default_factory=list, max_length=EVIDENCE_ENTRY_MAX
+    )
+    explanation: EvidenceText | None = None
+    unavailable_reason: EvidenceText | None = None
+
+    @model_validator(mode="after")
+    def _evidence_state(self) -> "LinkedEvidenceTarget":
+        for name in ("explanation", "unavailable_reason"):
+            value = getattr(self, name)
+            setattr(self, name, (value.strip() or None) if value is not None else None)
+        identities = [(entry.kind, entry.content) for entry in self.entries]
+        if len(identities) != len(set(identities)):
+            raise ValueError("duplicate evidence entries are not allowed")
+        if self.evidence_status == "not_addressed":
+            if self.entries or self.explanation or self.unavailable_reason:
+                raise ValueError(
+                    "not-addressed Evidence cannot contain entries or explanations"
+                )
+        elif self.evidence_status == "evidence_recorded":
+            if not self.entries:
+                raise ValueError("recorded Evidence needs at least one evidence entry")
+            if self.unavailable_reason:
+                raise ValueError(
+                    "recorded Evidence cannot also be marked unavailable"
+                )
+        else:
+            if self.entries or self.explanation:
+                raise ValueError(
+                    "unavailable Evidence cannot contain evidence entries or an evidence explanation"
+                )
+            if not self.unavailable_reason:
+                raise ValueError("unavailable Evidence needs a student-provided reason")
+        return self
+
+
+class StoredEvidenceArtifact(EvidenceArtifact):
+    """Backward-compatible manual or linked Evidence storage/read shape."""
+
+    saved_at: str | None = None
+    initialized_at: ReviewTimestamp | None = None
+    source_verification_binding: EvidenceVerificationBinding | None = None
+    evidence_targets: list[LinkedEvidenceTarget] = Field(
+        default_factory=list, max_length=EVIDENCE_TARGET_MAX
+    )
+
+    @model_validator(mode="after")
+    def _linked_integrity(self) -> "StoredEvidenceArtifact":
+        linked = self.source_verification_binding is not None
+        if linked != (self.initialized_at is not None):
+            raise ValueError(
+                "linked Evidence needs a source Verification binding and initialization time"
+            )
+        if self.evidence_targets and not linked:
+            raise ValueError("Evidence targets need a source Verification binding")
+        target_ids = [target.evidence_target_id for target in self.evidence_targets]
+        verification_ids = [
+            target.source_verification_target_id for target in self.evidence_targets
+        ]
+        if len(target_ids) != len(set(target_ids)):
+            raise ValueError("duplicate Evidence target ids")
+        if len(verification_ids) != len(set(verification_ids)):
+            raise ValueError("duplicate linked Verification target ids")
+        if sum(len(target.entries) for target in self.evidence_targets) > EVIDENCE_ENTRY_MAX:
+            raise ValueError(
+                f"linked Evidence may contain at most {EVIDENCE_ENTRY_MAX} entries per phase"
+            )
+        return self
+
+
+class EvidenceTargetUpdate(_Artifact):
+    """Student-owned fields for one immutable server-issued Evidence target."""
+
+    evidence_target_id: Annotated[str, Field(pattern=r"^ev-[0-9a-f]{12}$")]
+    evidence_status: EvidenceStatus | None = None
+    entries: list[EvidenceEntry] | None = Field(
+        default=None, max_length=EVIDENCE_ENTRY_MAX
+    )
+    explanation: EvidenceText | None = None
+    unavailable_reason: EvidenceText | None = None
+
+    @model_validator(mode="after")
+    def _require_update(self) -> "EvidenceTargetUpdate":
+        changed = self.model_fields_set - {"evidence_target_id"}
+        if not changed:
+            raise ValueError("an Evidence target update must change a student field")
+        for name in ("explanation", "unavailable_reason"):
+            if name in self.model_fields_set:
+                value = getattr(self, name)
+                setattr(self, name, (value.strip() or None) if value is not None else None)
+        return self
+
+
+class EvidenceSaveRequest(EvidenceArtifact):
+    """Legacy Evidence PUT plus additive student-only linked updates."""
+
+    target_updates: list[EvidenceTargetUpdate] = Field(
+        default_factory=list, max_length=EVIDENCE_TARGET_MAX
+    )
+
+
+class EvidenceFromVerificationRequest(_Artifact):
+    """Explicit selection/rebuild request; all source context is server-derived."""
+
+    selected_verification_target_ids: list[
+        Annotated[str, Field(pattern=r"^vt-[0-9a-f]{12}$")]
+    ] = Field(min_length=1, max_length=EVIDENCE_TARGET_MAX)
+    replace_existing: bool = False
+
+    @model_validator(mode="after")
+    def _unique_selection(self) -> "EvidenceFromVerificationRequest":
+        if len(self.selected_verification_target_ids) != len(
+            set(self.selected_verification_target_ids)
+        ):
+            raise ValueError("each Verification target may be selected at most once")
+        return self
 
 
 VerificationCheckId = Literal[
@@ -315,15 +519,6 @@ class VerificationArtifact(_Artifact):
 # Only the six implementation-decision categories that can become linked
 # Review targets can reach Verification. `changed_file` and
 # `question_to_understand` remain context, never generated checks.
-VerificationSourceCategory = Literal[
-    "behavior_change",
-    "implementation_decision",
-    "out_of_scope_change",
-    "security_sensitive_area",
-    "unresolved_risk",
-    "unverified_behavior",
-]
-
 VERIFICATION_TARGET_MAX = REVIEW_TARGET_MAX
 VerificationSuggestionText = Annotated[
     str, Field(min_length=1, max_length=1400), AfterValidator(_reject_secret_like)

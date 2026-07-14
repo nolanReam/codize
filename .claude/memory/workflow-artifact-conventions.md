@@ -133,3 +133,16 @@ Verification artifact still contributes exactly one of five captured sections,
 independent of target count, recorded progress, or stale state. Continue to
 Evidence is navigation only and creates no downstream record. See
 [[linked-verification-ui-conventions]].
+
+M16B.3A keeps Evidence in that SAME existing section/key/JSONB column—no
+migration, table, parallel store, or automatic handoff. Manual `entries +
+summary` reads/PUTs remain exact. Linked Evidence is created only by explicit
+`POST /workflow/{phase}/evidence/from-verification` selection after a pure
+preview GET; only current saved linked pass/fail results qualify. The generic
+Evidence PUT gains student-only target updates while source Verification/
+Review/Change Map linkage, snapshots, ids, binding, initialization, completion,
+and stale state stay server-owned. `GET /workflow/{phase}` uses the curated
+`evidence_service.evidence_view`; raw `stored_sections` still feeds the existing
+Defense normalizer, which intentionally reads only legacy top-level entries and
+summary, so nested linked Evidence does not enter Defense/Report before M16C.
+See [[verification-evidence-handoff-conventions]].

@@ -107,19 +107,24 @@ rail collapses at 1150px; linked surface padding, result summary, radio grid,
 field actions, and primary buttons stack at 640px; 390px has no page overflow.
 The existing reduced-motion rule applies.
 
-**Exact M16B.3 frontend seam:** add an explicit Evidence-handoff interaction
-to the existing `/app/phase/evidence` surface that consumes a typed, current,
-server-saved linked Verification view. It must let the student deliberately
-choose eligible performed results/material, preserve failed/skipped/N/A and
-provenance, and call an Evidence write only after an explicit student action.
-Do not read local drafts, infer proof, auto-create, auto-prefill on navigation,
-or reinterpret recorded completion as correctness.
+**Exact M16B.3B frontend seam after M16B.3A:** on the existing
+`/app/phase/evidence` surface, explicitly call
+`GET /workflow/{phase}/evidence/from-verification`. Render its server-derived
+missing/manual/current/stale state and all result outcomes; allow selection only
+where `eligibility=eligible`. After an explicit student action, POST
+`{selected_verification_target_ids, replace_existing?}` to the same route.
+Consume the returned curated linked Evidence artifact through the existing
+workflow state and save only changed
+`target_updates: [{evidence_target_id, evidence_status, entries, explanation,
+unavailable_reason}]` via the generic Evidence PUT. Do not derive eligibility,
+send Review/Change Map ids or bindings, auto-run on navigation, read
+Verification drafts, copy result notes into Evidence, or treat unavailable as
+Evidence. Existing manual mode remains unchanged.
 
-**Exact M16B.3 backend seam:** load the owned typed
-`StoredVerificationArtifact`, then call
-`verification_service.evidence_handoff_targets(verification)`. Each typed item
-contains Verification/Review/Change Map ids, category, effective check wording
-(`student_check` or suggestion), result, and result notes. The helper currently
-creates no Evidence. M16B.3 must define eligibility and a deliberate Evidence
-write while preserving fail/skipped/N/A honestly; it must not expose raw source
-snapshots or silently upgrade a student result into proof.
+**Exact M16C backend seam:** load typed linked Evidence with
+`evidence_service.get_stored_evidence(project, phase_number)`, require
+`initialized_from_verification` and server-derived non-stale state, then add a
+purpose-built safe normalizer for student-recorded target entries and explicit
+unavailable reasons. Do not feed internal bindings/ids or promote result
+snapshots into Evidence. M16B.3A intentionally leaves Defense Context and the
+client-assembled Report on legacy top-level `entries + summary`.

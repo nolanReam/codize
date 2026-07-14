@@ -19,9 +19,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import CurrentUser, require_user
 from app.schemas.change_map import ChangeMapGenerateRequest
-from app.schemas.workflow import ReviewFromChangeMapRequest, VerificationFromReviewRequest
+from app.schemas.workflow import (
+    EvidenceFromVerificationRequest,
+    ReviewFromChangeMapRequest,
+    VerificationFromReviewRequest,
+)
 from app.services import (
     change_map_service,
+    evidence_service,
     phase_service,
     review_service,
     verification_service,
@@ -78,6 +83,22 @@ def _verification_http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=422, detail=str(exc))
     # Workspace not ready / missing, manual, incomplete, or stale Review /
     # existing Verification / inconsistent source identity are state conflicts.
+    return HTTPException(status_code=409, detail=str(exc))
+
+
+def _evidence_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, phase_service.PhaseNotFoundError):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(
+        exc,
+        (
+            evidence_service.InvalidEvidenceSelectionError,
+            evidence_service.InvalidEvidenceUpdateError,
+        ),
+    ):
+        return HTTPException(status_code=422, detail=str(exc))
+    # Missing/manual/stale Verification, existing Evidence, and stale linked
+    # Evidence are lifecycle conflicts rather than malformed requests.
     return HTTPException(status_code=409, detail=str(exc))
 
 
@@ -189,6 +210,37 @@ async def create_verification_from_review(
         raise _verification_http_error(exc)
 
 
+@router.get("/{phase_number}/evidence/from-verification")
+async def preview_evidence_from_verification(
+    phase_number: int,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    """Read-only, student-safe handoff context; creates no Evidence."""
+    try:
+        return await evidence_service.handoff_preview(
+            repo, user.user_id, phase_number
+        )
+    except (phase_service.PhaseWorkspaceError, evidence_service.EvidenceError) as exc:
+        raise _evidence_http_error(exc)
+
+
+@router.post("/{phase_number}/evidence/from-verification")
+async def create_evidence_from_verification(
+    phase_number: int,
+    body: EvidenceFromVerificationRequest,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    """Explicitly initialize empty Evidence records for selected results."""
+    try:
+        return await evidence_service.create_from_verification(
+            repo, user.user_id, phase_number, body
+        )
+    except (phase_service.PhaseWorkspaceError, evidence_service.EvidenceError) as exc:
+        raise _evidence_http_error(exc)
+
+
 @router.put("/{phase_number}/{section}")
 async def put_section(
     phase_number: int,
@@ -206,5 +258,6 @@ async def put_section(
         workflow_service.WorkflowError,
         review_service.ReviewError,
         verification_service.VerificationError,
+        evidence_service.EvidenceError,
     ) as exc:
         raise _http_error(exc)

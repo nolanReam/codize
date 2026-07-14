@@ -38,7 +38,8 @@ app/
 │                  workflow_service.py: workflow artifact store, M13B;
 │                  change_map_service.py: reviewed Change Map lifecycle, M15C;
 │                  review_service.py: confirmed-map Review integration, M16A.1;
-│                  verification_service.py: Review-linked suggestions, M16B.1)
+│                  verification_service.py: Review-linked suggestions, M16B.1;
+│                  evidence_service.py: explicit Verification-result handoff, M16B.3A)
 ├── schemas/       request/response models (intake.py, phases.py, gate.py, workflow.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
@@ -215,7 +216,7 @@ Evaluation is a pure read — it never mutates the roadmap, task progress,
 gates, or unlocks, never advances phases, and never touches reconnection's
 `last_login_at`.
 
-## Workflow artifacts (M13B; implementation import M15A; Change Map M15C; linked Review M16A.1; linked Verification M16B.1)
+## Workflow artifacts (M13B; implementation import M15A; Change Map M15C; linked Review M16A.1; linked Verification M16B.1; linked Evidence M16B.3A)
 
 `services/workflow_service.py` stores the student-authored v3 Build Loop
 sections — `prompt_builder`, `review_board`, `evidence`, `verification`, and
@@ -431,10 +432,71 @@ owner-filtered repository, phase validation, and **no migration**.
 Exact M16B.2 frontend seam: explicitly call the POST above after a saved current
 Review, consume linked metadata from the existing workflow GET, and save only
 `target_updates` through the existing Verification PUT. Never infer checks in
-the browser or treat a suggestion as performed. Exact future M16B.3 seam:
+the browser or treat a suggestion as performed. The implemented M16B.3A seam:
 `verification_service.evidence_handoff_targets(stored_verification)` returns
 ids, effective check wording, recorded result/notes, and category; it creates
 no Evidence record and skipped/N/A never count as pass.
+
+### Verification results → Evidence handoff (M16B.3A)
+
+`services/evidence_service.py` adds a deterministic, explicit handoff without
+creating another store or table.
+`GET /workflow/{phase}/evidence/from-verification` is a pure preview over the owned,
+server-saved Verification artifact. It returns missing/manual/current/stale
+state and every linked outcome in order: `pass` and `fail` are performed and
+eligible; `skipped`, `not_applicable`, and `unrecorded` remain visible and
+ineligible. It uses
+`verification_service.evidence_handoff_targets(...)`, exposes no Review or
+Change Map ids/binding fingerprints, performs no write, creates no Evidence,
+and calls no provider.
+
+`POST /workflow/{phase}/evidence/from-verification` requires one to twenty
+unique server-issued Verification target ids. Every selected id must belong to
+the current non-stale linked Verification and have an explicit `pass` or
+`fail`; request order is normalized to source order. The POST initializes only
+empty per-target Evidence records (`not_addressed`) with server-owned source
+snapshots. It does not copy result notes into student Evidence, create entries,
+mark a target evidenced, or mark the record complete. Existing manual, linked,
+empty, or corrupt Evidence blocks with 409 unless the student deliberately
+sends `replace_existing=true`; replacement is destructive, never automatic,
+and performs no merge/history.
+
+The linked artifact remains at
+`workflow_artifacts[phase]["evidence"]` and retains the legacy top-level
+`entries + summary` fields for compatibility. Internally it adds initialization
+identity, a selected-target source binding, and per-target Verification/Review/
+Change Map linkage plus check/result/result-notes snapshots. The client read
+view deliberately omits Review/Change Map ids and internal fingerprints. The
+existing Evidence PUT accepts its legacy full-section payload and additive
+`target_updates` containing only Evidence target id, `evidence_status`, entries,
+student explanation, and unavailable reason. Source linkage/snapshots/binding,
+ids, and stale state are copied from storage and cannot be rewritten.
+
+`evidence_status` is exactly `not_addressed`, `evidence_recorded`, or
+`evidence_unavailable`. Recorded requires at least one student-provided entry;
+unavailable requires a bounded student reason and contains no entries;
+unavailable is not Evidence. `evidence_record_complete` is a computed read flag
+meaning every selected record is addressed by one of those two honest end
+states—it does not mean correct, passed, proved, or verified. Existing manual
+Evidence behavior is unchanged.
+
+Staleness is server-derived from the source Verification initialization/Review
+binding and a deterministic fingerprint of only the selected target identities,
+effective checks, results, and result notes. Relevant selected changes or a
+Verification rebuild stale linked Evidence; unrelated workflow sections and
+unselected Verification targets do not. Stale Evidence stays readable with all
+student content preserved, but normal linked edits are 409 until an explicit
+POST rebuild. No automatic rebuild, merge, deletion, or attachment exists.
+
+M16B.3B frontend seam: preview with the GET, let the student select only targets
+whose server eligibility is `eligible`, POST the selected Verification target
+ids only after explicit confirmation, then edit per-target student fields
+through the existing Evidence PUT. M16C backend seam: load typed linked Evidence
+with `evidence_service.get_stored_evidence(project, phase)` and consume only
+non-stale student-recorded entries/unavailable reasons through a future
+purpose-built safe normalizer. M16B.3A intentionally leaves the existing
+Defense Context and client-assembled Report readers on legacy top-level
+`entries + summary`; nested linked Evidence is not integrated downstream yet.
 
 ## Defense context pack (M14A)
 

@@ -66,7 +66,7 @@ from `auth.users`).
 | `roadmap` | jsonb | personalized roadmap (template structure, LLM wording) |
 | `current_phase` | smallint 1–7 | advanced by gate passes (M9), never by task completion |
 | `task_progress` | jsonb, default `{}` | M8 phase workspace: `{"<phase>": ["ai-1", "human-2", …]}` — completed task ids per phase, backend-written only |
-| `workflow_artifacts` | jsonb, default `{}` | M13B workflow store: `{"<phase>": {"prompt_builder": {…}, "review_board": {…}, "evidence": {…}, "verification": {…}}}` — student-authored Build Loop artifacts, validated + size-capped by the backend |
+| `workflow_artifacts` | jsonb, default `{}` | M13B workflow store: `{"<phase>": {"prompt_builder": {…}, "review_board": {…}, "evidence": {…}, "verification": {…}}}` — student-authored Build Loop artifacts plus additive server-owned provenance for linked Review, Verification, and Evidence; validated + size-capped by the backend |
 | `gate_history_summary` | text | summarized transcripts; calibrates future gates |
 | `status` | 'intake' \| 'active' \| 'completed' | |
 
@@ -211,6 +211,23 @@ users deleted; cascade left zero rows in all four tables.
 - `verify_auth.py` 11/11 PASS (SETUP/CLEANUP via MCP; cleanup left zero rows
   in all four tables and zero test users).
 - Security advisors after the migration: clean (`{"lints": []}`).
+
+## M16B.3A linked Evidence storage (2026-07-14)
+
+No migration or database object was added. The existing phase-scoped
+`projects.workflow_artifacts` JSONB model safely carries linked Evidence at the
+same `evidence` key used by manual Evidence. Manual rows remain
+`entries + summary + saved_at`. A linked value adds server-owned Verification
+binding/snapshots and per-target student Evidence state; successful writes still
+merge only that phase key and patch only the `workflow_artifacts` column.
+
+FastAPI is the sole writer. The M16S.1 `authenticated` read-only projects grant
+prevents browser clients from forging target ids, Review/Change Map linkage,
+source Verification snapshots, fingerprints, initialization timestamps, or
+stale state. The trusted repository update remains filtered by both project id
+and JWT-derived `user_id`; phase membership is checked against the owned stored
+roadmap. Linked Evidence therefore needs no new table, policy, grant, trigger,
+view, function, or RLS change.
 
 ## M16S.1 write-boundary hardening (2026-07-14)
 
