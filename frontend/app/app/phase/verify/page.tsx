@@ -28,6 +28,7 @@ import {
   linkedVerificationResultSummary,
   linkedVerificationServerRevision,
   restoreLinkedVerificationDraft,
+  shouldKeepVerificationSaveNotice,
   showFullVerificationInitializationState,
   targetFormFromVerification,
   verificationArtifactMode,
@@ -496,13 +497,18 @@ function LinkedVerificationBoard({
   const [justSaved, setJustSaved] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [resultAnnouncement, setResultAnnouncement] = useState("");
+  const acknowledgedSaveRevision = useRef<string | null>(null);
   const verificationRef = useRef(verification);
   verificationRef.current = verification;
   const serverRevision = linkedVerificationServerRevision(verification);
 
   useEffect(() => {
     setForm(targetFormFromVerification(verificationRef.current));
-    setJustSaved(false);
+    if (shouldKeepVerificationSaveNotice(acknowledgedSaveRevision.current, serverRevision)) {
+      acknowledgedSaveRevision.current = null;
+    } else {
+      setJustSaved(false);
+    }
     setReplaceOpen(false);
   }, [serverRevision]);
 
@@ -554,6 +560,7 @@ function LinkedVerificationBoard({
     if (!dirty || blocker || verification.stale || draftBlocked) return;
     const result = await onSave(deriveVerificationSavePayload(verification, form));
     if (result && isLinkedVerificationArtifact(result)) {
+      acknowledgedSaveRevision.current = linkedVerificationServerRevision(result);
       draft.clear();
       setForm(targetFormFromVerification(result));
       setJustSaved(true);

@@ -56,6 +56,9 @@ unchanged/reverted/server-saved forms are clean. A 422 or network error keeps
 the mounted form and local draft; success remains on-page, announces
 “Verification saved,” reconciles from the response, and clears the draft.
 
+Keep the save acknowledgement through the matching returned server revision;
+clear it only after a later revision, rebuild/reload, or student edit.
+
 **Draft scope:** reuse `useDraft` and its authenticated-user key prefix, 400ms
 debounce, storage-failure tolerance, and four-marker secret guard. Surface is
 `linked_verification:active-project:<phase>:<fingerprint>`; the current

@@ -436,6 +436,13 @@ export function linkedVerificationServerRevision(
   });
 }
 
+export function shouldKeepVerificationSaveNotice(
+  acknowledgedRevision: string | null,
+  serverRevision: string
+): boolean {
+  return acknowledgedRevision === serverRevision;
+}
+
 export interface LinkedVerificationDraft {
   fingerprint: string;
   targets: LinkedVerificationFormState;

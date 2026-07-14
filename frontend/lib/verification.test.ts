@@ -21,6 +21,7 @@ import {
   linkedVerificationResultSummary,
   linkedVerificationServerRevision,
   restoreLinkedVerificationDraft,
+  shouldKeepVerificationSaveNotice,
   showFullVerificationInitializationState,
   targetFormFromVerification,
   validateVerificationTarget,
@@ -431,6 +432,18 @@ describe("scoped linked Verification drafts and stale invalidation", () => {
       linkedVerificationServerRevision(after)
     );
     expect(linkedVerificationServerRevision(before)).not.toContain("Tasks are filtered");
+  });
+
+  it("keeps save feedback only for the exact server revision that was acknowledged", () => {
+    const saved = verification({ saved_at: "2026-07-13T12:30:00Z" });
+    const savedRevision = linkedVerificationServerRevision(saved);
+    const rebuiltRevision = linkedVerificationServerRevision(
+      verification({ initialized_at: "2026-07-13T13:00:00Z" })
+    );
+
+    expect(shouldKeepVerificationSaveNotice(savedRevision, savedRevision)).toBe(true);
+    expect(shouldKeepVerificationSaveNotice(null, savedRevision)).toBe(false);
+    expect(shouldKeepVerificationSaveNotice(savedRevision, rebuiltRevision)).toBe(false);
   });
 });
 
