@@ -100,6 +100,7 @@ def test_durable_verifiers_cover_effective_mutation_paths_and_parse():
         "on conflict (id) do update",
         "delete from public.projects",
         "has_function_privilege('authenticated'",
+        "when p.prokind in ('f', 'p')",
         "rollback;",
     ):
         assert fragment in sql

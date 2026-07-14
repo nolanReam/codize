@@ -228,7 +228,11 @@ begin
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('public', 'api')
       and has_function_privilege('authenticated', p.oid, 'execute')
-      and pg_get_functiondef(p.oid) ilike '%projects%'
+      and case
+        when p.prokind in ('f', 'p')
+          then pg_get_functiondef(p.oid) ilike '%projects%'
+        else false
+      end
   ) then
     raise exception 'authenticated executable function references projects';
   end if;
