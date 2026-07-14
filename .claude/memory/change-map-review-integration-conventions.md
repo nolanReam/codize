@@ -126,3 +126,17 @@ explicit student action, keyed by the saved Review target references. It must
 not derive tests from Change Map text in the browser, read raw imports, or treat
 `needs_verification` as a completed check. `/app/phase/verify` currently receives
 navigation only and has no Review-prefill code.
+
+**M16B.1 backend consumer (built 2026-07-13):**
+`verification_service.create_from_review` loads this typed saved Review,
+requires it complete/current/non-stale, and calls ONLY
+`review_service.needs_verification_targets(review)`. Each returned target gets
+one deterministic category template and server `vt-...` id; pending/keep/
+revise/remove/uncertain never enter. The linked Verification binding includes
+this Review's saved timestamp, source Change Map timestamps, and an ordered
+identity/decision fingerprint, so later Review changes make Verification stale
+without rewriting either artifact. Review source text/rationale is copied only
+for needs-testing targets; raw import, Change Map references, full Review JSON,
+and non-needs target snapshots are absent. A suggestion is proposed work, never
+a performed result, proof, Evidence, or automatic pass. Exact conventions:
+[[review-verification-integration-conventions]].

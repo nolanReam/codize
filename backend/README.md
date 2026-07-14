@@ -37,7 +37,8 @@ app/
 │                  evaluation_service.py: deterministic progress evaluation, M12;
 │                  workflow_service.py: workflow artifact store, M13B;
 │                  change_map_service.py: reviewed Change Map lifecycle, M15C;
-│                  review_service.py: confirmed-map Review integration, M16A.1)
+│                  review_service.py: confirmed-map Review integration, M16A.1;
+│                  verification_service.py: Review-linked suggestions, M16B.1)
 ├── schemas/       request/response models (intake.py, phases.py, gate.py, workflow.py)
 ├── templates/     the three archetype JSON templates (Milestone 1)
 └── prompts/       the six system prompts (Milestone 1)
@@ -214,7 +215,7 @@ Evaluation is a pure read — it never mutates the roadmap, task progress,
 gates, or unlocks, never advances phases, and never touches reconnection's
 `last_login_at`.
 
-## Workflow artifacts (M13B; implementation import M15A; Change Map M15C; linked Review M16A.1)
+## Workflow artifacts (M13B; implementation import M15A; Change Map M15C; linked Review M16A.1; linked Verification M16B.1)
 
 `services/workflow_service.py` stores the student-authored v3 Build Loop
 sections — `prompt_builder`, `review_board`, `evidence`, `verification`, and
@@ -356,6 +357,64 @@ Review PUT `target_updates`. M16B uses
 `review_service.needs_verification_targets(review)`; M16A.1 creates no
 Verification or Evidence records and does not feed linked target data into
 Defense Context, Project Defense, the evaluator, or the report.
+
+### Review decisions → Verification suggestions (M16B.1)
+
+`services/verification_service.py` converts only the current saved linked
+Review targets whose exact decision is `needs_verification` into deterministic,
+category-aware proposed checks. A Review decision ("I need to test this") is
+not a Verification result ("I performed this check"). Initialization makes no
+Gemini, OpenRouter, or stub-provider call, executes no code, and creates no
+Evidence. Suggestions embed the bounded effective Review text in one of six
+explicit templates; they never invent project identifiers or initialize a
+completed result.
+
+`POST /workflow/{phase}/verification/from-review` is explicit only and accepts
+no body or `{"replace_existing": bool}`. It requires an owned active project,
+a real roadmap phase, and a saved, complete, current linked Review. Source
+targets come only from `review_service.needs_verification_targets(review)`;
+the client cannot submit ids, categories, source snapshots, suggestions,
+bindings, timestamps, or results. A completed Review with no needs-testing
+decisions succeeds with a valid linked artifact containing zero targets—it is
+not automatically complete. Any existing manual or linked Verification blocks
+with 409 unless deliberate replacement is requested; replacement rebuilds one
+active artifact and creates no merge/history.
+
+Each linked target stores a deterministic timestamp-free `vt-...` id derived
+from its server-issued Review target id, the Review/Change Map ids, category,
+bounded source text and optional rationale snapshots, deterministic suggestion,
+and nullable `student_check`, `result`, and `result_notes`. Null result is the
+unperformed state. The only completed result vocabulary remains the legacy
+`pass`/`fail`/`skipped`/`not_applicable`; M16B.1 initializes none of them.
+The source binding records the Change Map generation/confirmation timestamps,
+the saved Review timestamp, and a SHA-256 fingerprint of ordered server target
+identity/decisions (never raw source text as the version key).
+
+`GET /workflow/{phase}` remains the only read path. A linked
+`sections.verification` adds `initialized_from_review=true`, its binding and
+targets, plus server-computed `stale`. It becomes stale when Review is missing,
+corrupt, stale, rebuilt, incomplete, re-saved, reidentified, changes relevant
+decisions/target membership, or changes its Change Map binding. Stale work stays
+readable and is never rewritten. Manual/legacy artifacts retain their exact
+M13B read shape.
+
+The existing `PUT /workflow/{phase}/verification` keeps accepting the current
+frontend's `checks + explanation` payload. For a linked artifact it preserves
+all server-owned fields and additionally accepts `target_updates` containing
+only a server-issued Verification target id plus student-owned check wording,
+result, and notes. Forged provenance/snapshots/suggestions/ids/bindings/
+timestamps/stale state are rejected with 422. Typed helpers expose pending,
+performed (pass/fail), failed, unresolved (anything not pass), and the future
+M16B.3 Evidence handoff view; no helper creates Evidence. Same JSONB column,
+owner-filtered repository, phase validation, and **no migration**.
+
+Exact M16B.2 frontend seam: explicitly call the POST above after a saved current
+Review, consume linked metadata from the existing workflow GET, and save only
+`target_updates` through the existing Verification PUT. Never infer checks in
+the browser or treat a suggestion as performed. Exact future M16B.3 seam:
+`verification_service.evidence_handoff_targets(stored_verification)` returns
+ids, effective check wording, recorded result/notes, and category; it creates
+no Evidence record and skipped/N/A never count as pass.
 
 ## Defense context pack (M14A)
 

@@ -99,3 +99,20 @@ M13B shape. The presence of any `review_board` value still contributes exactly
 one captured artifact to `Object.values(sections)`, regardless of target count,
 progress, completion, or stale state. Change Map remains top-level and excluded,
 so cockpit/phase progress stays N/5. See [[linked-review-ui-conventions]].
+
+M16B.1 keeps Verification in the SAME existing `verification` section and
+JSONB column—no table, migration, parallel store, duplicate GET, or frontend
+change. `VerificationArtifact` remains the byte-compatible M13B manual write
+shape (`checks + explanation`). `StoredVerificationArtifact` adds an optional
+Review binding, initialization time, and linked targets; manual reads retain
+their exact old shape. Explicit
+`POST /workflow/{phase}/verification/from-review` is the only initializer and
+accepts replacement intent only. `GET /workflow/{phase}` computes linked
+`initialized_from_review=true` + `stale`. The generic Verification PUT still
+accepts the old frontend payload and adds student-only `target_updates`; the
+service copies ids/source snapshots/category/suggestion/binding/timestamps and
+stale authority from storage. A linked artifact still contributes exactly one
+captured section to N/5 regardless of target count or stale state. Linked
+source/suggestion fields are ignored by the existing Defense Context
+normalizer and do not reach Project Defense. See
+[[review-verification-integration-conventions]].

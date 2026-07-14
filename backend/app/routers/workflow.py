@@ -19,11 +19,12 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import CurrentUser, require_user
 from app.schemas.change_map import ChangeMapGenerateRequest
-from app.schemas.workflow import ReviewFromChangeMapRequest
+from app.schemas.workflow import ReviewFromChangeMapRequest, VerificationFromReviewRequest
 from app.services import (
     change_map_service,
     phase_service,
     review_service,
+    verification_service,
     workflow_service,
 )
 from app.services.llm_service import LLMService, get_llm_service
@@ -67,6 +68,16 @@ def _review_http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=422, detail=str(exc))
     # Workspace not ready / no current confirmed map / stale map / existing
     # Review are workflow-state conflicts.
+    return HTTPException(status_code=409, detail=str(exc))
+
+
+def _verification_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, phase_service.PhaseNotFoundError):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, verification_service.InvalidVerificationUpdateError):
+        return HTTPException(status_code=422, detail=str(exc))
+    # Workspace not ready / missing, manual, incomplete, or stale Review /
+    # existing Verification / inconsistent source identity are state conflicts.
     return HTTPException(status_code=409, detail=str(exc))
 
 
@@ -151,6 +162,33 @@ async def create_review_from_change_map(
         raise _review_http_error(exc)
 
 
+@router.post("/{phase_number}/verification/from-review")
+async def create_verification_from_review(
+    phase_number: int,
+    body: VerificationFromReviewRequest | None = None,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    """Initialize proposed checks from the current saved linked Review.
+
+    The request carries replacement intent only. Targets, source snapshots,
+    suggestions, ids, bindings, timestamps, results, and stale state are all
+    server-derived or left unresolved.
+    """
+    try:
+        return await verification_service.create_from_review(
+            repo,
+            user.user_id,
+            phase_number,
+            replace_existing=bool(body and body.replace_existing),
+        )
+    except (
+        phase_service.PhaseWorkspaceError,
+        verification_service.VerificationError,
+    ) as exc:
+        raise _verification_http_error(exc)
+
+
 @router.put("/{phase_number}/{section}")
 async def put_section(
     phase_number: int,
@@ -167,5 +205,6 @@ async def put_section(
         phase_service.PhaseWorkspaceError,
         workflow_service.WorkflowError,
         review_service.ReviewError,
+        verification_service.VerificationError,
     ) as exc:
         raise _http_error(exc)

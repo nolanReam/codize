@@ -286,10 +286,12 @@ VerificationCheckId = Literal[
     "rls_wrong_user_checked",
 ]
 
+VerificationResult = Literal["pass", "fail", "skipped", "not_applicable"]
+
 
 class VerificationCheck(_Artifact):
     check: VerificationCheckId
-    result: Literal["pass", "fail", "skipped", "not_applicable"]
+    result: VerificationResult
     note: MedText | None = None
 
 
@@ -306,6 +308,153 @@ class VerificationArtifact(_Artifact):
         if len(ids) != len(set(ids)):
             raise ValueError("each verification check may appear at most once")
         return self
+
+
+# --- linked Verification model (M16B.1) -----------------------------------
+
+# Only the six implementation-decision categories that can become linked
+# Review targets can reach Verification. `changed_file` and
+# `question_to_understand` remain context, never generated checks.
+VerificationSourceCategory = Literal[
+    "behavior_change",
+    "implementation_decision",
+    "out_of_scope_change",
+    "security_sensitive_area",
+    "unresolved_risk",
+    "unverified_behavior",
+]
+
+VERIFICATION_TARGET_MAX = REVIEW_TARGET_MAX
+VerificationSuggestionText = Annotated[
+    str, Field(min_length=1, max_length=1400), AfterValidator(_reject_secret_like)
+]
+
+
+class VerificationReviewBinding(_Artifact):
+    """Server-owned identity of the saved Review version used at creation.
+
+    The digest is based on ordered server ids and Review decisions, never raw
+    source text. `review_saved_at` also makes a deliberate Review rebuild a
+    new version even when its deterministic target ids happen to be the same.
+    """
+
+    source_change_map_generated_at: ReviewTimestamp
+    source_change_map_confirmed_at: ReviewTimestamp
+    review_saved_at: ReviewTimestamp
+    review_target_fingerprint: Annotated[
+        str, Field(pattern=r"^[0-9a-f]{64}$")
+    ]
+
+
+class LinkedVerificationTarget(_Artifact):
+    """One suggested check linked to one saved Review decision.
+
+    Source identity/snapshots and `suggested_check` are server-owned. The
+    nullable student fields are the future M16B.2 write seam. A null `result`
+    is the existing architecture's honest unperformed state; the completed
+    result vocabulary remains exactly pass/fail/skipped/not_applicable.
+    """
+
+    verification_target_id: Annotated[str, Field(pattern=r"^vt-[0-9a-f]{12}$")]
+    review_target_id: Annotated[str, Field(pattern=r"^rv-[0-9a-f]{12}$")]
+    change_map_item_id: Annotated[str, Field(min_length=1, max_length=64)]
+    category: VerificationSourceCategory
+    source_text: ReviewSnapshotText
+    source_rationale: MedText | None = None
+    suggested_check: VerificationSuggestionText
+    student_check: MedText | None = None
+    result: VerificationResult | None = None
+    result_notes: MedText | None = None
+
+    @model_validator(mode="after")
+    def _normalize_student_fields(self) -> "LinkedVerificationTarget":
+        for name in ("student_check", "result_notes"):
+            value = getattr(self, name)
+            setattr(self, name, (value.strip() or None) if value is not None else None)
+        return self
+
+
+class StoredVerificationArtifact(VerificationArtifact):
+    """Backward-compatible stored/read Verification shape.
+
+    Legacy/manual artifacts contain only checks, explanation, and saved_at.
+    Linked artifacts add one Review binding and bounded targets. Read-only
+    `initialized_from_review` and `stale` flags are computed by the service
+    and are never persisted or accepted from a client.
+    """
+
+    saved_at: str | None = None
+    initialized_at: ReviewTimestamp | None = None
+    source_review_binding: VerificationReviewBinding | None = None
+    verification_targets: list[LinkedVerificationTarget] = Field(
+        default_factory=list, max_length=VERIFICATION_TARGET_MAX
+    )
+
+    @model_validator(mode="after")
+    def _linked_integrity(self) -> "StoredVerificationArtifact":
+        linked = self.source_review_binding is not None
+        if linked != (self.initialized_at is not None):
+            raise ValueError(
+                "linked Verification needs a source Review binding and initialization time"
+            )
+        if self.verification_targets and not linked:
+            raise ValueError("verification targets need a source Review binding")
+        target_ids = [target.verification_target_id for target in self.verification_targets]
+        review_ids = [target.review_target_id for target in self.verification_targets]
+        item_ids = [target.change_map_item_id for target in self.verification_targets]
+        if len(target_ids) != len(set(target_ids)):
+            raise ValueError("duplicate verification target ids")
+        if len(review_ids) != len(set(review_ids)):
+            raise ValueError("duplicate linked Review target ids")
+        if len(item_ids) != len(set(item_ids)):
+            raise ValueError("duplicate linked Change Map item ids")
+        return self
+
+
+class VerificationTargetUpdate(_Artifact):
+    """Future M16B.2 student-owned fields for one server-issued target."""
+
+    verification_target_id: Annotated[str, Field(pattern=r"^vt-[0-9a-f]{12}$")]
+    student_check: MedText | None = None
+    result: VerificationResult | None = None
+    result_notes: MedText | None = None
+
+    @model_validator(mode="after")
+    def _normalize_update(self) -> "VerificationTargetUpdate":
+        changed = self.model_fields_set - {"verification_target_id"}
+        if not changed:
+            raise ValueError("a verification target update must change a student field")
+        for name in ("student_check", "result_notes"):
+            if name in self.model_fields_set:
+                value = getattr(self, name)
+                setattr(self, name, (value.strip() or None) if value is not None else None)
+        return self
+
+
+class VerificationSaveRequest(VerificationArtifact):
+    """Legacy Verification PUT plus additive student-only linked updates."""
+
+    target_updates: list[VerificationTargetUpdate] = Field(
+        default_factory=list, max_length=VERIFICATION_TARGET_MAX
+    )
+
+
+class VerificationFromReviewRequest(_Artifact):
+    """Explicit linked initialization; every source value is server-derived."""
+
+    replace_existing: bool = False
+
+
+class VerificationHandoffTarget(_Artifact):
+    """Typed future M16B.3 read seam only; creates no Evidence record."""
+
+    verification_target_id: str
+    review_target_id: str
+    change_map_item_id: str
+    category: VerificationSourceCategory
+    check_wording: str
+    result: VerificationResult | None = None
+    result_notes: str | None = None
 
 
 ImportSourceKind = Literal[
