@@ -610,26 +610,26 @@ export function derivePhaseNextStep(
           };
         }
         return {
-          label: "Evidence record complete",
-          href: "/app/phase/evidence",
-          hint: "Every selected result has saved Evidence or an unavailable explanation. This is a record, not proof of total correctness.",
+          label: "Start the defense",
+          href: "/app/gate",
+          hint: "The Evidence record is complete. Explain the implementation in your own words.",
         };
       }
     }
     if (!sections.evidence) {
       return {
-        label: "Save one piece of proof",
+        label: "Save supporting Evidence",
         href: "/app/phase/evidence",
-        hint: "A test output, a screenshot note, a commit—one is enough.",
+        hint: "Record a test output, screenshot note, commit, or other student-provided support.",
       };
     }
   }
   // Legacy/manual Review keeps its established evidence-first continuation.
   if (!sections.evidence) {
     return {
-      label: "Save one piece of proof",
+      label: "Save supporting Evidence",
       href: "/app/phase/evidence",
-      hint: "A test output, a screenshot note, a commit—one is enough.",
+      hint: "Record a test output, screenshot note, commit, or other student-provided support.",
     };
   }
   if (!sections.verification) {

@@ -101,3 +101,11 @@ contract.
 parse `sections.evidence.evidence_targets` in Defense/Report. The backend
 excludes stale linked support content and labels the stale state; manual
 Evidence remains compatible.
+
+**M16C.2 frontend now implemented:** the Defense ready screen displays only the
+metadata source state for Evidence. The Report consumes the server-curated
+Evidence records and keeps Verification check/result/notes in a visibly
+separate “Verification context — not Evidence” block. Student entries,
+student explanation, unavailable reason, stale-support omission,
+not-addressed, and manual compatibility each retain distinct UI semantics.
+Neither a passed Verification result nor an Evidence entry is called proof.

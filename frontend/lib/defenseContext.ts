@@ -1,94 +1,81 @@
-// Defense context summary helpers (M14C) — pure and deterministic, like
-// promptBuilder/report/phaseGuide. The backend's /gate/context-summary is
-// metadata-only (source labels + presence + truncation, never content); these
-// helpers turn it into the calm ready-state UI: grouped chips, one honest
-// missing-source line, and deterministic preparation tips. No LLM anywhere,
-// and no per-question source attribution is ever inferred here.
+// Pure presentation rules for the metadata-only M16C.1 Defense summary.
+// The browser receives source state, label, and truncation only. It never
+// reconstructs workflow content or decides whether Defense is allowed.
 
 import type {
-  ContextSummaryMissingSource,
-  ContextSummarySource,
   DefenseContextSummary,
+  DefenseWorkflowSource,
+  DefenseWorkflowSourceId,
+  WorkflowArtifactState,
 } from "./types";
 
-// The student's four workflow sources, in Build Loop order — the display
-// priority. System sources are grouped, never shown as individual chips.
-export const WORKFLOW_SOURCE_ORDER = [
-  "workflow.prompt_builder",
-  "workflow.review_board",
-  "workflow.evidence",
-  "workflow.verification",
-] as const;
+export const DEFENSE_WORKFLOW_SOURCE_ORDER: readonly DefenseWorkflowSourceId[] = [
+  "change_map",
+  "review",
+  "verification",
+  "evidence",
+];
 
-// Where to add a missing artifact — the existing workflow pages.
-export const WORKFLOW_PAGE_LINKS: Record<string, string> = {
-  "workflow.prompt_builder": "/app/phase/prompt",
-  "workflow.review_board": "/app/phase/review",
-  "workflow.evidence": "/app/phase/evidence",
-  "workflow.verification": "/app/phase/verify",
+export type SourceStateSeverity = "neutral" | "positive" | "attention" | "unavailable";
+
+interface SourceStatePresentation {
+  label: string;
+  description: string;
+  severity: SourceStateSeverity;
+}
+
+const SOURCE_STATE_PRESENTATION: Record<WorkflowArtifactState, SourceStatePresentation> = {
+  current: {
+    label: "Current",
+    description: "This saved record is available as context for Project Defense.",
+    severity: "positive",
+  },
+  missing: {
+    label: "Not available",
+    description: "No saved record is available for this source.",
+    severity: "neutral",
+  },
+  incomplete: {
+    label: "Incomplete",
+    description: "This record exists but is not fully completed.",
+    severity: "attention",
+  },
+  stale: {
+    label: "Needs updating",
+    description: "An upstream workflow step changed after this record was created.",
+    severity: "attention",
+  },
+  manual: {
+    label: "Manual record",
+    description: "This record uses the earlier manual workflow format.",
+    severity: "neutral",
+  },
+  malformed: {
+    label: "Unavailable",
+    description: "Codize could not safely use this optional record.",
+    severity: "unavailable",
+  },
 };
 
-export interface GroupedSummary {
-  /** Present workflow sources, Build Loop order. */
-  workflow: ContextSummarySource[];
-  /** Missing workflow sources, Build Loop order — optional, never an error. */
-  missingWorkflow: ContextSummaryMissingSource[];
-  /** Any system source (project / phase / progress / intake) is present. */
-  hasSystemContext: boolean;
-  hasWorkflowContext: boolean;
+export function sourceStatePresentation(state: WorkflowArtifactState): SourceStatePresentation {
+  return SOURCE_STATE_PRESENTATION[state];
 }
 
-function workflowIndex(sourceId: string): number {
-  const i = (WORKFLOW_SOURCE_ORDER as readonly string[]).indexOf(sourceId);
-  return i === -1 ? WORKFLOW_SOURCE_ORDER.length : i;
+export function orderedWorkflowSources(summary: DefenseContextSummary): DefenseWorkflowSource[] {
+  return [...summary.workflow_sources].sort(
+    (left, right) =>
+      DEFENSE_WORKFLOW_SOURCE_ORDER.indexOf(left.source_id) -
+      DEFENSE_WORKFLOW_SOURCE_ORDER.indexOf(right.source_id)
+  );
 }
 
-export function groupSummary(summary: DefenseContextSummary): GroupedSummary {
-  const workflow = summary.included_sources
-    .filter((s) => s.source_id.startsWith("workflow."))
-    .sort((a, b) => workflowIndex(a.source_id) - workflowIndex(b.source_id));
-  const missingWorkflow = summary.missing_sources
-    .filter((m) => m.source_id.startsWith("workflow."))
-    .sort((a, b) => workflowIndex(a.source_id) - workflowIndex(b.source_id));
-  return {
-    workflow,
-    missingWorkflow,
-    hasSystemContext: summary.included_sources.some(
-      (s) => !s.source_id.startsWith("workflow.")
-    ),
-    hasWorkflowContext: workflow.length > 0,
-  };
+export function sourcePillClass(state: WorkflowArtifactState): string {
+  const severity = sourceStatePresentation(state).severity;
+  if (severity === "positive") return "ok";
+  if (severity === "attention") return "warn";
+  if (severity === "unavailable") return "danger";
+  return "";
 }
 
-// One deterministic preparation tip per recorded source; the sparse fallback
-// keeps missing artifacts from ever feeling like a blocker.
-const PREPARATION_TIPS: Record<string, string> = {
-  "workflow.prompt_builder":
-    "Be ready to explain why you asked AI for this implementation.",
-  "workflow.review_board":
-    "Be ready to explain what changed and what you reviewed.",
-  "workflow.evidence":
-    "Be ready to explain what your evidence shows — and what it does not prove.",
-  "workflow.verification": "Be ready to explain how you checked behavior.",
-};
-
-export const SPARSE_PREPARATION_TIP =
-  "Your anchor and phase context are enough to begin.";
-
-export function preparationTips(summary: DefenseContextSummary): string[] {
-  const tips = groupSummary(summary)
-    .workflow.map((s) => PREPARATION_TIPS[s.source_id])
-    .filter((tip): tip is string => Boolean(tip));
-  return tips.length ? tips : [SPARSE_PREPARATION_TIP];
-}
-
-// "Evidence and Verification not added yet — optional, you can still continue."
-export function missingNote(missing: ContextSummaryMissingSource[]): string | null {
-  if (!missing.length) return null;
-  const labels = missing.map((m) => m.label);
-  const joined =
-    labels.length === 1
-      ? labels[0]
-      : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
-  return `${joined} not added yet — optional, you can still continue.`;
-}
+export const DEFENSE_TRUNCATION_EXPLANATION =
+  "Some long details were shortened before being used as Defense context. Your saved project record was not changed.";

@@ -66,6 +66,21 @@ export default function CockpitPage() {
   const savedCount = sections
     ? Object.values(sections).filter((s) => s != null).length
     : 0;
+  const defenseAction = evaluation
+    ? evaluation.state === "complete"
+      ? { href: `/app/report?phase=${evaluation.current_phase ?? 1}`, label: "View Defense Report" }
+      : evaluation.state === "gate_ready"
+        ? {
+            href: "/app/gate",
+            label:
+              evaluation.recent_gate?.outcome === "in_progress"
+                ? "Continue the defense"
+                : "Start the defense",
+          }
+        : evaluation.state === "cooldown"
+          ? { href: "/app/gate", label: "View Defense status" }
+          : { href: "/app/phase", label: "Continue project" }
+    : null;
 
   return (
     <>
@@ -95,12 +110,11 @@ export default function CockpitPage() {
                 <h3>Do this next</h3>
                 <p style={{ fontSize: 17, fontWeight: 600 }}>{evaluation.next_action}</p>
                 <div className="row" style={{ marginTop: 12 }}>
-                  <Link
-                    href={evaluation.state === "gate_ready" ? "/app/gate" : "/app/phase"}
-                    className="btn primary"
-                  >
-                    {evaluation.state === "gate_ready" ? "Start the defense" : "Continue project"}
-                  </Link>
+                  {defenseAction && (
+                    <Link href={defenseAction.href} className="btn primary">
+                      {defenseAction.label}
+                    </Link>
+                  )}
                   {evaluation.state === "cooldown" &&
                     evaluation.cooldown_seconds_remaining != null && (
                       <span className="muted">
@@ -160,11 +174,16 @@ export default function CockpitPage() {
                 <h3>Build Loop — Phase {evaluation.current_phase}</h3>
                 <WorkflowSteps sections={sections} changeMap={changeMap} />
                 <div className="row" style={{ marginTop: 10 }}>
-                  <Link href="/app/report" className="btn small">
-                    Open Defense Report
-                  </Link>
+                  {(evaluation.state === "complete" || evaluation.state === "cooldown") && (
+                    <Link
+                      href={`/app/report?phase=${evaluation.current_phase ?? 1}`}
+                      className="btn small"
+                    >
+                      View Defense Report
+                    </Link>
+                  )}
                   <span className="muted">
-                    Your five captured workflow records feed the report.
+                    The Defense Report becomes available after a completed attempt.
                   </span>
                 </div>
               </div>

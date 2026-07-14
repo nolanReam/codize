@@ -2,218 +2,269 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildReportMarkdown,
-  defenseStatus,
-  deriveInterviewQuestions,
-  deriveSkills,
-  deriveWeakSpots,
-  type ReportInput,
+  changeMapProvenanceLabel,
+  defenseOutcomeLabel,
+  evidenceStatusPresentation,
+  reportIsReady,
+  reportSourceSummaries,
+  reviewDecisionPresentation,
+  safeEvidenceHref,
+  verificationResultPresentation,
+  workflowContextSourcePresentation,
 } from "./report";
-import type { Evaluation, GateCurrent, PhaseView, WorkflowSections } from "./types";
+import type { DefenseReport, WorkflowArtifactState } from "./types";
 
-const evaluation: Evaluation = {
-  state: "in_progress",
-  project_status: "active",
-  next_action: "Build phase 2, then defend it.",
-  current_phase: 2,
-  phase_title: "Data Model",
-  total_phases: 7,
-  completed_phases: 0,
-  completed_task_count: 3,
-  total_task_count: 6,
-  recent_gate: { outcome: "in_progress", summary: null },
-};
-
-const phase: PhaseView = {
-  phase: 2,
-  phase_title: "Data Model",
-  core_concept: "Model the tasks and members tables with ownership.",
-  ai_appropriate_tasks: [],
-  human_required_tasks: [],
-  explanation_gate_targets: ["ownership", "foreign keys"],
-  gate_depth: "standard",
-  unlock_condition: "",
-  functional_unlock: "",
-  is_current: true,
-  completed_task_count: 3,
-  total_task_count: 6,
-};
-
-const fullSections: WorkflowSections = {
-  prompt_builder: {
-    inputs: {},
-    generated_prompt: "Design a schema for tasks and members with RLS.",
-    why_stronger: "It scopes the task and names the constraints.",
-    bad_prompt_comparison: "make me a database",
-  },
-  review_board: {
-    files_changed: ["app/models.py", "app/routes/tasks.py"],
-    ai_generated: "the Task model and the POST route",
-    accepted: "the model",
-    rejected: "an auth rewrite",
-    edited_manually: "renamed a field",
-    ai_assumptions: "assumed every task has a due date",
-    least_confident: "the list query",
-    out_of_scope_changes: null,
-  },
-  evidence: {
-    entries: [{ kind: "test_output", content: "3 passed in 0.2s" }],
-    summary: "the create + fetch cycle passes",
-  },
-  verification: {
-    checks: [
-      { check: "app_runs_locally", result: "pass", note: "uvicorn boots" },
-      { check: "rls_wrong_user_checked", result: "pass", note: "user B gets 404" },
-    ],
-    explanation: "It shows ownership isolation works.",
-  },
-  implementation_import: {
-    source_kind: "git_diff",
-    content: "+    if row.user_id != user_id:\n+        raise PermissionError",
-    changed_files: ["app/routes/tasks.py"],
-    student_summary: "AI added ownership checks.",
-    tool_name: "Claude",
-  },
-};
-
-const gate: GateCurrent = { phase: 2, phase_title: "Data Model", state: "not_started" };
-
-function makeInput(overrides: Partial<ReportInput> = {}): ReportInput {
+export function reportFixture(overrides: Partial<DefenseReport> = {}): DefenseReport {
   return {
-    evaluation,
-    answers: { purpose: "Help my study group track expenses.", scope: "small", stack: "FastAPI", self_assessment: "Sometimes", timeline: "6 weeks" },
-    archetypeId: 2,
-    phase,
-    sections: fullSections,
-    gate,
+    schema_version: "1.0",
+    phase_number: 2,
+    phase_title: "Data Model",
+    workflow_context_source: "defense_attempt",
+    workflow_context: {
+      schema_version: "1.0",
+      phase_number: 2,
+      state: "incomplete",
+      change_map: {
+        state: "current",
+        truncated: false,
+        items: [
+          {
+            category: "implementation_decision",
+            origin: "ai_inferred",
+            student_decision: "confirmed",
+            text: "<img src=x onerror=example()> uses user_id ownership.",
+            provenance: "Student-confirmed AI-inferred Change Map item",
+            ai_uncertainty: "supported",
+            uncertainty_reason: null,
+            student_note: "I checked the route.",
+          },
+          {
+            category: "unresolved_risk",
+            origin: "ai_inferred",
+            student_decision: "rejected",
+            text: "Rejected claim",
+            provenance: "AI-inferred Change Map item rejected by the student",
+            ai_uncertainty: "ambiguous",
+            uncertainty_reason: "The import was incomplete.",
+            student_note: null,
+          },
+        ],
+      },
+      review: {
+        state: "current",
+        truncated: false,
+        manual: null,
+        items: [
+          {
+            category: "implementation_decision",
+            source_origin: "ai_inferred",
+            source_student_decision: "confirmed",
+            source_resolution: "confirmed",
+            reviewed_text: "Use user_id per row.",
+            review_decision: "needs_verification",
+            student_rationale: "Ownership must be tested <script>example()</script>.",
+            student_revision: null,
+          },
+        ],
+      },
+      verification: {
+        state: "incomplete",
+        truncated: false,
+        student_explanation: "I ran the checks myself.",
+        checks: [
+          {
+            check: "Create a record as user A.",
+            result: "pass",
+            result_notes: "A received 201.",
+            category: "security_sensitive_area",
+            provenance: "student_recorded",
+          },
+          {
+            check: "Read it as user B.",
+            result: "fail",
+            result_notes: "B could still read it.",
+            category: "security_sensitive_area",
+            provenance: "student_recorded",
+          },
+          {
+            check: "Browser flow",
+            result: "skipped",
+            result_notes: null,
+            category: null,
+            provenance: "student_recorded",
+          },
+          {
+            check: "Mobile app",
+            result: "not_applicable",
+            result_notes: null,
+            category: null,
+            provenance: "student_recorded",
+          },
+          {
+            check: "Failure case",
+            result: "unrecorded",
+            result_notes: null,
+            category: null,
+            provenance: "student_unrecorded",
+          },
+        ],
+      },
+      evidence: {
+        state: "current",
+        truncated: true,
+        manual_entries: [],
+        manual_summary: null,
+        records: [
+          {
+            category: "security_sensitive_area",
+            check_context: "Create a record as user A.",
+            verification_result: "pass",
+            verification_notes: "A received 201.",
+            evidence_status: "evidence_recorded",
+            entries: [
+              { kind: "test_output", content: "3 passed <iframe src=x></iframe>" },
+              { kind: "app_url", content: "https://example.test/result" },
+            ],
+            student_explanation: "This shows the tested happy path only.",
+            unavailable_reason: null,
+            stale_support_omitted: false,
+          },
+          {
+            category: "security_sensitive_area",
+            check_context: "Read it as user B.",
+            verification_result: "fail",
+            verification_notes: "B could still read it.",
+            evidence_status: "evidence_unavailable",
+            entries: [],
+            student_explanation: null,
+            unavailable_reason: "The hosted environment was offline <object>example</object>.",
+            stale_support_omitted: false,
+          },
+        ],
+      },
+      content_truncated: true,
+      content_redacted: false,
+    },
+    defense: {
+      state: "failed",
+      evaluator_outcome: "FAIL",
+      evaluator_reason: "The ownership failure was not fully explained.",
+      turns: [
+        {
+          turn: 1,
+          question: "Why store user_id? <embed src=x>",
+          answer: "To scope rows to a user. **not rendered**",
+        },
+      ],
+    },
+    truth_notice:
+      "Workflow records are student-recorded or student-confirmed; Verification is not independent proof; Evidence is student-provided; PASS/FAIL is the evaluator's outcome. <img src=x>",
     ...overrides,
   };
 }
 
-describe("defenseStatus", () => {
-  it("reports not_attempted when the gate has not started", () => {
-    expect(defenseStatus(makeInput())).toBe("not_attempted");
+describe("Defense Report presentation rules", () => {
+  it("distinguishes attempt snapshots from the legacy current-workflow fallback", () => {
+    expect(workflowContextSourcePresentation("defense_attempt").label).toContain("captured");
+    const legacy = workflowContextSourcePresentation("current_workflow");
+    expect(legacy.label).toContain("legacy attempt");
+    expect(legacy.description).toContain("may differ");
+    expect(legacy.label.toLowerCase()).not.toContain("snapshot");
   });
-  it("reports passed when the current phase's gate state is passed", () => {
-    expect(defenseStatus(makeInput({ gate: { ...gate, state: "passed" } }))).toBe("passed");
+
+  it.each<[WorkflowArtifactState, string]>([
+    ["current", "Current"],
+    ["missing", "Not available"],
+    ["incomplete", "Incomplete"],
+    ["stale", "Needs updating"],
+    ["manual", "Manual record"],
+    ["malformed", "Unavailable"],
+  ])("preserves the %s source state", (state, label) => {
+    const report = reportFixture();
+    report.workflow_context.change_map.state = state;
+    expect(reportSourceSummaries(report.workflow_context)[0]).toMatchObject({ state, stateLabel: label });
   });
-  it("does NOT mark the current phase passed just because a prior phase's gate passed", () => {
-    // On phase 2 with phase 1 already passed, the current phase's gate reads
-    // not_started — its defense hasn't happened yet.
-    const input = makeInput({
-      evaluation: { ...evaluation, completed_phases: 1, recent_gate: { outcome: "passed", summary: "Phase 1 passed" } },
-      gate: { ...gate, state: "not_started" },
-    });
-    expect(defenseStatus(input)).toBe("not_attempted");
+
+  it("preserves Change Map provenance and Review semantics", () => {
+    expect(changeMapProvenanceLabel("ai_inferred", "confirmed")).toBe(
+      "Student-confirmed AI inference"
+    );
+    expect(changeMapProvenanceLabel("ai_inferred", "rejected")).toContain("Rejected");
+    expect(changeMapProvenanceLabel("ai_inferred", "needs_inspection")).toBe("Needs inspection");
+    expect(reviewDecisionPresentation("needs_verification").label).toBe("Needs testing");
+    expect(reviewDecisionPresentation("keep").description).toContain("student chose");
+  });
+
+  it("preserves every Verification result without calling pass verified", () => {
+    expect(verificationResultPresentation("pass").label).toBe("Passed");
+    expect(verificationResultPresentation("pass").label).not.toBe("Verified");
+    expect(verificationResultPresentation("fail").label).toBe("Failed");
+    expect(verificationResultPresentation("skipped").label).toBe("Skipped");
+    expect(verificationResultPresentation("not_applicable").label).toBe("Not applicable");
+    expect(verificationResultPresentation("unrecorded").label).toBe("Not recorded");
+  });
+
+  it("keeps actual Evidence, unavailable, and not addressed separate", () => {
+    expect(evidenceStatusPresentation("evidence_recorded").label).toBe(
+      "Student-provided Evidence"
+    );
+    expect(evidenceStatusPresentation("evidence_unavailable").label).toBe(
+      "Evidence unavailable"
+    );
+    expect(evidenceStatusPresentation("not_addressed").label).toBe(
+      "Evidence not addressed"
+    );
+  });
+
+  it("allows only validated URL Evidence kinds to become links", () => {
+    expect(safeEvidenceHref({ kind: "app_url", content: "https://example.test/a" })).toBe(
+      "https://example.test/a"
+    );
+    expect(safeEvidenceHref({ kind: "note", content: "https://example.test/a" })).toBeNull();
+    expect(safeEvidenceHref({ kind: "app_url", content: "javascript:example()" })).toBeNull();
+  });
+
+  it("treats only completed PASS or FAIL attempts as report-ready", () => {
+    expect(reportIsReady(reportFixture())).toBe(true);
+    expect(reportIsReady(reportFixture({ defense: { state: "passed", evaluator_outcome: "PASS", evaluator_reason: null, turns: [] } }))).toBe(true);
+    expect(reportIsReady(reportFixture({ defense: { state: "in_progress", evaluator_outcome: null, evaluator_reason: null, turns: [] } }))).toBe(false);
+    expect(reportIsReady(reportFixture({ defense: { state: "not_started", evaluator_outcome: null, evaluator_reason: null, turns: [] } }))).toBe(false);
+  });
+
+  it("uses exact student-safe outcome language without scores or certainty estimates", () => {
+    expect(defenseOutcomeLabel("passed")).toBe("Defense passed");
+    expect(defenseOutcomeLabel("failed")).toBe("Defense needs another attempt");
+    const markdown = buildReportMarkdown(reportFixture());
+    expect(markdown).toContain("FAIL");
+    expect(markdown).not.toMatch(/score|threshold|confidence\s*:/i);
   });
 });
 
-describe("buildReportMarkdown", () => {
-  it("includes the real purpose and archetype", () => {
-    const md = buildReportMarkdown(makeInput());
-    expect(md).toContain("Help my study group track expenses.");
-    expect(md).toContain("REST API Backend");
-    expect(md).toContain("Design a schema for tasks and members with RLS.");
+describe("authoritative Report Markdown export", () => {
+  it("includes provenance, mixed results, Evidence distinctions, transcript, and truth notice", () => {
+    const markdown = buildReportMarkdown(reportFixture());
+    expect(markdown).toContain("Project record captured for this Defense");
+    expect(markdown).toContain("Student-confirmed AI inference");
+    expect(markdown).toContain("Rejected AI-inferred change");
+    expect(markdown).toContain("Needs testing");
+    expect(markdown).toContain("Passed");
+    expect(markdown).toContain("Failed");
+    expect(markdown).toContain("Skipped");
+    expect(markdown).toContain("Not applicable");
+    expect(markdown).toContain("Not recorded");
+    expect(markdown).toContain("Student-provided Evidence");
+    expect(markdown).toContain("Evidence unavailable");
+    expect(markdown).toContain("Your response");
+    expect(markdown).toContain("not independent proof");
   });
 
-  it("labels verification as self-reported and never leaks a numeric score", () => {
-    const md = buildReportMarkdown(makeInput());
-    expect(md.toLowerCase()).toContain("self-reported");
-    // No "score: <n>" style leakage.
-    expect(md).not.toMatch(/score[":\s]+\d/i);
-  });
-
-  it("marks missing sections honestly instead of inventing evidence", () => {
-    const md = buildReportMarkdown(
-      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null, implementation_import: null } })
-    );
-    expect(md).toContain("No engineered prompt saved for this phase.");
-    expect(md).toContain("No verification checks recorded for this phase.");
-    expect(md).toContain("No evidence attached for this phase.");
-  });
-
-  it("says the gate is not attempted when it hasn't been", () => {
-    const md = buildReportMarkdown(makeInput());
-    expect(md).toContain("Defense not yet attempted");
-  });
-
-  it("labels skipped and N/A checks honestly, never as evidence (M13E.2)", () => {
-    const md = buildReportMarkdown(
-      makeInput({
-        sections: {
-          ...fullSections,
-          verification: {
-            checks: [
-              { check: "app_runs_locally", result: "pass", note: "uvicorn boots" },
-              { check: "smoke_test", result: "skipped", note: null },
-              { check: "auth_boundary_checked", result: "not_applicable", note: "no auth yet" },
-            ],
-            explanation: null,
-          },
-        },
-      })
-    );
-    expect(md).toContain("**skipped — not checked yet**");
-    expect(md).toContain("**n/a — doesn't apply**");
-    // The raw enum value never leaks into the export.
-    expect(md).not.toContain("**not_applicable**");
-  });
-
-  it("ends with a single trailing newline and no giant gaps", () => {
-    const md = buildReportMarkdown(makeInput());
-    expect(md.endsWith("\n")).toBe(true);
-    expect(md).not.toMatch(/\n{3,}/);
-  });
-});
-
-describe("deriveSkills", () => {
-  it("marks planning/prompting/reviewing/verification demonstrated when artifacts exist", () => {
-    const skills = deriveSkills(makeInput());
-    const by = Object.fromEntries(skills.map((s) => [s.skill, s.demonstrated]));
-    expect(by["Planning"]).toBe(true);
-    expect(by["Prompting"]).toBe(true);
-    expect(by["Reviewing AI output"]).toBe(true);
-    expect(by["Verification"]).toBe(true);
-    expect(by["Security awareness"]).toBe(true); // rls check present
-    expect(by["Explanation / defense"]).toBe(false); // gate not passed
-  });
-
-  it("credits explanation/defense once any phase gate has been passed", () => {
-    const skills = deriveSkills(makeInput({ evaluation: { ...evaluation, completed_phases: 1 } }));
-    const explanation = skills.find((s) => s.skill === "Explanation / defense");
-    expect(explanation?.demonstrated).toBe(true);
-  });
-
-  it("marks nothing demonstrated when no artifacts exist", () => {
-    const skills = deriveSkills(
-      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null, implementation_import: null } })
-    );
-    expect(skills.every((s) => !s.demonstrated)).toBe(true);
-  });
-});
-
-describe("deriveWeakSpots", () => {
-  it("flags every missing artifact and the un-attempted gate", () => {
-    const weak = deriveWeakSpots(
-      makeInput({ sections: { prompt_builder: null, review_board: null, evidence: null, verification: null, implementation_import: null } })
-    );
-    expect(weak.join(" ")).toContain("Prompt Builder");
-    expect(weak.join(" ")).toContain("Review Board");
-    expect(weak.join(" ")).toContain("Evidence Panel");
-    expect(weak.join(" ")).toContain("Verification Lab");
-    expect(weak.join(" ")).toContain("hasn’t been attempted");
-  });
-
-  it("is empty of gaps when everything is present and the gate passed", () => {
-    const weak = deriveWeakSpots(makeInput({ gate: { ...gate, state: "passed" } }));
-    expect(weak).toHaveLength(0);
-  });
-});
-
-describe("deriveInterviewQuestions", () => {
-  it("weaves in changed files and always covers data flow + verification", () => {
-    const qs = deriveInterviewQuestions(makeInput());
-    expect(qs.join(" ")).toContain("data flow");
-    expect(qs.join(" ")).toContain("app/models.py");
-    expect(qs.some((q) => q.toLowerCase().includes("verify"))).toBe(true);
+  it("escapes HTML-like and Markdown-like student text in the export", () => {
+    const markdown = buildReportMarkdown(reportFixture());
+    expect(markdown).not.toContain("<img");
+    expect(markdown).not.toContain("<script>");
+    expect(markdown).not.toContain("<iframe");
+    expect(markdown).not.toContain("<embed");
+    expect(markdown).toContain("&lt;img");
+    expect(markdown).toContain("\\*\\*not rendered\\*\\*");
   });
 });

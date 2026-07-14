@@ -1,350 +1,366 @@
-// Project Defense Report assembly (M13C.2) — pure, client-side, no LLM. The
-// report is built entirely from data the backend already exposes to the owner
-// (intake, phase, workflow artifacts, gate state, evaluation). It never invents
-// evidence and never surfaces private backend data: raw gate scores, evaluator
-// reasoning, hidden thresholds, and internal prompts are not in any input here
-// by backend design, and nothing here reconstructs them.
+// Pure presentation and export rules for the authoritative M16C.1 Defense
+// Report response. Nothing here parses raw workflow JSON or derives authority.
 
+import { evidenceKindLabel as linkedEvidenceKindLabel } from "./evidence";
+import { sourceStatePresentation } from "./defenseContext";
 import type {
-  Evaluation,
-  GateCurrent,
-  PhaseView,
-  VerificationCheckId,
-  VerificationResult,
-  WorkflowSections,
+  ChangeMapCategory,
+  ChangeMapStudentDecision,
+  CuratedWorkflowContext,
+  DefenseReport,
+  DefenseWorkflowSourceId,
+  EvidenceKind,
+  EvidenceStatus,
+  ReportDefenseState,
+  ReportEvidenceEntry,
+  ReportVerificationResult,
+  ReviewDecision,
+  WorkflowArtifactState,
+  WorkflowContextSource,
 } from "./types";
 
-// The three fixed archetypes (spec-fixed — there is never a fourth).
-export const ARCHETYPE_NAMES: Record<number, string> = {
-  1: "AI-Powered App",
-  2: "REST API Backend",
-  3: "Full-Stack Web App",
-};
-
-// Human labels for the fixed 8-check verification enum (mirrors the Verification Lab).
-export const VERIFICATION_LABELS: Record<VerificationCheckId, string> = {
-  app_runs_locally: "The app runs locally",
-  smoke_test: "Ran at least one smoke test",
-  api_route_checked: "The relevant API route responds correctly",
-  ui_flow_checked: "The relevant UI flow works",
-  failure_case_tested: "Tested at least one failure case",
-  auth_boundary_checked: "Auth boundary checked",
-  secret_exposure_checked: "No secrets exposed in frontend/repo",
-  rls_wrong_user_checked: "Wrong-user access blocked (RLS)",
-};
-
-const SECURITY_CHECKS: VerificationCheckId[] = [
-  "auth_boundary_checked",
-  "secret_exposure_checked",
-  "rls_wrong_user_checked",
+export const REPORT_SOURCE_ORDER: readonly DefenseWorkflowSourceId[] = [
+  "change_map",
+  "review",
+  "verification",
+  "evidence",
 ];
 
-// Honest result labels (M13E.2): a skipped or N/A check was not checked, and
-// the report must say so plainly instead of printing a raw enum value.
-export const VERIFICATION_RESULT_LABELS: Record<VerificationResult, string> = {
-  pass: "pass",
-  fail: "fail",
-  skipped: "skipped — not checked yet",
-  not_applicable: "n/a — doesn't apply",
+export const REPORT_SOURCE_LABELS: Record<DefenseWorkflowSourceId, string> = {
+  change_map: "Change Map",
+  review: "Review",
+  verification: "Verification",
+  evidence: "Evidence",
 };
 
-export interface ReportInput {
-  evaluation: Evaluation;
-  answers: Record<string, string | null> | null;
-  archetypeId: number | null;
-  phase: PhaseView | null;
-  sections: WorkflowSections | null;
-  gate: GateCurrent | null;
+export interface LabelDescription {
+  label: string;
+  description: string;
 }
 
-// --- defense status (safe, no score/reasoning leakage) -----------------------
+const CONTEXT_SOURCE_PRESENTATION: Record<WorkflowContextSource, LabelDescription> = {
+  defense_attempt: {
+    label: "Project record captured for this Defense",
+    description:
+      "The workflow sections in this report use the server-owned project record captured for this Defense attempt.",
+  },
+  current_workflow: {
+    label: "Current project record used for this legacy attempt",
+    description:
+      "This older Defense attempt did not store a workflow snapshot. The workflow sections below reflect the project’s current saved record and may differ from what existed when the Defense occurred.",
+  },
+};
 
-export type DefenseStatus =
-  | "passed"
-  | "cooldown"
-  | "in_progress"
-  | "not_attempted";
-
-// Status of the CURRENT phase's defense only. On non-final phases a pass
-// advances the phase, so the current phase's gate reads "not_started" again —
-// which is honest: this phase hasn't been defended yet. Prior passes are shown
-// separately as the "latest gate note", never conflated into this label.
-export function defenseStatus(input: ReportInput): DefenseStatus {
-  const state = input.gate?.state;
-  if (state === "passed") return "passed";
-  if (state === "cooldown") return "cooldown";
-  if (state === "in_progress") return "in_progress";
-  return "not_attempted";
+export function workflowContextSourcePresentation(
+  source: WorkflowContextSource
+): LabelDescription {
+  return CONTEXT_SOURCE_PRESENTATION[source];
 }
 
-export function defenseLabel(status: DefenseStatus): string {
-  switch (status) {
+const CATEGORY_LABELS: Record<ChangeMapCategory, string> = {
+  changed_file: "Changed file",
+  behavior_change: "Behavior change",
+  implementation_decision: "Implementation decision",
+  out_of_scope_change: "Out-of-scope change",
+  security_sensitive_area: "Security-sensitive area",
+  unresolved_risk: "Unresolved risk",
+  unverified_behavior: "Unverified behavior",
+  question_to_understand: "Question to understand",
+};
+
+export function reportCategoryLabel(category: ChangeMapCategory): string {
+  return CATEGORY_LABELS[category];
+}
+
+const CHANGE_MAP_PROVENANCE: Record<ChangeMapStudentDecision, string> = {
+  pending_review: "Awaiting student review",
+  confirmed: "Student-confirmed AI inference",
+  edited: "Student-edited change",
+  rejected: "Rejected AI-inferred change",
+  uncertain: "Uncertain",
+  needs_inspection: "Needs inspection",
+};
+
+export function changeMapProvenanceLabel(
+  origin: "ai_inferred" | "student_added",
+  decision: ChangeMapStudentDecision
+): string {
+  return origin === "student_added" ? "Student-authored change" : CHANGE_MAP_PROVENANCE[decision];
+}
+
+const REVIEW_DECISIONS: Record<ReviewDecision, LabelDescription> = {
+  pending: { label: "Not decided", description: "No Review decision was recorded." },
+  keep: { label: "Keep", description: "The student chose to keep this change." },
+  revise: { label: "Revise", description: "The student chose to revise this change." },
+  remove: { label: "Remove", description: "The student chose to remove this change." },
+  needs_verification: {
+    label: "Needs testing",
+    description: "The student marked this change for Verification.",
+  },
+  uncertain: { label: "Uncertain", description: "The student preserved uncertainty." },
+};
+
+export function reviewDecisionPresentation(decision: ReviewDecision): LabelDescription {
+  return REVIEW_DECISIONS[decision];
+}
+
+const VERIFICATION_RESULTS: Record<ReportVerificationResult, LabelDescription> = {
+  pass: { label: "Passed", description: "The student recorded this check as passed." },
+  fail: { label: "Failed", description: "The student recorded this check as failed." },
+  skipped: { label: "Skipped", description: "The student did not perform this check." },
+  not_applicable: {
+    label: "Not applicable",
+    description: "The student recorded that this check did not apply.",
+  },
+  unrecorded: { label: "Not recorded", description: "No result was recorded for this check." },
+};
+
+export function verificationResultPresentation(
+  result: ReportVerificationResult
+): LabelDescription {
+  return VERIFICATION_RESULTS[result];
+}
+
+const EVIDENCE_STATUS: Record<EvidenceStatus, LabelDescription> = {
+  evidence_recorded: {
+    label: "Student-provided Evidence",
+    description: "The student recorded supporting material for this check.",
+  },
+  evidence_unavailable: {
+    label: "Evidence unavailable",
+    description: "The student recorded why supporting Evidence was unavailable.",
+  },
+  not_addressed: {
+    label: "Evidence not addressed",
+    description: "No Evidence or unavailable explanation was recorded for this check.",
+  },
+};
+
+export function evidenceStatusPresentation(status: EvidenceStatus): LabelDescription {
+  return EVIDENCE_STATUS[status];
+}
+
+export function reportEvidenceKindLabel(kind: EvidenceKind): string {
+  return linkedEvidenceKindLabel(kind);
+}
+
+export function defenseOutcomeLabel(state: ReportDefenseState): string {
+  switch (state) {
     case "passed":
-      return "Defense passed for this phase";
-    case "cooldown":
-      return "Recent attempt didn’t pass — in cooldown";
+      return "Defense passed";
+    case "failed":
+      return "Defense needs another attempt";
     case "in_progress":
       return "Defense in progress";
-    case "not_attempted":
-      return "Defense not yet attempted";
+    case "not_started":
+      return "Defense not started";
   }
 }
 
-// --- skills demonstrated -----------------------------------------------------
-
-export interface SkillRow {
-  skill: string;
-  demonstrated: boolean;
-  note: string;
+export function defenseOutcomeTone(state: ReportDefenseState): string {
+  if (state === "passed") return "ok";
+  if (state === "failed") return "danger";
+  if (state === "in_progress") return "warn";
+  return "";
 }
 
-export function deriveSkills(input: ReportInput): SkillRow[] {
-  const s = input.sections;
-  const prompt = s?.prompt_builder ?? null;
-  const review = s?.review_board ?? null;
-  const verification = s?.verification ?? null;
-  // Project-level: has the student passed any gate so far? (Current-phase
-  // defenseStatus resets after each pass; completed_phases carries the history.)
-  const anyGatePassed = (input.evaluation.completed_phases ?? 0) > 0 || defenseStatus(input) === "passed";
-
-  const securityTouched =
-    (verification?.checks ?? []).some(
-      (c) => SECURITY_CHECKS.includes(c.check) && c.result !== "not_applicable"
-    ) || (review?.out_of_scope_changes ?? "").trim().length > 0;
-
-  return [
-    {
-      skill: "Planning",
-      demonstrated: prompt != null,
-      note: prompt ? "Scoped the work in a deliberate prompt before generating." : "No planned prompt saved for this phase.",
-    },
-    {
-      skill: "Prompting",
-      demonstrated: !!prompt?.generated_prompt,
-      note: prompt?.generated_prompt
-        ? "Engineered a constraint-driven prompt rather than a vague ask."
-        : "No engineered prompt on record.",
-    },
-    {
-      skill: "Reviewing AI output",
-      demonstrated: review != null,
-      note: review
-        ? "Recorded what the AI generated and what was accepted, rejected, or edited."
-        : "No review of the AI’s output recorded.",
-    },
-    {
-      skill: "Verification",
-      demonstrated: (verification?.checks ?? []).length > 0,
-      note: verification?.checks?.length
-        ? `Ran ${verification.checks.length} self-reported check(s).`
-        : "No verification checks recorded.",
-    },
-    {
-      skill: "Explanation / defense",
-      demonstrated: anyGatePassed,
-      note: anyGatePassed
-        ? "Passed the Interrogation Gate for at least one phase."
-        : "No Interrogation Gate passed yet.",
-    },
-    {
-      skill: "Security awareness",
-      demonstrated: securityTouched,
-      note: securityTouched
-        ? "Considered auth / secrets / ownership as part of the work."
-        : "No security-specific checks recorded yet.",
-    },
-  ];
+export function reportIsReady(report: DefenseReport): boolean {
+  return report.defense.state === "passed" || report.defense.state === "failed";
 }
 
-// --- weak spots / next actions -----------------------------------------------
+export interface ReportSourceSummary {
+  sourceId: DefenseWorkflowSourceId;
+  label: string;
+  state: WorkflowArtifactState;
+  stateLabel: string;
+  stateDescription: string;
+  truncated: boolean;
+}
 
-export function deriveWeakSpots(input: ReportInput): string[] {
-  const gaps: string[] = [];
-  const s = input.sections;
-  if (!s?.prompt_builder) gaps.push("No engineered prompt saved for this phase (Prompt Builder).");
-  if (!s?.review_board) gaps.push("The AI’s output for this phase hasn’t been reviewed (Review Board).");
-  if (!s?.evidence || (s.evidence.entries ?? []).length === 0)
-    gaps.push("No evidence attached yet (Evidence Panel).");
-  if (!s?.verification || (s.verification.checks ?? []).length === 0)
-    gaps.push("No verification checks recorded (Verification Lab).");
-  else {
-    const failed = s.verification.checks.filter((c) => c.result === "fail");
-    if (failed.length)
-      gaps.push(
-        `${failed.length} verification check(s) recorded as failing — worth resolving before defending.`
+export function reportSourceSummaries(context: CuratedWorkflowContext): ReportSourceSummary[] {
+  return REPORT_SOURCE_ORDER.map((sourceId) => {
+    const source = context[sourceId];
+    const presentation = sourceStatePresentation(source.state);
+    return {
+      sourceId,
+      label: REPORT_SOURCE_LABELS[sourceId],
+      state: source.state,
+      stateLabel: presentation.label,
+      stateDescription: presentation.description,
+      truncated: source.truncated,
+    };
+  });
+}
+
+export function sourceHasReportContent(
+  sourceId: DefenseWorkflowSourceId,
+  context: CuratedWorkflowContext
+): boolean {
+  switch (sourceId) {
+    case "change_map":
+      return context.change_map.items.length > 0;
+    case "review":
+      return context.review.items.length > 0 || context.review.manual !== null;
+    case "verification":
+      return context.verification.checks.length > 0 || context.verification.student_explanation !== null;
+    case "evidence":
+      return (
+        context.evidence.records.length > 0 ||
+        context.evidence.manual_entries.length > 0 ||
+        context.evidence.manual_summary !== null
       );
   }
-
-  const status = defenseStatus(input);
-  if (status === "not_attempted") gaps.push("The Interrogation Gate hasn’t been attempted for this phase.");
-  if (status === "cooldown") gaps.push("A recent gate attempt didn’t pass; review your work before retrying.");
-
-  return gaps;
 }
 
-// --- interview / defense questions (derived, no LLM) -------------------------
-
-export function deriveInterviewQuestions(input: ReportInput): string[] {
-  const questions: string[] = [];
-  const phaseTitle = input.phase?.phase_title ?? input.evaluation.phase_title;
-  const files = input.sections?.review_board?.files_changed ?? [];
-  const assumptions = input.sections?.review_board?.ai_assumptions ?? null;
-  const archetype = input.archetypeId ? ARCHETYPE_NAMES[input.archetypeId] : null;
-
-  questions.push("Walk me through your project’s data flow, end to end.");
-  if (phaseTitle) questions.push(`In “${phaseTitle}”, what did you build and why is it structured that way?`);
-  questions.push("What did the AI generate that you had to verify yourself, and how did you verify it?");
-  if (files.length)
-    questions.push(
-      `You changed ${files.slice(0, 3).join(", ")}${files.length > 3 ? ", …" : ""}. What breaks if one of those changes?`
-    );
-  else questions.push("What would break if the route or table you worked on changed?");
-  questions.push("How do you know this feature actually works — not just that it looks done?");
-  if (assumptions && assumptions.trim())
-    questions.push("You noted an assumption the AI made. Was it correct, and how did you check?");
-  else questions.push("What assumption did the AI make that you had to catch?");
-  if (archetype === "Full-Stack Web App" || archetype === "AI-Powered App")
-    questions.push("Where does user input reach the database or the UI, and how is it validated?");
-  if (archetype === "REST API Backend" || archetype === "Full-Stack Web App")
-    questions.push("How does your ownership / RLS model stop one user from reading another’s data?");
-
-  return questions;
+export function safeEvidenceHref(entry: ReportEvidenceEntry): string | null {
+  if (entry.kind !== "repo_url" && entry.kind !== "app_url") return null;
+  try {
+    const url = new URL(entry.content);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
-// --- markdown assembly -------------------------------------------------------
-
-function line(label: string, value: string | null | undefined): string {
-  return value && value.trim() ? `- **${label}:** ${value.trim()}` : `- **${label}:** _Not provided_`;
+function escapeMarkdown(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/([\\`*_{}\[\]()#+\-.!|])/g, "\\$1")
+    .replace(/\r?\n/g, "  \n");
 }
 
-function section(title: string, body: string[]): string {
-  return [`## ${title}`, "", ...body, ""].join("\n");
+function mdLine(label: string, value: string | null | undefined): string {
+  return `- **${label}:** ${value ? escapeMarkdown(value) : "_Not recorded_"}`;
 }
 
-export function buildReportMarkdown(input: ReportInput): string {
-  const { evaluation, answers, phase, sections } = input;
-  const archetype = input.archetypeId ? ARCHETYPE_NAMES[input.archetypeId] : null;
-  const status = defenseStatus(input);
-  const out: string[] = [];
+function mdSection(title: string, lines: string[]): string[] {
+  return [`## ${title}`, "", ...lines, ""];
+}
 
-  out.push("# Project Defense Report", "");
+export function buildReportMarkdown(report: DefenseReport): string {
+  const contextSource = workflowContextSourcePresentation(report.workflow_context_source);
+  const context = report.workflow_context;
+  const out: string[] = [
+    "# Defense Report",
+    "",
+    mdLine("Phase", `${report.phase_number} — ${report.phase_title}`),
+    mdLine("Defense outcome", defenseOutcomeLabel(report.defense.state)),
+    mdLine("Workflow context", contextSource.label),
+    "",
+    escapeMarkdown(contextSource.description),
+    "",
+    `> ${escapeMarkdown(report.truth_notice)}`,
+    "",
+  ];
+
   out.push(
-    "_Assembled by Codize from your own submitted workflow. Verification below is self-reported; " +
-      "this report is a record of what you did and can explain, not a guarantee that the project works._",
-    ""
-  );
-  out.push(`_Generated ${new Date().toISOString()}_`, "");
-
-  // 1. Project Overview
-  out.push(
-    section("1. Project Overview", [
-      line("Problem being solved (and who it helps)", answers?.purpose ?? null),
-      line("Scope", answers?.scope ?? null),
-      line("Stack", answers?.stack ?? null),
-      line("Archetype", archetype),
-      line(
-        "Current phase",
-        evaluation.current_phase != null
-          ? `Phase ${evaluation.current_phase} of ${evaluation.total_phases ?? "?"} — ${
-              phase?.phase_title ?? evaluation.phase_title ?? ""
-            }`.trim()
-          : null
-      ),
-      line("Core concept for this phase", phase?.core_concept ?? null),
-    ])
-  );
-
-  // 2. AI Workflow Evidence
-  const pb = sections?.prompt_builder ?? null;
-  const rb = sections?.review_board ?? null;
-  const workflowBody: string[] = [];
-  if (pb) {
-    workflowBody.push("**Engineered prompt**", "", "```", (pb.generated_prompt || "").trim(), "```", "");
-    if (pb.why_stronger?.trim()) workflowBody.push(line("Why the prompt is stronger", pb.why_stronger), "");
-  } else {
-    workflowBody.push("_No engineered prompt saved for this phase._", "");
-  }
-  if (rb) {
-    workflowBody.push(
-      line("Files changed", (rb.files_changed ?? []).join(", ") || null),
-      line("What the AI generated", rb.ai_generated),
-      line("Accepted", rb.accepted),
-      line("Rejected", rb.rejected),
-      line("Edited manually", rb.edited_manually),
-      line("AI assumptions identified", rb.ai_assumptions),
-      line("Least confident about", rb.least_confident),
-      line("Out-of-scope changes", rb.out_of_scope_changes)
-    );
-  } else {
-    workflowBody.push("_The AI’s output for this phase hasn’t been reviewed yet._");
-  }
-  out.push(section("2. AI Workflow Evidence", workflowBody));
-
-  // 3. Verification Evidence
-  const ver = sections?.verification ?? null;
-  const ev = sections?.evidence ?? null;
-  const verBody: string[] = [];
-  if (ver?.checks?.length) {
-    verBody.push("**Self-reported checks**", "");
-    for (const c of ver.checks) {
-      const label = VERIFICATION_LABELS[c.check] ?? c.check;
-      const result = VERIFICATION_RESULT_LABELS[c.result] ?? c.result;
-      const note = c.note?.trim() ? ` — ${c.note.trim()}` : "";
-      verBody.push(`- ${label}: **${result}**${note}`);
-    }
-    verBody.push("");
-    if (ver.explanation?.trim()) verBody.push(line("What this verification proves", ver.explanation), "");
-  } else {
-    verBody.push("_No verification checks recorded for this phase._", "");
-  }
-  if (ev?.entries?.length) {
-    verBody.push("**Submitted evidence**", "");
-    for (const entry of ev.entries) {
-      const oneLine = entry.content.replace(/\s+/g, " ").trim();
-      const clipped = oneLine.length > 300 ? `${oneLine.slice(0, 300)}…` : oneLine;
-      verBody.push(`- \`${entry.kind}\`: ${clipped}`);
-    }
-    verBody.push("");
-    if (ev.summary?.trim()) verBody.push(line("What the evidence shows", ev.summary), "");
-  } else {
-    verBody.push("_No evidence attached for this phase._");
-  }
-  out.push(section("3. Verification Evidence", verBody));
-
-  // 4. Project Defense Status
-  const defenseBody: string[] = [line("Defense status", defenseLabel(status))];
-  if (status === "cooldown" && input.gate?.cooldown_seconds_remaining != null) {
-    defenseBody.push(
-      line(
-        "Retry available in",
-        `about ${Math.max(1, Math.ceil(input.gate.cooldown_seconds_remaining / 60))} minute(s)`
+    ...mdSection(
+      "Project record",
+      reportSourceSummaries(context).map(
+        (source) =>
+          `- **${source.label}:** ${source.stateLabel}${source.truncated ? " — long details shortened" : ""}`
       )
-    );
-  }
-  if (evaluation.recent_gate?.summary) defenseBody.push(line("Latest gate note", evaluation.recent_gate.summary));
-  defenseBody.push("", "_The gate’s numeric score and private evaluator reasoning are intentionally not shown._");
-  out.push(section("4. Project Defense Status", defenseBody));
-
-  // 5. Skills Demonstrated
-  out.push(
-    section(
-      "5. Skills Demonstrated",
-      deriveSkills(input).map((row) => `- ${row.demonstrated ? "✅" : "⬜"} **${row.skill}** — ${row.note}`)
     )
   );
 
-  // 6. Weak Spots / Next Actions
-  const weak = deriveWeakSpots(input);
-  const weakBody = weak.length ? weak.map((w) => `- ${w}`) : ["- No obvious gaps for this phase — nice."];
-  weakBody.push("", line("Recommended next action", evaluation.next_action));
-  out.push(section("6. Weak Spots / Next Actions", weakBody));
+  const changeLines = context.change_map.items.length
+    ? context.change_map.items.flatMap((item) => [
+        `- **${changeMapProvenanceLabel(item.origin, item.student_decision)} · ${reportCategoryLabel(item.category)}**`,
+        `  - ${escapeMarkdown(item.text)}`,
+        ...(item.uncertainty_reason
+          ? [`  - Uncertainty: ${escapeMarkdown(item.uncertainty_reason)}`]
+          : []),
+        ...(item.student_note ? [`  - Student note: ${escapeMarkdown(item.student_note)}`] : []),
+      ])
+    : [`_${sourceStatePresentation(context.change_map.state).description}_`];
+  out.push(...mdSection("Change Map", changeLines));
 
-  // 7. Interview / Defense Questions
+  const reviewLines: string[] = [];
+  for (const item of context.review.items) {
+    reviewLines.push(
+      `- **${reviewDecisionPresentation(item.review_decision).label} · ${reportCategoryLabel(item.category)}**`,
+      `  - Reviewed change: ${escapeMarkdown(item.reviewed_text)}`
+    );
+    if (item.student_rationale) reviewLines.push(`  - Student rationale: ${escapeMarkdown(item.student_rationale)}`);
+    if (item.student_revision) reviewLines.push(`  - Student revision: ${escapeMarkdown(item.student_revision)}`);
+  }
+  if (context.review.manual) {
+    const manual = context.review.manual;
+    reviewLines.push("- **Manual Review record**");
+    if (manual.files_changed.length) reviewLines.push(`  - Files changed: ${escapeMarkdown(manual.files_changed.join(", "))}`);
+    for (const [label, value] of [
+      ["AI generated", manual.ai_generated],
+      ["Accepted", manual.accepted],
+      ["Rejected", manual.rejected],
+      ["Edited manually", manual.edited_manually],
+      ["AI assumptions", manual.ai_assumptions],
+      ["Least confident", manual.least_confident],
+      ["Out-of-scope changes", manual.out_of_scope_changes],
+    ] as const) {
+      if (value) reviewLines.push(`  - ${label}: ${escapeMarkdown(value)}`);
+    }
+  }
   out.push(
-    section(
-      "7. Interview / Defense Questions",
-      deriveInterviewQuestions(input).map((q) => `- ${q}`)
+    ...mdSection(
+      "Review",
+      reviewLines.length ? reviewLines : [`_${sourceStatePresentation(context.review.state).description}_`]
     )
+  );
+
+  const verificationLines = context.verification.checks.length
+    ? context.verification.checks.flatMap((check) => [
+        `- **${verificationResultPresentation(check.result).label}:** ${escapeMarkdown(check.check)}`,
+        ...(check.result_notes ? [`  - What happened: ${escapeMarkdown(check.result_notes)}`] : []),
+      ])
+    : [`_${sourceStatePresentation(context.verification.state).description}_`];
+  if (context.verification.student_explanation) {
+    verificationLines.push(`- Student explanation: ${escapeMarkdown(context.verification.student_explanation)}`);
+  }
+  out.push(...mdSection("Verification", verificationLines));
+
+  const evidenceLines: string[] = [];
+  for (const record of context.evidence.records) {
+    evidenceLines.push(
+      `- **${evidenceStatusPresentation(record.evidence_status).label}:** ${escapeMarkdown(record.check_context)}`,
+      `  - Recorded Verification result: ${verificationResultPresentation(record.verification_result).label}`
+    );
+    if (record.verification_notes) evidenceLines.push(`  - Verification notes: ${escapeMarkdown(record.verification_notes)}`);
+    for (const entry of record.entries) {
+      evidenceLines.push(`  - ${reportEvidenceKindLabel(entry.kind)}: ${escapeMarkdown(entry.content)}`);
+    }
+    if (record.student_explanation) evidenceLines.push(`  - Student explanation: ${escapeMarkdown(record.student_explanation)}`);
+    if (record.unavailable_reason) evidenceLines.push(`  - Unavailable reason: ${escapeMarkdown(record.unavailable_reason)}`);
+    if (record.stale_support_omitted) evidenceLines.push("  - Evidence needs updating; prior supporting content is not shown as current.");
+  }
+  for (const entry of context.evidence.manual_entries) {
+    evidenceLines.push(`- **Manual student-provided Evidence · ${reportEvidenceKindLabel(entry.kind)}:** ${escapeMarkdown(entry.content)}`);
+  }
+  if (context.evidence.manual_summary) evidenceLines.push(`- Manual student summary: ${escapeMarkdown(context.evidence.manual_summary)}`);
+  out.push(
+    ...mdSection(
+      "Evidence",
+      evidenceLines.length ? evidenceLines : [`_${sourceStatePresentation(context.evidence.state).description}_`]
+    )
+  );
+
+  const transcriptLines = report.defense.turns.length
+    ? report.defense.turns.flatMap((turn) => [
+        `### Question ${turn.turn}`,
+        "",
+        escapeMarkdown(turn.question),
+        "",
+        `**Your response:** ${turn.answer ? escapeMarkdown(turn.answer) : "_Not recorded_"}`,
+        "",
+      ])
+    : ["_No student-safe Defense transcript is available._"];
+  out.push(...mdSection("Project Defense", transcriptLines));
+  out.push(
+    ...mdSection("Defense outcome", [
+      mdLine("Outcome", report.defense.evaluator_outcome ?? defenseOutcomeLabel(report.defense.state)),
+      mdLine("Recorded evaluator feedback", report.defense.evaluator_reason),
+    ])
   );
 
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";

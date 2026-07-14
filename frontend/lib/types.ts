@@ -567,16 +567,58 @@ export interface Evaluation {
 // Metadata-only view of what Project Defense questions can draw on (M14C).
 // Presence + labels + truncation flags ONLY — the backend never sends artifact
 // content, intake answers, rendered context, or grounding terms here.
+export type DefenseContextSourceId =
+  | "project"
+  | "phase"
+  | "progress"
+  | "intake"
+  | "workflow.prompt_builder"
+  | "workflow.review_board"
+  | "workflow.evidence"
+  | "workflow.verification"
+  | "workflow.change_map"
+  | "workflow.artifact_record";
+
+export type DefenseContextSourceType =
+  | "system_project"
+  | "system_roadmap"
+  | "system_progress"
+  | "student_intake"
+  | "student_artifact"
+  | "student_recorded_evidence"
+  | "student_recorded_verification";
+
 export interface ContextSummarySource {
-  source_id: string;
+  source_id: DefenseContextSourceId;
   label: string;
-  source_type: string;
+  source_type: DefenseContextSourceType;
   truncated: boolean;
 }
 
 export interface ContextSummaryMissingSource {
-  source_id: string;
+  source_id: DefenseContextSourceId;
   label: string;
+}
+
+export type DefenseWorkflowSourceId =
+  | "change_map"
+  | "review"
+  | "verification"
+  | "evidence";
+
+export type WorkflowArtifactState =
+  | "missing"
+  | "manual"
+  | "current"
+  | "stale"
+  | "incomplete"
+  | "malformed";
+
+export interface DefenseWorkflowSource {
+  source_id: DefenseWorkflowSourceId;
+  label: string;
+  state: WorkflowArtifactState;
+  truncated: boolean;
 }
 
 export interface DefenseContextSummary {
@@ -584,6 +626,7 @@ export interface DefenseContextSummary {
   phase_number: number;
   included_sources: ContextSummarySource[];
   missing_sources: ContextSummaryMissingSource[];
+  workflow_sources: DefenseWorkflowSource[];
   has_truncation: boolean;
   artifact_aware: boolean;
 }
@@ -630,4 +673,142 @@ export interface GateEvaluationResult {
   current_phase: number;
   new_unlocks?: UnlockView[];
   cooldown_seconds?: number;
+}
+
+// --- artifact-aware Defense Report (M16C.1 backend / M16C.2 UI) ------------
+
+export type DefenseReportSchemaVersion = "1.0";
+export type WorkflowContextSchemaVersion = "1.0";
+export type WorkflowContextSource = "defense_attempt" | "current_workflow";
+
+export interface ReportEvidenceEntry {
+  kind: EvidenceKind;
+  content: string;
+}
+
+export interface ReportChangeMapItem {
+  category: ChangeMapCategory;
+  origin: ChangeMapOrigin;
+  student_decision: ChangeMapStudentDecision;
+  text: string;
+  provenance: string;
+  ai_uncertainty: ChangeMapAiUncertainty | null;
+  uncertainty_reason: string | null;
+  student_note: string | null;
+}
+
+export interface ReportChangeMapContext {
+  state: WorkflowArtifactState;
+  items: ReportChangeMapItem[];
+  truncated: boolean;
+}
+
+export interface ReportManualReviewContext {
+  files_changed: string[];
+  ai_generated: string | null;
+  accepted: string | null;
+  rejected: string | null;
+  edited_manually: string | null;
+  ai_assumptions: string | null;
+  least_confident: string | null;
+  out_of_scope_changes: string | null;
+}
+
+export interface ReportReviewItem {
+  category: ChangeMapCategory;
+  source_origin: ChangeMapOrigin;
+  source_student_decision: ChangeMapStudentDecision;
+  source_resolution: ReviewSourceResolution;
+  reviewed_text: string;
+  review_decision: ReviewDecision;
+  student_rationale: string | null;
+  student_revision: string | null;
+}
+
+export interface ReportReviewContext {
+  state: WorkflowArtifactState;
+  items: ReportReviewItem[];
+  manual: ReportManualReviewContext | null;
+  truncated: boolean;
+}
+
+export type ReportVerificationResult = VerificationResult | "unrecorded";
+export type ReportVerificationProvenance =
+  | "student_recorded"
+  | "student_unrecorded";
+
+export interface ReportVerificationCheck {
+  check: string;
+  result: ReportVerificationResult;
+  result_notes: string | null;
+  category: VerificationSourceCategory | null;
+  provenance: ReportVerificationProvenance;
+}
+
+export interface ReportVerificationContext {
+  state: WorkflowArtifactState;
+  checks: ReportVerificationCheck[];
+  student_explanation: string | null;
+  truncated: boolean;
+}
+
+export interface ReportEvidenceRecord {
+  category: VerificationSourceCategory;
+  check_context: string;
+  verification_result: "pass" | "fail";
+  verification_notes: string | null;
+  evidence_status: EvidenceStatus;
+  entries: ReportEvidenceEntry[];
+  student_explanation: string | null;
+  unavailable_reason: string | null;
+  stale_support_omitted: boolean;
+}
+
+export interface ReportEvidenceContext {
+  state: WorkflowArtifactState;
+  records: ReportEvidenceRecord[];
+  manual_entries: ReportEvidenceEntry[];
+  manual_summary: string | null;
+  truncated: boolean;
+}
+
+export interface CuratedWorkflowContext {
+  schema_version: WorkflowContextSchemaVersion;
+  phase_number: number;
+  state: WorkflowArtifactState;
+  change_map: ReportChangeMapContext;
+  review: ReportReviewContext;
+  verification: ReportVerificationContext;
+  evidence: ReportEvidenceContext;
+  content_truncated: boolean;
+  content_redacted: boolean;
+}
+
+export interface ReportDefenseTurn {
+  turn: number;
+  question: string;
+  answer: string | null;
+}
+
+export type ReportDefenseState =
+  | "not_started"
+  | "in_progress"
+  | "passed"
+  | "failed";
+
+export interface ReportDefenseRecord {
+  state: ReportDefenseState;
+  turns: ReportDefenseTurn[];
+  evaluator_outcome: "PASS" | "FAIL" | null;
+  evaluator_reason: string | null;
+}
+
+export interface DefenseReport {
+  schema_version: DefenseReportSchemaVersion;
+  phase_number: number;
+  phase_title: string;
+  workflow_context_source: WorkflowContextSource;
+  workflow_context: CuratedWorkflowContext;
+  defense: ReportDefenseRecord;
+  truth_notice: string;
 }

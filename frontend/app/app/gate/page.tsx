@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import Async from "@/components/Async";
+import DefenseContextSummaryBlock, {
+  type DefenseContextSummaryState,
+} from "@/components/DefenseContextSummary";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import {
@@ -16,12 +19,6 @@ import {
   submitGateAnchor,
   submitGateAnswer,
 } from "@/lib/api";
-import {
-  WORKFLOW_PAGE_LINKS,
-  groupSummary,
-  missingNote,
-  preparationTips,
-} from "@/lib/defenseContext";
 import { useDraft } from "@/lib/drafts";
 import type {
   DefenseContextSummary,
@@ -67,22 +64,19 @@ export default function GatePage() {
   // Fetched fresh on every mount, so artifacts saved on other pages are
   // reflected the next time the student lands here (no polling needed).
   const [summary, setSummary] = useState<DefenseContextSummary | null>(null);
-  const [summaryState, setSummaryState] = useState<"loading" | "ready" | "error">("loading");
-  useEffect(() => {
-    let cancelled = false;
-    getDefenseContextSummary()
-      .then((s) => {
-        if (cancelled) return;
-        setSummary(s);
-        setSummaryState("ready");
-      })
-      .catch(() => {
-        if (!cancelled) setSummaryState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
+  const [summaryState, setSummaryState] = useState<DefenseContextSummaryState>("loading");
+  const loadSummary = useCallback(async () => {
+    setSummaryState("loading");
+    try {
+      setSummary(await getDefenseContextSummary());
+      setSummaryState("ready");
+    } catch {
+      setSummaryState("error");
+    }
   }, []);
+  useEffect(() => {
+    void loadSummary();
+  }, [loadSummary]);
 
   // Unsaved-draft persistence (M13E.2): the typed answer survives switching
   // tabs mid-defense. Scoped per session AND per step, so a restored draft can
@@ -235,7 +229,7 @@ export default function GatePage() {
                 ) : gate.state === "cooldown" ? (
                   <CooldownView gate={gate} />
                 ) : gate.state === "passed" ? (
-                  <PassedView />
+                  <PassedView gate={gate} />
                 ) : (
                   <ReadyView
                     phase={phase}
@@ -244,6 +238,7 @@ export default function GatePage() {
                     flowError={flowError}
                     summary={summary}
                     summaryState={summaryState}
+                    onRetrySummary={loadSummary}
                   />
                 )}
               </div>
@@ -268,17 +263,19 @@ function ReadyView({
   flowError,
   summary,
   summaryState,
+  onRetrySummary,
 }: {
   phase: PhaseView | null;
   busy: boolean;
   onBegin: () => void;
   flowError: string | null;
   summary: DefenseContextSummary | null;
-  summaryState: "loading" | "ready" | "error";
+  summaryState: DefenseContextSummaryState;
+  onRetrySummary: () => void;
 }) {
   return (
     <div className="card">
-      <h3>Ready to defend</h3>
+      <h2 className="section-title">Ready to defend</h2>
       {phase && (
         <div className="kv">
           <span className="k">Phase</span>
@@ -293,7 +290,7 @@ function ReadyView({
         you answer.
       </p>
 
-      <ContextSummaryBlock summary={summary} summaryState={summaryState} />
+      <DefenseContextSummaryBlock summary={summary} state={summaryState} onRetry={onRetrySummary} />
 
       <details className="help">
         <summary>What exactly will happen?</summary>
@@ -335,38 +332,13 @@ function ReadyView({
           </p>
         </div>
       </details>
-      <details className="help">
-        <summary>How are my questions personalized?</summary>
-        <div className="help-body">
-          <ul>
-            <li>
-              Codize draws on the project context you&rsquo;ve recorded — your prompts, Review
-              Notes, Evidence, and Verification.
-            </li>
-            <li>
-              Recorded notes count as <em>your own</em> self-reported information, never as
-              verified facts.
-            </li>
-            <li>
-              Recording something doesn&rsquo;t prove it&rsquo;s correct — you still explain the
-              implementation yourself.
-            </li>
-            <li>Nothing recorded yet? Questions stay anchored to your project and phase.</li>
-          </ul>
-        </div>
-      </details>
-      {summary && (
-        <details className="help">
-          <summary>Prepare in 30 seconds</summary>
-          <div className="help-body">
-            <ul>
-              {preparationTips(summary).map((tip) => (
-                <li key={tip}>{tip}</li>
-              ))}
-            </ul>
-          </div>
-        </details>
-      )}
+      <div className="attempt-context-note">
+        <strong>A stable record for this attempt</strong>
+        <p>
+          When this attempt begins, Codize keeps a stable server-owned view of the project record
+          used for the questions. Later workflow edits do not rewrite this active Defense attempt.
+        </p>
+      </div>
       {flowError && (
         <div className="notice error" style={{ marginTop: 12 }}>
           {flowError}
@@ -380,82 +352,6 @@ function ReadyView({
           Review the phase first
         </Link>
       </div>
-    </div>
-  );
-}
-
-// --- what questions can draw on (metadata only, M14C) --------------------------
-
-// Compact, honest, and never blocking: shows WHICH sources exist — the backend
-// never sends artifact content here, and missing artifacts are optional, not
-// errors. The Begin button is never gated on this block.
-function ContextSummaryBlock({
-  summary,
-  summaryState,
-}: {
-  summary: DefenseContextSummary | null;
-  summaryState: "loading" | "ready" | "error";
-}) {
-  if (summaryState === "loading") {
-    return (
-      <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
-        Checking what you&rsquo;ve recorded this phase…
-      </p>
-    );
-  }
-  if (summaryState === "error" || !summary) {
-    return (
-      <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
-        Project context is unavailable right now. You can still prepare using your phase and
-        implementation.
-      </p>
-    );
-  }
-
-  const grouped = groupSummary(summary);
-  const note = missingNote(grouped.missingWorkflow);
-
-  return (
-    <div style={{ marginTop: 10 }}>
-      <p style={{ margin: "0 0 8px" }}>
-        {grouped.hasWorkflowContext ? (
-          <>Your questions will draw from the work you recorded in this phase.</>
-        ) : (
-          <>
-            Codize will use your project, phase, and anchor. Add workflow notes later for more
-            specific questions.
-          </>
-        )}
-      </p>
-      <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        <span className="muted" style={{ fontSize: 12 }}>
-          Using:
-        </span>
-        {grouped.workflow.map((s) => (
-          <span className="pill ok" key={s.source_id}>
-            ✓ {s.label}
-          </span>
-        ))}
-        {grouped.hasSystemContext && <span className="pill">Project context</span>}
-      </div>
-      {note && (
-        <p className="muted" style={{ fontSize: 13, marginTop: 8, marginBottom: 0 }}>
-          {note}
-          {grouped.missingWorkflow.map((m) =>
-            WORKFLOW_PAGE_LINKS[m.source_id] ? (
-              <span key={m.source_id}>
-                {" "}
-                <Link href={WORKFLOW_PAGE_LINKS[m.source_id]}>Add {m.label} →</Link>
-              </span>
-            ) : null
-          )}
-        </p>
-      )}
-      {summary.has_truncation && (
-        <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
-          Some long notes were shortened for question generation.
-        </p>
-      )}
     </div>
   );
 }
@@ -549,7 +445,16 @@ function ActiveFlow({
           </>
         )}
 
+        <label className="field-label" htmlFor="defense-response">
+          {isAnchor ? "Your anchor" : "Your response"}
+        </label>
+        <p className="muted" id="defense-response-guidance">
+          {isAnchor
+            ? "Name one concrete implementation element."
+            : "Explain the implementation in your own words."}
+        </p>
         <textarea
+          id="defense-response"
           rows={isAnchor ? 3 : 6}
           maxLength={maxLen}
           value={input}
@@ -560,12 +465,30 @@ function ActiveFlow({
               : "Answer in your own words, about your own code. Be specific."
           }
           disabled={busy}
+          aria-invalid={flowError ? true : undefined}
+          aria-describedby={`defense-response-guidance defense-response-limit${
+            flowError ? " defense-response-error" : ""
+          }`}
         />
 
+        <p className="field-limit" id="defense-response-limit">
+          {input.length.toLocaleString()} / {maxLen.toLocaleString()} characters
+        </p>
+
         {flowError && (
-          <div className="notice error" style={{ marginTop: 10 }}>
+          <div className="notice error" id="defense-response-error" role="alert" style={{ marginTop: 10 }}>
             {flowError}
           </div>
+        )}
+
+        {busy && (
+          <p className="muted" role="status" aria-live="polite">
+            {isEvaluate
+              ? "Evaluating your Defense…"
+              : isAnchor
+                ? "Preparing your first question…"
+                : "Preparing the next question…"}
+          </p>
         )}
 
         <div className="row" style={{ marginTop: 12 }}>
@@ -596,7 +519,10 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
     return (
       <>
         <div className="card">
-          <div className="notice ok">You passed the defense for this phase.</div>
+          <div className="notice ok" role="status">
+            <strong>Defense passed</strong>
+          </div>
+          <p>You completed Project Defense under Codize&rsquo;s current evaluation criteria.</p>
           <p style={{ marginTop: 12 }}>{outcome.reason}</p>
           {outcome.new_unlocks && outcome.new_unlocks.length > 0 && (
             <div style={{ marginTop: 14 }}>
@@ -610,8 +536,8 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
             </div>
           )}
           <div className="row" style={{ marginTop: 16 }}>
-            <Link href="/app/report" className="btn primary">
-              Add this to your Defense Report
+            <Link href={`/app/report?phase=${outcome.phase}`} className="btn primary">
+              View Defense Report
             </Link>
             <Link href="/app" className="btn">
               Back to cockpit
@@ -631,9 +557,10 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
 
   return (
     <div className="card">
-      <div className="notice info">
-        Didn&rsquo;t pass this time — that just means &ldquo;review and try again&rdquo;, not
-        that you&rsquo;re bad at this.
+      <div className="notice info" role="status">
+        <strong>Defense needs another attempt</strong>
+        <br />
+        Review the feedback and your implementation, then try again after the cooldown.
       </div>
       <p style={{ marginTop: 12 }}>{outcome.reason}</p>
       {cooldownMin != null && (
@@ -644,6 +571,9 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
         </p>
       )}
       <div className="row" style={{ marginTop: 16 }}>
+        <Link href={`/app/report?phase=${outcome.phase}`} className="btn primary">
+          View Defense Report
+        </Link>
         <Link href="/app/phase/review" className="btn">
           Revisit Review Board
         </Link>
@@ -694,6 +624,9 @@ function CooldownView({ gate }: { gate: GateCurrent }) {
         </div>
       )}
       <div className="row" style={{ marginTop: 14 }}>
+        <Link href={`/app/report?phase=${gate.phase}`} className="btn">
+          View last Defense Report
+        </Link>
         <Link href="/app/phase/review" className="btn">
           Revisit your work
         </Link>
@@ -705,7 +638,7 @@ function CooldownView({ gate }: { gate: GateCurrent }) {
   );
 }
 
-function PassedView() {
+function PassedView({ gate }: { gate: GateCurrent }) {
   return (
     <div className="card">
       <div className="notice ok">You&rsquo;ve passed this phase&rsquo;s defense.</div>
@@ -714,7 +647,7 @@ function PassedView() {
         everything together in your Project Defense Report.
       </p>
       <div className="row" style={{ marginTop: 14 }}>
-        <Link href="/app/report" className="btn primary">
+        <Link href={`/app/report?phase=${gate.phase}`} className="btn primary">
           Open Defense Report
         </Link>
         <Link href="/app" className="btn">

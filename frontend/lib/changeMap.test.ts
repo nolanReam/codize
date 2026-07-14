@@ -643,7 +643,7 @@ describe("phase next-step logic and N/5 preservation", () => {
     expect(derivePhaseNextStep(sections({
       review_board: linkedReview("keep"),
       verification: { checks: [] },
-    }), confirmed).label).toBe("Save one piece of proof");
+    }), confirmed).label).toBe("Save supporting Evidence");
   });
 
   it("routes linked Verification through in-progress, stale, recorded, and zero-target states", () => {
@@ -675,7 +675,10 @@ describe("phase next-step logic and N/5 preservation", () => {
     };
     expect(derivePhaseNextStep(sections({ ...base, evidence: linkedEvidence() }), confirmed).label).toBe("Continue Evidence");
     expect(derivePhaseNextStep(sections({ ...base, evidence: linkedEvidence(false, true) }), confirmed).label).toBe("Rebuild Evidence");
-    expect(derivePhaseNextStep(sections({ ...base, evidence: linkedEvidence(true) }), confirmed).label).toBe("Evidence record complete");
+    expect(derivePhaseNextStep(sections({ ...base, evidence: linkedEvidence(true) }), confirmed)).toMatchObject({
+      label: "Start the defense",
+      href: "/app/gate",
+    });
   });
 
   it("keeps Prompt first, preserves manual Review continuation, and preserves N/5", () => {
@@ -685,7 +688,7 @@ describe("phase next-step logic and N/5 preservation", () => {
     const confirmed = map({ status: "confirmed", confirmed_at: "2026-07-13T11:00:00Z" });
     expect(
       derivePhaseNextStep(sections({ review_board: { files_changed: [] } }), confirmed).label
-    ).toBe("Save one piece of proof");
+    ).toBe("Save supporting Evidence");
     const allFive = sections({
       review_board: { files_changed: [] },
       evidence: { entries: [] },

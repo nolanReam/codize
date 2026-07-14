@@ -12,6 +12,7 @@ import type {
   ChangeMapMutationResult,
   ChangeMapUpdateRequest,
   DefenseContextSummary,
+  DefenseReport,
   Evaluation,
   EvidenceHandoffPreview,
   EvidenceInitializationResponse,
@@ -234,6 +235,8 @@ export const getCurrentGate = () => request<GateCurrent>("/gate/current");
 // Metadata-only: which sources defense questions can draw on (never content).
 export const getDefenseContextSummary = () =>
   request<DefenseContextSummary>("/gate/context-summary");
+export const getDefenseReport = (phaseNumber: number) =>
+  request<DefenseReport>(`/report/${phaseNumber}`);
 
 // Interrogation Gate flow (M9 backend). start creates the session; turn1 is the
 // anchor statement; turn2/turn3 submit the prior answer and return the next

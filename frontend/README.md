@@ -65,10 +65,12 @@ app/
                         preserved legacy/manual Review form
       evidence/page.tsx Evidence Panel
       verify/page.tsx   Linked + legacy/manual Verification
-    gate/page.tsx       Project Defense — live Interrogation Gate flow
-                        (anchor → 3 turns → evaluate → pass/fail), resume-safe
-    report/page.tsx     Project Defense Report — full client-assembled report
-                        with Markdown copy/download
+    gate/page.tsx       Artifact-aware Project Defense — metadata-only project-
+                        record readiness, then the unchanged anchor → 3 turns →
+                        evaluate → pass/fail flow; resume-safe
+    report/page.tsx     Authoritative Project Defense Report from GET /report/{phase}:
+                        snapshot/current-workflow provenance, workflow records,
+                        transcript, outcome, and safe Markdown copy/download
   icon.svg              App favicon (served by Next as the tab icon)
 components/             Async, NotReady, SaveBar, WorkflowSteps, ReconnectionModal,
                         Tutorial (How Codize works), GuideCard (guidance rail),
@@ -103,11 +105,12 @@ only, plus the existing Review GET/PUT paths), reconnection (`GET /reconnection`
 `POST /reconnection/acknowledge`), evaluation (`GET /evaluation`), and the full
 gate flow (`GET /gate/current`, `POST /gate/start`,
 `POST /gate/{id}/turn1|turn2|turn3|evaluate`), plus the metadata-only
-`GET /gate/context-summary` (M14C — which sources defense questions can draw
-on: labels + present/missing + truncation flags, **never artifact content**;
-fetched non-blocking on gate-page mount, so it can never gate the defense).
-The Project Defense Report is assembled client-side from these routes — no
-dedicated report endpoint.
+`GET /gate/context-summary` (M16C.1 — source ids, labels, exact workflow-source
+states, and truncation flags, **never artifact content**; fetched non-blocking
+on gate-page mount, so it can never gate the defense). The Defense Report is
+read only from `GET /report/{phase}`. The browser supplies only the phase path
+parameter; the server owns the workflow snapshot/current-workflow fallback,
+curated records, transcript, evaluator outcome, and truth notice.
 
 ## Environment
 
@@ -135,6 +138,34 @@ npm run typecheck
 npm run build
 npm test           # vitest — deterministic prompt builder + report builder
 ```
+
+## Status (M16C.2)
+
+Project Defense and Defense Report now consume the reviewed M16C.1 contracts.
+The Defense ready state loads `GET /gate/context-summary` independently from
+the gate lifecycle and renders Change Map, Review, Verification, and Evidence
+as current, missing, incomplete, stale, manual, or unavailable, with honest
+truncation copy. The summary is metadata-only: it never renders artifact text,
+internal ids, bindings, fingerprints, or snapshot internals. A failed summary
+load stays retryable and never disables **Begin defense**. The page explains
+that the server keeps a stable record when a new attempt starts, while every
+answer remains empty and student-owned. Anchor, three-turn ordering, draft
+persistence, request limits, evaluation, PASS/FAIL, cooldown, and retry behavior
+remain on the existing gate endpoints.
+
+The Report page is no longer client-assembled from mutable workflow screens.
+It requests `GET /report/{phase}` and renders the server-owned attempt snapshot
+or the explicitly labeled current-workflow fallback for legacy attempts.
+Change Map provenance and uncertainty, Review decisions, student-recorded
+Verification outcomes, linked/manual/stale/unavailable Evidence, the student-safe
+Defense transcript, exact PASS/FAIL outcome, source states, truncation, and the
+backend truth notice remain separate. Evidence and Verification are never
+called proof. HTML-like values render as text; only validated HTTP(S) Evidence
+URLs become `noopener noreferrer` links. Loading, prerequisite, unavailable,
+retry, malformed-source, long-content, 390/768/1080/1920, keyboard, focus, and
+reduced-motion states are covered. Cockpit and phase handoffs can now complete
+the core workflow at Project Defense/Report without changing workflow **N/5**.
+No backend, migration, prompt, provider, evaluator, or model change was needed.
 
 ## Status (M16B.3B)
 

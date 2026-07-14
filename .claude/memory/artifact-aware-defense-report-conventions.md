@@ -54,3 +54,12 @@ Report reads `GET /report/{phase}` and renders its curated workflow context plus
 Defense record. Never submit context/provenance, parse raw workflow JSON, treat
 Verification as Evidence, treat unavailable as Evidence, or claim Codize
 independently verified correctness.
+
+M16C.2 implements that seam without a compatibility change. The ready Defense
+screen treats the summary request as optional/non-blocking and renders the
+four workflow-source states with text labels, descriptions, and truncation.
+The Report route supplies only its numeric phase path parameter and renders
+the returned context source, truth notice, curated records, transcript, and
+outcome. No raw workflow reconstruction, hidden evaluator value, provider
+detail, client-computed score, or proof/correctness claim was introduced. See
+[[artifact-aware-defense-report-ui-conventions]].

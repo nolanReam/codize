@@ -168,3 +168,11 @@ states and is reused by Defense plus `GET /report/{phase}`. Raw Import,
 artifact ids, bindings, fingerprints, and timestamps never enter it. Linked
 Evidence now reaches downstream only through this context; manual artifacts
 remain compatible. See [[artifact-aware-defense-report-conventions]].
+
+M16C.2 is a frontend-only consumer of that reader's two public contracts.
+Defense renders `workflow_sources` metadata only; Report renders only the
+curated `GET /report/{phase}` response. The browser never posts workflow
+sections, source states, provenance, snapshots, bindings, or fingerprints to
+Defense/Report. Artifact capture remains exactly N/5; Change Map is still a
+sibling derived record, not a sixth section. See
+[[artifact-aware-defense-report-ui-conventions]].
