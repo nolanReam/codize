@@ -18,7 +18,13 @@ describe("Evidence page lifecycle contract", () => {
     expect(source).toContain("normalizeEvidenceSelection(preview, selected)");
     expect(source).toContain("useState<string[]>([])");
     expect(source).toContain('type="checkbox"');
+    expect(source).toContain("Select performed check: ${target.check} Recorded result:");
     expect(source).not.toMatch(/result\s*===\s*["']pass["'][\s\S]{0,80}selectable/i);
+  });
+
+  it("keeps target selection mounted through initialization failures", () => {
+    expect(source).toContain("Preparing your Evidence workspace");
+    expect(source).not.toContain('if (initializing && mode === "none")');
   });
 
   it("shows every prerequisite and ineligible outcome honestly", () => {
@@ -40,6 +46,9 @@ describe("Evidence page lifecycle contract", () => {
     expect(source).toContain("What you recorded");
     expect(source).toContain("<fieldset className=\"evidence-status-picker\"");
     expect(source).toContain("Your Evidence decision");
+    expect(source).toContain("savedLinkedEvidenceProgress(evidence)");
+    expect(source).toContain("aria-label={`Remove Evidence ${entryIndex + 1}`}");
+    expect(source).toContain("key={entryIndex}");
     expect(source).not.toMatch(/value=\{target\.check_snapshot\}|onChange[\s\S]{0,100}check_snapshot/);
   });
 

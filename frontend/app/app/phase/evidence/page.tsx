@@ -47,10 +47,12 @@ import {
   linkedEvidenceServerRevision,
   normalizeEvidenceSelection,
   restoreLinkedEvidenceDraft,
+  savedLinkedEvidenceProgress,
   safeEvidenceLink,
   selectedEvidenceTargetCount,
   shouldKeepEvidenceSaveNotice,
   targetFormFromEvidence,
+  updateEvidenceSelection,
   validateEvidenceEntry,
   validateEvidenceTarget,
   type LinkedEvidenceDraft,
@@ -218,11 +220,18 @@ function EvidenceSelectionPanel({
                   type="checkbox"
                   checked={checked}
                   disabled={busy}
+                  aria-label={`Select performed check: ${target.check} Recorded result: ${evidenceResultLabel(target.result)}`}
                   onChange={(event) => {
-                    setSelected((current) => event.target.checked
-                      ? [...current, target.verification_target_id]
-                      : current.filter((id) => id !== target.verification_target_id));
-                    setSelectionError(null);
+                    const update = updateEvidenceSelection(
+                      preview,
+                      selected,
+                      target.verification_target_id,
+                      event.target.checked
+                    );
+                    setSelected(update.selectedIds);
+                    setSelectionError(update.limitReached
+                      ? `Select at most ${EVIDENCE_TARGET_MAX} performed checks.`
+                      : null);
                   }}
                 />
                 <span>Select this performed check</span>
@@ -250,6 +259,12 @@ function EvidenceSelectionPanel({
 
       {selectionError && <div className="notice error" role="alert">{selectionError}</div>}
       {error && <div className="notice error" role="alert">{error}</div>}
+      {busy && (
+        <div className="notice info" role="status" aria-live="polite">
+          <strong>Preparing your Evidence workspace...</strong>
+          <p>Codize is linking the performed checks you selected. No Evidence is added automatically.</p>
+        </div>
+      )}
 
       {!replaceExisting || !confirming ? (
         <div className="row evidence-selection-actions">
@@ -314,7 +329,13 @@ function EvidenceEntryEditor({
     <div className="evidence-entry">
       <div className="evidence-entry-heading">
         <strong>Evidence {entryIndex + 1}</strong>
-        <button className="btn small" type="button" disabled={disabled} onClick={onRemove}>
+        <button
+          className="btn small"
+          type="button"
+          disabled={disabled}
+          aria-label={`Remove Evidence ${entryIndex + 1}`}
+          onClick={onRemove}
+        >
           Remove
         </button>
       </div>
@@ -409,7 +430,8 @@ function LinkedEvidenceBoard({
 
   const dirty = useMemo(() => isLinkedEvidenceDirty(evidence, form), [evidence, form]);
   const blocker = useMemo(() => evidenceFormBlocker(evidence, form), [evidence, form]);
-  const progress = useMemo(() => linkedEvidenceProgress(evidence, form), [evidence, form]);
+  const progress = useMemo(() => savedLinkedEvidenceProgress(evidence), [evidence]);
+  const draftProgress = useMemo(() => linkedEvidenceProgress(evidence, form), [evidence, form]);
   const draftBlocked = dirty && containsSecretMarker(JSON.stringify(form));
   const saveLocalDraft = draft.save;
   useEffect(() => {
@@ -504,7 +526,9 @@ function LinkedEvidenceBoard({
                   <section className="linked-evidence-target" key={target.evidence_target_id} aria-labelledby={`evidence-target-${targetIndex}`}>
                     <div className="evidence-source">
                       <span className="evidence-source-label">From your Verification</span>
-                      <h3 id={`evidence-target-${targetIndex}`}>Check performed</h3>
+                      <h3 id={`evidence-target-${targetIndex}`}>
+                        Check performed<span className="sr-only">: {target.check_snapshot}</span>
+                      </h3>
                       <p className="evidence-plain-text">{target.check_snapshot}</p>
                       <dl className="evidence-source-grid compact">
                         <div>
@@ -552,7 +576,7 @@ function LinkedEvidenceBoard({
                         </div>
                         {targetForm.entries.map((entry, entryIndex) => (
                           <EvidenceEntryEditor
-                            key={`${entryIndex}-${entry.kind}`}
+                            key={entryIndex}
                             entry={entry}
                             targetIndex={targetIndex}
                             entryIndex={entryIndex}
@@ -568,7 +592,7 @@ function LinkedEvidenceBoard({
                         <button
                           className="btn"
                           type="button"
-                          disabled={disabled || progress.entries >= EVIDENCE_ENTRY_MAX}
+                          disabled={disabled || draftProgress.entries >= EVIDENCE_ENTRY_MAX}
                           onClick={() => updateTarget(target.evidence_target_id, {
                             entries: [...targetForm.entries, { kind: "screenshot_note", content: "" }],
                           })}
@@ -936,18 +960,6 @@ export default function EvidencePanelPage() {
       </div>
     )
   ) : null;
-
-  if (initializing && mode === "none") {
-    return (
-      <>
-        <EvidencePageHeading />
-        <div className="card primary evidence-initializing" role="status" aria-live="polite">
-          <h2>Preparing your Evidence workspace…</h2>
-          <p>Codize is linking the performed checks you selected. No Evidence is added automatically.</p>
-        </div>
-      </>
-    );
-  }
 
   return (
     <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>

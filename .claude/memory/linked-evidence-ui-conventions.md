@@ -50,7 +50,8 @@ and clear incompatible drafts. The shared debounce, storage-failure tolerance,
 secret-marker guard, successful-save clearing, and manual-draft separation
 remain intact.
 
-**Progress and completion.** Primary progress is `N of M targets addressed`.
+**Progress and completion.** Primary progress is `N of M targets addressed`,
+computed from server-saved target states rather than unsaved local choices.
 An accessible summary distinguishes recorded, unavailable, and not addressed;
 there is no pass rate, correctness score, evidenced percentage, or proof
 claim. Completion appears only when the returned server artifact says
@@ -65,8 +66,9 @@ preview and starts with zero selected targets while old Evidence remains
 mounted. The inline warning states that prior linked/manual Evidence is
 replaced; only its final explicit action sends `replace_existing=true`. Failed
 replacement preserves old work and unsaved state. Success applies a fresh
-not-addressed artifact, clears the old draft, and never merges or creates
-history. Current manual/linked replacement lives under secondary options.
+not-addressed artifact whose new fingerprint makes the old draft incompatible,
+and never merges or creates history. Current manual/linked replacement lives
+under secondary options.
 
 **Navigation and accessibility.** Workflow Evidence status distinguishes
 unavailable, ready, in progress, complete, and stale from the server contract;

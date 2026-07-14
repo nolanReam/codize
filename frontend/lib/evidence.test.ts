@@ -31,9 +31,11 @@ import {
   linkedEvidenceServerRevision,
   normalizeEvidenceSelection,
   restoreLinkedEvidenceDraft,
+  savedLinkedEvidenceProgress,
   safeEvidenceLink,
   shouldKeepEvidenceSaveNotice,
   targetFormFromEvidence,
+  updateEvidenceSelection,
   validateEvidenceEntry,
   validateEvidenceTarget,
   type LinkedEvidenceFormState,
@@ -176,6 +178,17 @@ describe("server preview interpretation and explicit selection", () => {
   it("accepts exact preview shapes and fails malformed optional fields", () => {
     expect(isEvidenceHandoffPreview(preview())).toBe(true);
     expect(isEvidenceHandoffPreview({ ...preview(), targets: [{ ...preview().targets[0], result_notes: 7 }] })).toBe(false);
+    expect(isEvidenceHandoffPreview(preview({
+      eligible_count: 1,
+      targets: [sourceTarget("vt-333333333333", "skipped", "eligible", {
+        performed: false,
+        ineligibility_reason: null,
+      })],
+    }))).toBe(false);
+    expect(isEvidenceHandoffPreview(preview({
+      eligible_count: 0,
+      targets: [sourceTarget("vt-111111111111", "pass", "ineligible")],
+    }))).toBe(true);
   });
 
   it("covers missing, manual, stale, incomplete, ready, and zero eligible states", () => {
@@ -195,6 +208,22 @@ describe("server preview interpretation and explicit selection", () => {
     expect(normalizeEvidenceSelection(value, [
       "vt-333333333333", "vt-222222222222", "vt-111111111111", "unknown",
     ])).toEqual(["vt-111111111111", "vt-222222222222"]);
+  });
+
+  it("blocks the twenty-first selection without truncating or changing the first twenty", () => {
+    const targets = Array.from({ length: 21 }, (_, index) => sourceTarget(
+      `vt-${String(index).padStart(12, "0")}`,
+      index % 2 ? "fail" : "pass",
+      "eligible"
+    ));
+    const value = preview({ eligible_count: 21, targets });
+    const firstTwenty = targets.slice(0, 20).map((target) => target.verification_target_id);
+    expect(updateEvidenceSelection(
+      value,
+      firstTwenty,
+      targets[20].verification_target_id,
+      true
+    )).toEqual({ selectedIds: firstTwenty, limitReached: true });
   });
 
   it("keeps honest labels and meanings", () => {
@@ -357,6 +386,19 @@ describe("active validation, aggregate safety belt, and progress", () => {
     const progress = linkedEvidenceProgress(artifact, state);
     expect(progress).toEqual({ addressed: 2, recorded: 1, unavailable: 1, unaddressed: 1, entries: 1, total: 3 });
     expect(evidenceCompletionSummary(progress)).toBe("2 of 3 Evidence records addressed");
+  });
+
+  it("keeps primary progress on saved server states while local edits remain drafts", () => {
+    const artifact = evidence();
+    const state = targetFormFromEvidence(artifact);
+    state["ev-111111111111"] = {
+      status: "evidence_unavailable",
+      entries: [],
+      explanation: "",
+      unavailableReason: "Not saved yet",
+    };
+    expect(linkedEvidenceProgress(artifact, state).addressed).toBe(1);
+    expect(savedLinkedEvidenceProgress(artifact).addressed).toBe(0);
   });
 });
 

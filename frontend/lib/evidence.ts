@@ -217,7 +217,7 @@ export function isEvidenceHandoffPreview(value: unknown): value is EvidenceHando
     "current",
     "stale",
   ]);
-  return (
+  const valid = (
     typeof value.mode === "string" &&
     modes.has(value.mode) &&
     typeof value.verification_state === "string" &&
@@ -227,7 +227,7 @@ export function isEvidenceHandoffPreview(value: unknown): value is EvidenceHando
     typeof value.guidance === "string" &&
     value.targets.every((target) => {
       if (!isRecord(target)) return false;
-      return (
+      const shapeIsValid = (
         typeof target.verification_target_id === "string" &&
         typeof target.category === "string" &&
         CATEGORY_SET.has(target.category as VerificationSourceCategory) &&
@@ -241,8 +241,19 @@ export function isEvidenceHandoffPreview(value: unknown): value is EvidenceHando
           target.ineligibility_reason === "verification_stale" ||
           target.ineligibility_reason === "not_performed")
       );
+      if (!shapeIsValid) return false;
+      const performedResult = target.result === "pass" || target.result === "fail";
+      if (target.performed !== performedResult) return false;
+      if (target.eligibility === "eligible") {
+        return target.performed === true && target.ineligibility_reason === null;
+      }
+      return true;
     })
   );
+  if (!valid) return false;
+  return value.eligible_count === value.targets.filter(
+    (target) => target.eligibility === "eligible"
+  ).length;
 }
 
 export type EvidencePreviewState =
@@ -292,6 +303,34 @@ export function normalizeEvidenceSelection(
 
 export function selectedEvidenceTargetCount(selectedIds: readonly string[]): number {
   return new Set(selectedIds).size;
+}
+
+export function updateEvidenceSelection(
+  preview: EvidenceHandoffPreview,
+  selectedIds: readonly string[],
+  targetId: string,
+  checked: boolean
+): { selectedIds: string[]; limitReached: boolean } {
+  const current = normalizeEvidenceSelection(preview, selectedIds);
+  if (!checked) {
+    return {
+      selectedIds: current.filter((id) => id !== targetId),
+      limitReached: false,
+    };
+  }
+  const targetIsEligible = eligibleEvidenceTargets(preview).some(
+    (target) => target.verification_target_id === targetId
+  );
+  if (!targetIsEligible || current.includes(targetId)) {
+    return { selectedIds: current, limitReached: false };
+  }
+  if (current.length >= EVIDENCE_TARGET_MAX) {
+    return { selectedIds: current, limitReached: true };
+  }
+  return {
+    selectedIds: normalizeEvidenceSelection(preview, [...current, targetId]),
+    limitReached: false,
+  };
 }
 
 export function evidenceInitializationBody(
@@ -590,6 +629,12 @@ export function linkedEvidenceProgress(
     ),
     total,
   };
+}
+
+export function savedLinkedEvidenceProgress(
+  evidence: LinkedEvidenceArtifact
+): EvidenceProgress {
+  return linkedEvidenceProgress(evidence, targetFormFromEvidence(evidence));
 }
 
 export function evidenceCompletionSummary(progress: EvidenceProgress): string {
