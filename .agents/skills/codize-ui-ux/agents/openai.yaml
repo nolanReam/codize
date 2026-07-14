@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codize UI/UX"
+  short_description: "Build and audit clear Codize interfaces"
+  default_prompt: "Use $codize-ui-ux in BUILD mode to design this Codize interface with a clear next action and honest states."
