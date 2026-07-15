@@ -111,10 +111,21 @@ def test_entry_profile_route_persists_only_student_choices_and_server_derives_fi
     "forged",
     [
         {"recommended_start": "report"},
+        {"recommendation": "prompt_builder"},
         {"guidance_depth": "minimal"},
+        {"complete": True},
+        {"completed": True},
+        {"recovery_emphasis": True},
         {"workflow_complete": True},
+        {"workflow_status": "active"},
+        {"current_stage": "report"},
         {"stale": False},
+        {"defense_state": "passed"},
         {"defense_ready": True},
+        {"report_ready": True},
+        {"workflow_artifacts": {}},
+        {"phase": 1},
+        {"user_id": USER_B},
     ],
 )
 def test_entry_profile_rejects_server_owned_or_unknown_fields(client, forged):
@@ -123,6 +134,37 @@ def test_entry_profile_rejects_server_owned_or_unknown_fields(client, forged):
     )
     assert resp.status_code == 422
     assert resp.json() == {"error": {"status": 422, "message": "Invalid request."}}
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["current_situation", "coding_confidence", "ai_changed_files"],
+)
+def test_entry_profile_rejects_explicit_null_choices(client, field):
+    resp = client.put(
+        "/intake/entry-profile", json={field: None}, headers=auth_headers()
+    )
+    assert resp.status_code == 422
+    assert resp.json() == {"error": {"status": 422, "message": "Invalid request."}}
+
+
+def test_second_user_update_cannot_change_the_first_users_profile(client):
+    first = client.put(
+        "/intake/entry-profile",
+        json={"current_situation": "stuck", "coding_confidence": "know_basics"},
+        headers=auth_headers(USER_A),
+    ).json()["profile"]
+    client.put(
+        "/intake/entry-profile",
+        json={
+            "current_situation": "starting_fresh",
+            "coding_confidence": "comfortable",
+        },
+        headers=auth_headers(USER_B),
+    )
+    assert client.get(
+        "/intake/entry-profile", headers=auth_headers(USER_A)
+    ).json()["profile"] == first
 
 
 def test_hidden_ai_change_field_is_rejected_outside_already_building(client):

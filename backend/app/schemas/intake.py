@@ -32,6 +32,8 @@ class EntryProfileUpdateRequest(BaseModel):
     def _at_least_one_choice(self) -> "EntryProfileUpdateRequest":
         if not self.model_fields_set:
             raise ValueError("at least one entry choice is required")
+        if any(getattr(self, field) is None for field in self.model_fields_set):
+            raise ValueError("entry choices cannot be null")
         if (
             "current_situation" in self.model_fields_set
             and self.current_situation != "already_building"

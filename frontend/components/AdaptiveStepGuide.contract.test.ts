@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(process.cwd(), "components/AdaptiveStepGuide.tsx"), "utf8");
+const styles = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
 
 describe("AdaptiveStepGuide contract", () => {
   it("uses one accessible disclosure for every typed workflow stage", () => {
@@ -21,5 +22,9 @@ describe("AdaptiveStepGuide contract", () => {
 
   it("shows recovery copy only from the saved recovery emphasis", () => {
     expect(source).toContain("entryProfile?.recovery_emphasis && content.recovery");
+  });
+
+  it("keeps collapsed guide content visually hidden despite the grid layout", () => {
+    expect(styles).toContain(".adaptive-guide-body[hidden] { display: none; }");
   });
 });

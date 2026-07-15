@@ -7,6 +7,7 @@ this file are fake fixtures.
 """
 
 import asyncio
+import copy
 import json
 
 import pytest
@@ -145,6 +146,17 @@ def test_ui_only_prompt_field_is_omitted():
     # The deliberately-bad counter-example is a UI teaching aid, not evidence.
     assert "make me a database" not in dumped
     assert "bad_prompt_comparison" not in dumped
+
+
+def test_reserved_entry_profile_never_enters_defense_context():
+    repo = full_repo()
+    project = run(repo.get_project(USER))
+    artifacts = copy.deepcopy(project["workflow_artifacts"])
+    artifacts["_entry_profile"] = {"marker": "ENTRY_PROFILE_MUST_NOT_LEAK"}
+    run(repo.update_project(USER, project["id"], {"workflow_artifacts": artifacts}))
+    rendered = render_defense_context(run(build_defense_context(repo, USER, 1)))
+    assert "ENTRY_PROFILE_MUST_NOT_LEAK" not in rendered
+    assert "_entry_profile" not in rendered
 
 
 def test_progress_reflects_ticked_tasks():

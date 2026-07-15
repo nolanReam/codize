@@ -1,6 +1,7 @@
 """Intake service tests — business rules against the in-memory fake repo."""
 
 import asyncio
+import copy
 
 import pytest
 
@@ -156,6 +157,49 @@ def test_entry_profile_uses_reserved_json_key_and_preserves_workflow_and_lifecyc
         "archetype_id",
     ):
         assert after[key] == before[key]
+
+
+def test_entry_profile_retries_without_losing_a_concurrent_workflow_write():
+    class ConcurrentWorkflowRepository(InMemoryProjectRepository):
+        injected = False
+
+        async def update_workflow_artifacts_if_current(
+            self, user_id, project_id, expected, replacement
+        ):
+            if not self.injected:
+                self.injected = True
+                current = await self.get_project(user_id)
+                artifacts = copy.deepcopy(current["workflow_artifacts"])
+                artifacts["1"]["implementation_import"] = {
+                    "source_kind": "manual_summary",
+                    "student_summary": "Concurrent saved change",
+                    "saved_at": "2026-07-15T16:00:00Z",
+                }
+                await self.update_project(
+                    user_id, project_id, {"workflow_artifacts": artifacts}
+                )
+            return await super().update_workflow_artifacts_if_current(
+                user_id, project_id, expected, replacement
+            )
+
+    repo = ConcurrentWorkflowRepository()
+    run(
+        repo.create_project(
+            USER,
+            {
+                "workflow_artifacts": {
+                    "1": {"prompt_builder": {"generated_prompt": "saved"}}
+                }
+            },
+        )
+    )
+    run(update_entry_profile(repo, USER, {"coding_confidence": "comfortable"}))
+    artifacts = run(repo.get_project(USER))["workflow_artifacts"]
+    assert artifacts["1"]["prompt_builder"]["generated_prompt"] == "saved"
+    assert artifacts["1"]["implementation_import"]["student_summary"] == (
+        "Concurrent saved change"
+    )
+    assert artifacts[ENTRY_PROFILE_KEY]["guidance_depth"] == "minimal"
 
 
 def test_entry_profile_creation_reuses_the_one_project_intake_architecture():

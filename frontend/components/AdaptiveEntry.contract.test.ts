@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(process.cwd(), "components/AdaptiveEntry.tsx"), "utf8");
 const intake = readFileSync(resolve(process.cwd(), "app/app/intake/page.tsx"), "utf8");
+const home = readFileSync(resolve(process.cwd(), "app/app/page.tsx"), "utf8");
+const provider = readFileSync(
+  resolve(process.cwd(), "components/GuidedProjectNavigationProvider.tsx"),
+  "utf8"
+);
 
 describe("M17 adaptive entry UI contract", () => {
   it("uses native one-question fieldsets and no default student answer", () => {
@@ -29,8 +34,17 @@ describe("M17 adaptive entry UI contract", () => {
 
   it("uses one recommendation action and the existing Import destination", () => {
     expect(source).toContain("Continue project details");
+    expect(source).toContain("Review choices");
     expect(source).toContain('href="/app/phase/import"');
     expect(source).not.toMatch(/textarea|input.*latest AI response/i);
+  });
+
+  it("keeps setup status honest and makes pre-workflow profile errors retryable", () => {
+    expect(home).toContain('state === "ready" && evaluation && workflow');
+    expect(provider).toContain("getEntryProfile(),");
+    expect(
+      provider.match(/getEntryProfile\(\)\.catch\(\(\) => \(\{ profile: null \}\)\)/g)
+    ).toHaveLength(1);
   });
 
   it("announces entry progress, errors, and the recommendation", () => {

@@ -596,6 +596,7 @@ input:focus, textarea:focus, select:focus {
 .adaptive-guide-toggle:hover { color: var(--accent); }
 .adaptive-guide-summary { margin: 9px 0 0; max-width: 76ch; color: var(--ink-2); font-size: 13px; }
 .adaptive-guide-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 22px; margin-top: 15px; }
+.adaptive-guide-body[hidden] { display: none; }
 .adaptive-guide-body > div { min-width: 0; }
 .adaptive-guide-body h3 { margin: 0 0 4px; color: var(--ink-2); font: 700 11px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
 .adaptive-guide-body p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }

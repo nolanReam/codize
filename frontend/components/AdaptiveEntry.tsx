@@ -252,9 +252,14 @@ export default function AdaptiveEntry({
               saved workflow progress will take priority once you begin.
             </p>
           </details>
-          <button className="btn primary" type="button" onClick={onContinue}>
-            Continue project details
-          </button>
+          <div className="row entry-actions">
+            <button className="btn primary" type="button" onClick={onContinue}>
+              Continue project details
+            </button>
+            <button className="btn" type="button" onClick={() => setStep("situation")}>
+              Review choices
+            </button>
+          </div>
         </div>
       )}
 

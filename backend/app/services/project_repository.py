@@ -31,6 +31,14 @@ class ProjectRepository(Protocol):
 
     async def update_project(self, user_id: str, project_id: str, fields: dict) -> dict: ...
 
+    async def update_workflow_artifacts_if_current(
+        self,
+        user_id: str,
+        project_id: str,
+        expected: dict,
+        replacement: dict,
+    ) -> dict | None: ...
+
 
 class GateSessionRepository(Protocol):
     """What the gate service needs from storage — nothing more."""
@@ -129,6 +137,34 @@ class SupabaseProjectRepository(_SupabaseRest):
         if not rows:
             raise RepositoryError("update matched no owned row")
         return rows[0]
+
+    async def update_workflow_artifacts_if_current(
+        self,
+        user_id: str,
+        project_id: str,
+        expected: dict,
+        replacement: dict,
+    ) -> dict | None:
+        """Optimistic JSONB replace that cannot overwrite a concurrent write.
+
+        PostgreSQL jsonb equality is structural, so key order in the compact
+        filter value is irrelevant. Ownership remains part of the same atomic
+        PATCH predicate. A stale caller gets no row and can reload + merge.
+        """
+        expected_json = json.dumps(
+            expected, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        rows = await self._request(
+            "PATCH",
+            "/projects",
+            params={
+                "id": f"eq.{project_id}",
+                "user_id": f"eq.{user_id}",
+                "workflow_artifacts": f"eq.{expected_json}",
+            },
+            json={"workflow_artifacts": replacement},
+        )
+        return rows[0] if rows else None
 
 
 class SupabaseGateSessionRepository(_SupabaseRest):

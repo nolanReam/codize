@@ -51,6 +51,21 @@ class InMemoryProjectRepository:
                 return copy.deepcopy(row)
         raise RuntimeError("update matched no owned row")
 
+    async def update_workflow_artifacts_if_current(
+        self,
+        user_id: str,
+        project_id: str,
+        expected: dict,
+        replacement: dict,
+    ) -> dict | None:
+        for row in self._rows:
+            if row["id"] == project_id and row["user_id"] == user_id:
+                if row.get("workflow_artifacts") != expected:
+                    return None
+                row["workflow_artifacts"] = copy.deepcopy(replacement)
+                return copy.deepcopy(row)
+        return None
+
 
 class InMemoryGateSessionRepository:
     def __init__(self) -> None:

@@ -41,4 +41,10 @@ describe("guidance disclosure preference", () => {
     expect(readGuidanceOpen(broken, "key")).toBeNull();
     expect(() => writeGuidanceOpen(broken, "key", true)).not.toThrow();
   });
+
+  it("ignores corrupted stored values", () => {
+    const storage = new MemoryStorage();
+    storage.setItem("key", "open");
+    expect(readGuidanceOpen(storage, "key")).toBeNull();
+  });
 });

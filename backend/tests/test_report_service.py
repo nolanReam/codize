@@ -1,5 +1,6 @@
 """M16C.1 Defense Report context and attempt-snapshot tests."""
 
+import copy
 import inspect
 import json
 
@@ -33,6 +34,18 @@ def test_report_without_attempt_uses_current_curated_context_without_provider():
     assert "evaluator's outcome" in report.truth_notice
     assert "not independent proof" in report.truth_notice
     assert "llm_service" not in inspect.getsource(report_service)
+
+
+def test_reserved_entry_profile_never_enters_report_context():
+    repo, gates, _ = make_repos()
+    project = run(repo.get_project(USER))
+    artifacts = copy.deepcopy(project["workflow_artifacts"])
+    artifacts["_entry_profile"] = {"marker": "ENTRY_PROFILE_MUST_NOT_LEAK"}
+    run(repo.update_project(USER, project["id"], {"workflow_artifacts": artifacts}))
+    report = run(report_service.build_report_context(repo, gates, USER, 1))
+    serialized = json.dumps(report.model_dump(mode="json"))
+    assert "ENTRY_PROFILE_MUST_NOT_LEAK" not in serialized
+    assert "_entry_profile" not in serialized
 
 
 def test_active_attempt_uses_stable_server_snapshot_after_workflow_changes():

@@ -81,7 +81,7 @@ export default function GuidedProjectNavigationProvider({
       ) {
         const [intake, entry] = await Promise.all([
           getIntakeStatus().catch(() => null),
-          getEntryProfile().catch(() => ({ profile: null })),
+          getEntryProfile(),
         ]);
         if (activeRequest !== requestId.current) return;
         setWorkflow(null);

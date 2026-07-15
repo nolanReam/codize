@@ -111,6 +111,34 @@ def test_empty_state_has_all_sections_null():
     assert all(v is None for v in state["sections"].values())
 
 
+def test_entry_profile_is_not_a_phase_artifact_or_countable_section():
+    repo = InMemoryProjectRepository()
+    project = seed_active_project(repo)
+    run(
+        repo.update_project(
+            USER,
+            project["id"],
+            {
+                "workflow_artifacts": {
+                    "_entry_profile": {"current_situation": "stuck"},
+                    "1": {
+                        "prompt_builder": {
+                            **PROMPT_BUILDER,
+                            "saved_at": "2026-07-15T00:00:00Z",
+                        }
+                    },
+                },
+            },
+        )
+    )
+
+    sections = run(get_phase_artifacts(repo, USER, 1))["sections"]
+
+    assert set(sections) == set(SECTIONS)
+    assert "_entry_profile" not in sections
+    assert sum(value is not None for value in sections.values()) == 1
+
+
 @pytest.mark.parametrize("section", SECTIONS)
 def test_each_section_round_trips(section):
     repo = InMemoryProjectRepository()

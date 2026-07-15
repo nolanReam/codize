@@ -23,7 +23,7 @@ export default function ProjectHomePage() {
     setShowQuickStart(new URLSearchParams(window.location.search).get("quick-start") === "1");
   }, []);
 
-  const pill = state === "ready" && evaluation
+  const pill = state === "ready" && evaluation && workflow
     ? evaluation.state === "complete" || navigation.continueAction.stageId === "report"
       ? { label: "ROADMAP COMPLETE", cls: "ok" }
       : evaluation.state === "cooldown"
@@ -72,13 +72,15 @@ export default function ProjectHomePage() {
             <div>
               <div className="card primary">
                 <h2>
-                  {!entryProfile
+                  {evaluation.state === "not_started" && !entryProfile
                     ? "Let’s find the right place to start"
-                    : entryProfile.completed
+                    : entryProfile?.completed
                       ? "Finish your project details"
-                      : "Continue finding your starting point"}
+                      : entryProfile
+                        ? "Continue finding your starting point"
+                        : "Continue project setup"}
                 </h2>
-                {!entryProfile && (
+                {evaluation.state === "not_started" && !entryProfile && (
                   <p className="muted">
                     Answer a few short questions. Codize will recommend one starting point and guide you from there.
                   </p>

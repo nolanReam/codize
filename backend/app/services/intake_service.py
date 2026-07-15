@@ -22,7 +22,7 @@ from pydantic import ValidationError
 
 from app.schemas.intake import EntryProfileView
 from app.services import template_service
-from app.services.project_repository import ProjectRepository
+from app.services.project_repository import ProjectRepository, RepositoryError
 
 # The five mandatory questions, verbatim from the master spec. Question 1 is
 # the Yeager purpose framing — never "What do you want to build?". Exactly
@@ -75,6 +75,7 @@ MAX_ANSWER_LENGTH = 4000
 # records. Existing readers select only numeric phase keys, so this reserved
 # top-level key cannot become a workflow section or affect N/5 progress.
 ENTRY_PROFILE_KEY = "_entry_profile"
+_ENTRY_PROFILE_WRITE_ATTEMPTS = 3
 
 ARCHETYPE_NAMES = {aid: name for aid, name in template_service.EXPECTED_TEMPLATES.values()}
 
@@ -190,44 +191,56 @@ async def update_entry_profile(
     sections, drafts, or downstream records.
     """
     project = await repo.get_project(user_id)
-    current = entry_profile_from_project(project)
-    situation = updates.get(
-        "current_situation", current.get("current_situation") if current else None
-    )
-    confidence = updates.get(
-        "coding_confidence", current.get("coding_confidence") if current else None
-    )
-    ai_changed = updates.get(
-        "ai_changed_files", current.get("ai_changed_files") if current else None
-    )
-    if "current_situation" in updates and situation != "already_building":
-        ai_changed = None
-    if ai_changed is not None and situation != "already_building":
-        raise InvalidEntryProfileError(
-            "AI change status applies only when you are already building."
+    for _attempt in range(_ENTRY_PROFILE_WRITE_ATTEMPTS):
+        current = entry_profile_from_project(project)
+        situation = updates.get(
+            "current_situation", current.get("current_situation") if current else None
         )
-
-    profile = _profile_view(
-        current_situation=situation,
-        coding_confidence=confidence,
-        ai_changed_files=ai_changed,
-        updated_at=datetime.now(timezone.utc).isoformat(),
-    )
-    try:
-        stored = EntryProfileView.model_validate(profile).model_dump(mode="json")
-    except ValidationError as exc:
-        raise InvalidEntryProfileError("Invalid entry choices.") from exc
-
-    existing = project.get("workflow_artifacts") if project else None
-    artifacts = dict(existing) if isinstance(existing, dict) else {}
-    artifacts[ENTRY_PROFILE_KEY] = stored
-    if project is None:
-        await repo.create_project(user_id, {"workflow_artifacts": artifacts})
-    else:
-        await repo.update_project(
-            user_id, project["id"], {"workflow_artifacts": artifacts}
+        confidence = updates.get(
+            "coding_confidence", current.get("coding_confidence") if current else None
         )
-    return {"profile": stored}
+        ai_changed = updates.get(
+            "ai_changed_files", current.get("ai_changed_files") if current else None
+        )
+        if "current_situation" in updates and situation != "already_building":
+            ai_changed = None
+        if ai_changed is not None and situation != "already_building":
+            raise InvalidEntryProfileError(
+                "AI change status applies only when you are already building."
+            )
+
+        profile = _profile_view(
+            current_situation=situation,
+            coding_confidence=confidence,
+            ai_changed_files=ai_changed,
+            updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+        try:
+            stored = EntryProfileView.model_validate(profile).model_dump(mode="json")
+        except ValidationError as exc:
+            raise InvalidEntryProfileError("Invalid entry choices.") from exc
+
+        existing = project.get("workflow_artifacts") if project else None
+        expected = existing if isinstance(existing, dict) else {}
+        artifacts = dict(expected)
+        artifacts[ENTRY_PROFILE_KEY] = stored
+        if project is None:
+            await repo.create_project(user_id, {"workflow_artifacts": artifacts})
+            return {"profile": stored}
+
+        updated = await repo.update_workflow_artifacts_if_current(
+            user_id,
+            project["id"],
+            expected,
+            artifacts,
+        )
+        if updated is not None:
+            return {"profile": stored}
+        project = await repo.get_project(user_id)
+        if project is None:
+            break
+
+    raise RepositoryError("entry profile update conflicted repeatedly")
 
 
 def get_questions() -> list[dict]:
