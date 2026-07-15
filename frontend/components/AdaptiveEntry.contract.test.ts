@@ -39,6 +39,12 @@ describe("M17 adaptive entry UI contract", () => {
     expect(source).not.toMatch(/textarea|input.*latest AI response/i);
   });
 
+  it("reacts when same-route navigation opens the Quick Start query", () => {
+    expect(home).toContain("useSearchParams");
+    expect(home).toContain('searchParams.get("quick-start") === "1"');
+    expect(home).not.toContain("new URLSearchParams(window.location.search)");
+  });
+
   it("keeps setup status honest and makes pre-workflow profile errors retryable", () => {
     expect(home).toContain('state === "ready" && evaluation && workflow');
     expect(provider).toContain("getEntryProfile(),");

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 import { QuickStartPanel, StartingPathSummary } from "@/components/AdaptiveEntry";
 import Async from "@/components/Async";
@@ -15,13 +16,18 @@ import WorkflowSteps from "@/components/WorkflowSteps";
 // Project Home. The one-project selection contract and disabled new-project
 // action are unchanged.
 export default function ProjectHomePage() {
+  return (
+    <Suspense fallback={<p className="muted" role="status" aria-live="polite">Loading Project Home...</p>}>
+      <ProjectHomeContent />
+    </Suspense>
+  );
+}
+
+function ProjectHomeContent() {
   const { state, error, navigation, evaluation, workflow, entryProfile, refresh } =
     useGuidedProjectNavigation();
-  const [showQuickStart, setShowQuickStart] = useState(false);
-
-  useEffect(() => {
-    setShowQuickStart(new URLSearchParams(window.location.search).get("quick-start") === "1");
-  }, []);
+  const searchParams = useSearchParams();
+  const showQuickStart = searchParams.get("quick-start") === "1";
 
   const pill = state === "ready" && evaluation && workflow
     ? evaluation.state === "complete" || navigation.continueAction.stageId === "report"
