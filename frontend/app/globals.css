@@ -1739,7 +1739,10 @@ fieldset.evidence-status-picker legend { color: var(--ink-2); font-size: 13px; p
 
 .section-title { font-family: var(--sans); font-size: 22px; letter-spacing: -0.02em; margin-bottom: 10px; }
 .field-label { display: block; color: var(--ink); font-size: 13px; font-weight: 700; margin: 12px 0 3px; }
-.field-limit { color: var(--ink-3); font-family: var(--mono); font-size: 11px; margin-top: 5px; text-align: right; }
+.field-limit { color: var(--ink-2); font-family: var(--mono); font-size: 11px; margin-top: 5px; text-align: right; }
+
+.defense-page-body .muted,
+.defense-page-body .card h3 { color: var(--ink-2); }
 
 .defense-context-summary {
   border-top: 1px solid var(--border);
@@ -1747,7 +1750,7 @@ fieldset.evidence-status-picker legend { color: var(--ink-2); font-size: 13px; p
   margin: 20px 0 14px;
   padding: 18px 0;
 }
-.defense-context-summary h3 { font-family: var(--sans); font-size: 17px; letter-spacing: -0.01em; margin-bottom: 6px; }
+.defense-page-body .defense-context-summary h3 { color: var(--ink); font-family: var(--sans); font-size: 17px; letter-spacing: -0.01em; margin-bottom: 6px; text-transform: none; }
 .defense-context-summary > p { max-width: 72ch; }
 .defense-context-summary > .muted { margin-top: 4px; }
 .defense-context-status { background: var(--surface-2); border-radius: 8px; margin-top: 12px; padding: 12px 14px; }
@@ -1783,7 +1786,7 @@ fieldset.evidence-status-picker legend { color: var(--ink-2); font-size: 13px; p
 .report-hero h2 { font-family: var(--sans); font-size: clamp(24px, 3vw, 34px); letter-spacing: -0.035em; margin: 4px 0 7px; }
 .report-hero p:not(.report-kicker) { color: var(--ink-2); max-width: 66ch; }
 .report-outcome-pill { font-size: 11px; flex-shrink: 0; }
-.report-kicker { color: var(--ink-3); font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.report-kicker { color: var(--ink-2); font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .report-context-source { background: var(--surface-2); border-radius: 10px; margin-top: 14px; padding: 18px 22px; }
 .report-context-source h2 { font-family: var(--sans); font-size: 18px; margin: 4px 0; }
 .report-context-source > p:last-child { color: var(--ink-2); max-width: 80ch; }
@@ -1808,9 +1811,9 @@ fieldset.evidence-status-picker legend { color: var(--ink-2); font-size: 13px; p
 .report-plain-text { max-width: 82ch; overflow-wrap: anywhere; white-space: pre-wrap; }
 .report-details { margin: 10px 0 0; }
 .report-detail { display: grid; gap: 12px; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr); padding: 5px 0; }
-.report-detail dt { color: var(--ink-3); font-size: 12px; }
+.report-detail dt { color: var(--ink-2); font-size: 12px; }
 .report-detail dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
-.report-empty-source { min-height: 80px; padding: 20px 0; }
+.report-empty-source { color: var(--ink-2); min-height: 80px; padding: 20px 0; }
 .report-verification-context { background: var(--surface-2); border-radius: 8px; margin-top: 12px; padding: 14px 16px; }
 .report-verification-context > p { margin-top: 4px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .report-evidence-block,

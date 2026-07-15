@@ -50,7 +50,8 @@ not-addressed, and manual records are separate. Evidence is never proof.
 All response strings render as React text. Never use raw HTML or Markdown
 rendering, embeds, iframes, remote previews, or arbitrary auto-linking.
 `safeEvidenceHref` is the sole external-link gate: only valid `http:`/`https:`
-`app_url` entries become links, with `_blank` and `noopener noreferrer`.
+`app_url` or `repo_url` entries become links, with `_blank` and
+`noopener noreferrer`.
 Markdown copy/download escapes user content and remains a plain report export.
 
 Source states and results use text plus color, semantic headings, status/error

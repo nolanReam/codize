@@ -220,6 +220,9 @@ describe("Defense Report presentation rules", () => {
     expect(safeEvidenceHref({ kind: "app_url", content: "https://example.test/a" })).toBe(
       "https://example.test/a"
     );
+    expect(safeEvidenceHref({ kind: "repo_url", content: "https://example.test/repo" })).toBe(
+      "https://example.test/repo"
+    );
     expect(safeEvidenceHref({ kind: "note", content: "https://example.test/a" })).toBeNull();
     expect(safeEvidenceHref({ kind: "app_url", content: "javascript:example()" })).toBeNull();
   });

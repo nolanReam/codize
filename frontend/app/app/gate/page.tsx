@@ -210,45 +210,47 @@ export default function GatePage() {
       </div>
 
       <Async loading={loading} error={error} onRetry={load}>
-        {outcome ? (
-          <Outcome outcome={outcome} onReset={load} />
-        ) : (
-          gate && (
-            <div className="workspace">
-              <div>
-                {gate.state === "in_progress" ? (
-                  <ActiveFlow
-                    gate={gate}
-                    input={input}
-                    setInput={setInput}
-                    busy={busy}
-                    flowError={flowError}
-                    onAnchor={handleAnchor}
-                    onAnswer={handleAnswer}
-                  />
-                ) : gate.state === "cooldown" ? (
-                  <CooldownView gate={gate} />
-                ) : gate.state === "passed" ? (
-                  <PassedView gate={gate} />
-                ) : (
-                  <ReadyView
-                    phase={phase}
-                    busy={busy}
-                    onBegin={handleBegin}
-                    flowError={flowError}
-                    summary={summary}
-                    summaryState={summaryState}
-                    onRetrySummary={loadSummary}
-                  />
-                )}
-              </div>
+        <div className="defense-page-body">
+          {outcome ? (
+            <Outcome outcome={outcome} onReset={load} />
+          ) : (
+            gate && (
+              <div className="workspace">
+                <div>
+                  {gate.state === "in_progress" ? (
+                    <ActiveFlow
+                      gate={gate}
+                      input={input}
+                      setInput={setInput}
+                      busy={busy}
+                      flowError={flowError}
+                      onAnchor={handleAnchor}
+                      onAnswer={handleAnswer}
+                    />
+                  ) : gate.state === "cooldown" ? (
+                    <CooldownView gate={gate} />
+                  ) : gate.state === "passed" ? (
+                    <PassedView gate={gate} />
+                  ) : (
+                    <ReadyView
+                      phase={phase}
+                      busy={busy}
+                      onBegin={handleBegin}
+                      flowError={flowError}
+                      summary={summary}
+                      summaryState={summaryState}
+                      onRetrySummary={loadSummary}
+                    />
+                  )}
+                </div>
 
-              <aside className="ws-rail" aria-label="Guidance">
-                <GateExplainer />
-              </aside>
-            </div>
-          )
-        )}
+                <aside className="ws-rail" aria-label="Guidance">
+                  <GateExplainer />
+                </aside>
+              </div>
+            )
+          )}
+        </div>
       </Async>
     </>
   );
