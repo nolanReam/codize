@@ -22,9 +22,9 @@ describe("Review page lifecycle contract", () => {
     expect(source).toContain("showFullReviewInitializationState(initializing, Boolean(wf.stored))");
   });
 
-  it("navigates to Verification without prefilling or creating downstream records", () => {
-    expect(source).toContain('href="/app/phase/verify"');
-    expect(source).toContain("Continue Verification");
+  it("uses the shared saved-state Continue action without creating downstream records", () => {
+    expect(source).toContain('import { GuidedContinueAction }');
+    expect(source).toContain('<GuidedContinueAction className="btn primary" />');
     expect(source).not.toMatch(/saveWorkflowSection\([^)]*verification|createEvidence|verification suggestion/i);
   });
 

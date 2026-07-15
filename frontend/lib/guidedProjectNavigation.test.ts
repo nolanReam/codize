@@ -258,6 +258,27 @@ describe("guided project navigation model", () => {
     expect(stale.projectRecord.find((item) => item.stageId === "evidence")?.stateLabel).toBe("Needs update");
   });
 
+  it("fails malformed linked Evidence completion closed without breaking manual Evidence", () => {
+    for (const completion of [undefined, null, "true"]) {
+      const malformed = {
+        ...linkedEvidence(true),
+        evidence_record_complete: completion,
+      } as unknown as LinkedEvidenceArtifact;
+      const model = build({ evidence: malformed });
+      expect(model.continueAction).toMatchObject({
+        label: "Continue Evidence",
+        stageId: "evidence",
+      });
+      expect(model.journey[5].state).toBe("continue");
+      expect(model.journey[6].state).toBe("later");
+    }
+
+    const manual = build({
+      evidence: { entries: [], summary: "Manual note", saved_at: "2026-07-14T10:05:00Z" },
+    });
+    expect(manual.continueAction.stageId).toBe("defense");
+  });
+
   it("selects the earliest stale dependency when multiple records are stale", () => {
     const reviewFirst = build({
       review_board: linkedReview("keep", true),

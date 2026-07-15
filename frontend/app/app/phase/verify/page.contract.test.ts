@@ -24,9 +24,9 @@ describe("Verification page lifecycle contract", () => {
     );
   });
 
-  it("continues to Evidence by navigation only", () => {
-    expect(source).toContain('href="/app/phase/evidence"');
-    expect(source).toContain("Continue Evidence");
+  it("uses the shared saved-state Continue action without creating Evidence", () => {
+    expect(source).toContain('import { GuidedContinueAction }');
+    expect(source.match(/<GuidedContinueAction className="btn primary" \/>/g)).toHaveLength(2);
     expect(source).not.toMatch(/saveWorkflowSection\([^)]*evidence|createEvidence|prefillEvidence/i);
   });
 

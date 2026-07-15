@@ -1,8 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-
 import Async from "@/components/Async";
 import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import { useGuidedProjectNavigation } from "@/components/GuidedProjectNavigationProvider";
@@ -14,21 +11,8 @@ import WorkflowSteps from "@/components/WorkflowSteps";
 // Project Home. The one-project selection contract and disabled new-project
 // action are unchanged.
 export default function ProjectHomePage() {
-  const router = useRouter();
   const { state, error, navigation, evaluation, workflow, refresh } =
     useGuidedProjectNavigation();
-
-  useEffect(() => {
-    if (
-      state === "ready" &&
-      evaluation &&
-      (evaluation.state === "not_started" ||
-        evaluation.state === "intake_needed" ||
-        evaluation.state === "roadmap_needed")
-    ) {
-      router.replace("/app/intake");
-    }
-  }, [evaluation, router, state]);
 
   const pill = state === "ready" && evaluation
     ? evaluation.state === "complete" || navigation.continueAction.stageId === "report"
@@ -74,6 +58,32 @@ export default function ProjectHomePage() {
         error={state === "error" ? error ?? "Project progress is temporarily unavailable." : null}
         onRetry={refresh}
       >
+        {evaluation && !workflow && (
+          <div className="workspace project-home-setup">
+            <div>
+              <div className="card primary">
+                <h2>Continue project setup</h2>
+                <p style={{ fontSize: 17, fontWeight: 600 }}>
+                  {navigation.continueAction.label}
+                </p>
+                <p className="muted" style={{ marginTop: 4 }}>
+                  {navigation.continueAction.reason}
+                </p>
+                <div className="row" style={{ marginTop: 12 }}>
+                  <GuidedContinueAction className="btn primary" />
+                </div>
+              </div>
+            </div>
+            <aside className="ws-rail" aria-label="Guidance">
+              <GuideCard title="Project Home">
+                <p>
+                  Project Home stays available while you finish setup. Continue takes you to the
+                  required intake step without changing the project lifecycle.
+                </p>
+              </GuideCard>
+            </aside>
+          </div>
+        )}
         {evaluation && workflow && (
           <div className="workspace">
             <div>

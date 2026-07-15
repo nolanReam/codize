@@ -144,7 +144,7 @@ input:focus-visible[type="checkbox"] {
   line-height: 1.3;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .project-identity strong {
   font-size: 14px;
@@ -236,7 +236,7 @@ input:focus-visible[type="checkbox"] {
 .guided-stage-index {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-align: center;
 }
 .guided-stage-copy {
@@ -252,7 +252,7 @@ input:focus-visible[type="checkbox"] {
   flex-shrink: 0;
   font-family: var(--mono);
   font-size: 9.5px;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .guided-stage.complete .guided-stage-index { color: var(--ok); }
 .guided-stage.continue,
@@ -266,7 +266,8 @@ input:focus-visible[type="checkbox"] {
 .guided-stage.needs_attention .guided-stage-state { color: var(--warn); }
 .guided-stage.later,
 .guided-stage.unavailable { color: var(--ink-2); }
-.loading-stage { color: var(--ink-3); }
+.guided-stage.viewing { box-shadow: inset 2px 0 0 var(--accent); }
+.loading-stage { color: var(--ink-2); }
 .project-record {
   margin: 7px 4px 2px;
   border-top: 1px solid var(--border);

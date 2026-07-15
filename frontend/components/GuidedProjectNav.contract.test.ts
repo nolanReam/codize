@@ -31,11 +31,15 @@ describe("guided project shell contract", () => {
     expect(nav).toContain('aria-current={current ? "page" : undefined}');
     expect(nav).toContain("routeIsActive(pathname, item.href)");
     expect(nav).toContain("item.stateLabel");
+    expect(nav).toContain('pathname === "/app/phase" && !continueIsCurrent');
+    expect(nav).toContain("journeyCurrentId === item.id");
+    expect(nav).toContain('aria-current={journeyCurrentId === item.id ? "page" : undefined}');
+    expect(css).toContain(".guided-stage.viewing");
   });
 
   it("renders future Journey stages as semantic non-links with text state", () => {
     expect(nav).toContain('<ol className="guided-journey"');
-    expect(nav).toContain('<li className={`guided-stage ${item.state}`}');
+    expect(nav).toContain('className={`guided-stage ${item.state}${journeyCurrentId === item.id ? " viewing" : ""}`}');
     expect(nav).toContain("{item.stateLabel}");
     expect(nav).not.toContain("<Link href={item.href}");
     expect(css).toContain(".guided-stage.later");
@@ -90,6 +94,21 @@ describe("guided project shell contract", () => {
     expect(phase).not.toContain("derivePhaseNextStep");
     expect(workflowSteps).toContain("useGuidedProjectNavigation()");
     expect(workflowSteps).not.toContain("sections:");
+    expect(home).not.toContain("router.replace");
+    expect(home).toContain("evaluation && !workflow");
+  });
+
+  it("uses the shared Continue action on completed Review and Verification pages", () => {
+    const reviewPage = readFileSync(
+      resolve(process.cwd(), "app/app/phase/review/page.tsx"),
+      "utf8"
+    );
+    const verificationPage = readFileSync(
+      resolve(process.cwd(), "app/app/phase/verify/page.tsx"),
+      "utf8"
+    );
+    expect(reviewPage).toContain('<GuidedContinueAction className="btn primary" />');
+    expect(verificationPage.match(/<GuidedContinueAction className="btn primary" \/>/g)).toHaveLength(2);
   });
 
   it("preserves visible focus, reduced motion, and text-plus-color states", () => {
@@ -98,5 +117,8 @@ describe("guided project shell contract", () => {
     expect(css).toContain(".guided-stage.needs_attention");
     expect(css).toContain(".guided-stage-state");
     expect(css).toContain(".project-record li.needs_attention");
+    expect(css).toMatch(/\.project-identity-label,[\s\S]*?color: var\(--ink-2\)/);
+    expect(css).toMatch(/\.guided-stage-index \{[\s\S]*?color: var\(--ink-2\)/);
+    expect(css).toMatch(/\.guided-stage-state \{[\s\S]*?color: var\(--ink-2\)/);
   });
 });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import GuideCard from "@/components/GuideCard";
 import LinkedVerificationTargetRow from "@/components/LinkedVerificationTarget";
 import NotReady from "@/components/NotReady";
@@ -663,9 +664,7 @@ function LinkedVerificationBoard({
                   <Link className="btn" href="/app/phase/review">
                     Review your decisions
                   </Link>
-                  <Link className="btn primary" href="/app/phase/evidence">
-                    Continue Evidence
-                  </Link>
+                  <GuidedContinueAction className="btn primary" />
                 </div>
               </div>
             ) : (
@@ -761,9 +760,7 @@ function LinkedVerificationBoard({
                   You recorded an outcome for every suggested check. Failures, skipped checks, and
                   not-applicable items remain part of the project record.
                 </p>
-                <Link className="btn primary" href="/app/phase/evidence">
-                  Continue Evidence
-                </Link>
+                <GuidedContinueAction className="btn primary" />
               </div>
             )}
           </section>

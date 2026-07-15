@@ -58,6 +58,14 @@ export default function GuidedProjectNav({
   const recordContainsCurrent =
     !continueIsCurrent &&
     navigation.projectRecord.some((item) => routeIsActive(pathname, item.href));
+  const phaseWorkspaceIsCurrent = pathname === "/app/phase" && !continueIsCurrent;
+  const journeyCurrentId =
+    pathname !== "/app" &&
+    !continueIsCurrent &&
+    !recordContainsCurrent &&
+    !phaseWorkspaceIsCurrent
+      ? navigation.journey.find((item) => routeIsActive(pathname, item.href))?.id ?? null
+      : null;
 
   return (
     <>
@@ -126,7 +134,11 @@ export default function GuidedProjectNav({
                     </li>
                   ))
                 : navigation.journey.map((item, index) => (
-                    <li className={`guided-stage ${item.state}`} key={item.id}>
+                    <li
+                      className={`guided-stage ${item.state}${journeyCurrentId === item.id ? " viewing" : ""}`}
+                      aria-current={journeyCurrentId === item.id ? "page" : undefined}
+                      key={item.id}
+                    >
                       <span className="guided-stage-index" aria-hidden="true">
                         {item.state === "complete" ? "✓" : String(index + 1).padStart(2, "0")}
                       </span>
@@ -178,8 +190,8 @@ export default function GuidedProjectNav({
           <h2 id={`${idPrefix}-project-tools`}>Project tools</h2>
           <Link
             href="/app/phase"
-            className={pathname === "/app/phase" ? "active" : ""}
-            aria-current={pathname === "/app/phase" ? "page" : undefined}
+            className={phaseWorkspaceIsCurrent ? "active" : ""}
+            aria-current={phaseWorkspaceIsCurrent ? "page" : undefined}
             onClick={onNavigate}
           >
             Phase Workspace

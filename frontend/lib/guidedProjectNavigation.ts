@@ -1,4 +1,4 @@
-import { isLinkedEvidenceArtifact } from "./evidence";
+import { evidenceArtifactMode, isLinkedEvidenceArtifact } from "./evidence";
 import { isLinkedReviewArtifact, linkedReviewAllowsVerification, targetFormFromReview } from "./review";
 import {
   isLinkedVerificationArtifact,
@@ -139,8 +139,10 @@ function verificationIsComplete(sections: WorkflowSections): boolean {
 
 function evidenceIsComplete(sections: WorkflowSections): boolean {
   const evidence = sections.evidence;
-  if (!evidence) return false;
-  if (!isLinkedEvidenceArtifact(evidence)) return true;
+  const mode = evidenceArtifactMode(evidence);
+  if (mode === "none" || mode === "invalid_linked") return false;
+  if (mode === "legacy") return true;
+  if (!isLinkedEvidenceArtifact(evidence)) return false;
   return !evidence.stale && evidence.evidence_record_complete;
 }
 

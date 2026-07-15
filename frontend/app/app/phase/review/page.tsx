@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import GuideCard from "@/components/GuideCard";
 import LinkedReviewTargetRow from "@/components/LinkedReviewTarget";
 import NotReady from "@/components/NotReady";
@@ -601,9 +602,7 @@ function LinkedReviewBoard({
                 ) : (
                   <p>No automatic targets need a decision in this Review.</p>
                 )}
-                <Link className="btn primary" href="/app/phase/verify">
-                  Continue Verification
-                </Link>
+                <GuidedContinueAction className="btn primary" />
               </div>
             )}
           </section>
