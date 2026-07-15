@@ -452,3 +452,14 @@ gate, and evaluator behavior are unchanged. Full rules:
 [[linked-evidence-ui-conventions]].
 
 **M16C.2 (2026-07-14) — Artifact-aware Defense/Report frontend.** Defense readiness is a non-blocking metadata consumer of `GET /gate/context-summary`; render the server's Change Map/Review/Verification/Evidence labels and exact current/missing/incomplete/stale/manual/malformed states, plus truncation, without reconstructing or displaying source content. A context error gets its own retry and never disables Begin. The stable-attempt explanation belongs only before a new attempt; active/resumed attempts use the existing gate contract and preserve empty student-owned answers, scoped drafts, limits, order, evaluation, PASS/FAIL, cooldown, and retry semantics. The Report is now an authoritative `GET /report/{phase}` view selected by `?phase=` so a just-passed phase remains reachable after advancement. Do not combine it from workflow/intake/gate client state. Render attempt-snapshot vs legacy-current provenance, the exact truth notice, curated Change Map/Review/Verification/Evidence, public transcript, and outcome as separate semantic sections. User values are React text; only `safeEvidenceHref` may produce HTTP(S) external links with `noopener noreferrer`. The cockpit's primary handoff may point to Defense or Report, but workflow capture remains N/5. See [[artifact-aware-defense-report-ui-conventions]].
+
+**M16N (2026-07-14) — guided project shell.** `/app` remains the route and is
+visibly Project Home. `lib/guidedProjectNavigation.ts` is the single typed,
+pure lifecycle model used by desktop/mobile shell, Project Home, Phase
+Workspace, compact Journey, Continue, and Project Record. The provider reads
+saved evaluation/workflow/gate/intake state and refreshes after confirmed API
+mutations; it never reads drafts or derives progress from pathname. Future
+stages are non-links, current lifecycle and `aria-current=page` are separate,
+and stale records remain readable under Project Record. Mobile uses the same
+model in a modal drawer with focus entry/trap/Escape/return. See
+[[guided-project-shell-conventions]].

@@ -374,3 +374,24 @@ deterministic preparation tips. The **evaluation stays artifact-blind** —
 recorded artifacts never decide pass/fail, and the UI never claims Codize
 verified anything. Raw gate scores, evaluator reasoning, hidden thresholds,
 internal prompts, raw context, and grounding metadata never reach the client.
+
+## Status (M16N)
+
+The protected app now uses one state-aware guided project shell. `/app` keeps
+its route identity but is visibly named **Project Home**. Desktop and mobile
+both consume `lib/guidedProjectNavigation.ts`: one saved-state **Continue**
+action, the exact eight-stage Journey, and a secondary **Project Record** for
+saved/completed/stale work. Future stages are readable non-links; completed
+Journey rows are progress markers; stale Review, Verification, and Evidence
+remain readable under Project Record with `Needs update` language.
+
+Navigation loads existing `/evaluation`, `/workflow/{phase}`, `/gate/current`,
+and intake status through `GuidedProjectNavigationProvider`. Prompt/Import use
+their saved sections, Change Map uses confirmed/stale state, linked Review and
+Verification use saved target decisions/results, Evidence trusts only the
+server `evidence_record_complete` flag, and Defense/Report use the exact gate
+lifecycle. Local drafts, route presence, and optimistic state never advance
+the shell. Existing routes, manual/legacy records, workflow N/5, save/rebuild
+flows, backend lifecycle, and Report truth rules are unchanged. The mobile
+version is a focus-managed modal drawer with Escape, trapped Tab focus, return
+focus, and the same model as desktop.

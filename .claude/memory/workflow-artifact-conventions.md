@@ -176,3 +176,14 @@ sections, source states, provenance, snapshots, bindings, or fingerprints to
 Defense/Report. Artifact capture remains exactly N/5; Change Map is still a
 sibling derived record, not a sixth section. See
 [[artifact-aware-defense-report-ui-conventions]].
+
+M16N adds no artifact, store, route, or completion field. The guided shell
+reads the existing phase workflow view and treats Prompt/Import saved sections
+as their current completion contract, Change Map confirmation/staleness as its
+contract, linked Review/Verification saved target state as theirs, and linked
+Evidence as complete only when the server returns
+`evidence_record_complete=true`. A section still contributes to workflow N/5
+exactly as before; N/5 is not the Journey lifecycle. Local drafts, pathname,
+and section presence alone never complete linked Evidence. Stale artifacts
+stay readable through Project Record and existing deep links; rebuild remains
+an explicit existing page mutation. See [[guided-project-shell-conventions]].

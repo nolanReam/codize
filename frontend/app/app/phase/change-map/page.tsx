@@ -1015,7 +1015,7 @@ export default function ChangeMapPage() {
                       </div>
                       <div className="row">
                         <Link href="/app/phase/review" className="btn primary">
-                          Continue to Review
+                          Continue Review
                         </Link>
                         <button className="btn" type="button" onClick={() => setEditMode(true)}>
                           Edit reviewed map

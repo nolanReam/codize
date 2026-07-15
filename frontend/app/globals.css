@@ -57,7 +57,7 @@ input:focus-visible[type="checkbox"] {
 .shell { display: flex; min-height: 100vh; }
 
 .sidebar {
-  width: 232px;
+  width: 292px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   background: var(--surface);
@@ -68,6 +68,9 @@ input:focus-visible[type="checkbox"] {
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 .sidebar .brand {
@@ -123,6 +126,217 @@ input:focus-visible[type="checkbox"] {
   color: var(--ink-3);
   overflow-wrap: anywhere;
 }
+
+/* ---- guided project navigation (M16N) ---------------------------------- */
+
+.project-identity {
+  display: grid;
+  gap: 2px;
+  margin: 0 4px 8px;
+  padding: 11px 10px 13px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.project-identity-label,
+.guided-nav-section > h2 {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.project-identity strong {
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.project-identity > span:last-child {
+  color: var(--ink-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.guided-project-nav { display: flex; flex-direction: column; gap: 4px; }
+.project-home-link {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4px 6px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.project-home-link:hover,
+.project-home-link.active { background: var(--surface-2); text-decoration: none; }
+.project-home-link.active { box-shadow: inset 2px 0 0 var(--accent); }
+.guided-nav-section { padding: 8px 4px 5px; }
+.guided-nav-section > h2 { margin: 0 6px 7px; }
+.guided-continue-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 10px 11px;
+  border-radius: 8px;
+  border-left: 2px solid var(--accent);
+  background: var(--accent-bg);
+  color: var(--ink);
+  font-weight: 650;
+  line-height: 1.3;
+}
+.guided-continue-link:hover { color: var(--accent); text-decoration: none; }
+.guided-continue-link[aria-current="page"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.guided-continue > p,
+.project-record > p,
+.project-record li > p,
+.guided-nav-muted {
+  margin: 6px 7px 0;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.guided-continue-unavailable,
+.guided-continue-loading,
+.guided-navigation-error {
+  display: grid;
+  gap: 3px;
+  min-height: 46px;
+  padding: 10px 11px;
+  border-radius: 8px;
+  border-left: 2px solid var(--warn);
+  background: var(--warn-bg);
+  color: var(--ink);
+  font-size: 12px;
+}
+.guided-continue-unavailable span,
+.guided-continue-loading { color: var(--ink-2); }
+.guided-navigation-error { border-left-color: var(--danger); background: var(--danger-bg); }
+.guided-navigation-error button {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.guided-journey { list-style: none; display: grid; gap: 2px; }
+.guided-stage {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  color: var(--ink-2);
+}
+.guided-stage-index {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-align: center;
+}
+.guided-stage-copy {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.25;
+}
+.guided-stage-copy > span:first-child { overflow-wrap: anywhere; }
+.guided-stage-state {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.guided-stage.complete .guided-stage-index { color: var(--ok); }
+.guided-stage.continue,
+.guided-stage.ready { background: var(--accent-bg); color: var(--ink); }
+.guided-stage.continue .guided-stage-index,
+.guided-stage.ready .guided-stage-index,
+.guided-stage.continue .guided-stage-state,
+.guided-stage.ready .guided-stage-state { color: var(--accent); }
+.guided-stage.needs_attention { background: var(--warn-bg); color: var(--ink); }
+.guided-stage.needs_attention .guided-stage-index,
+.guided-stage.needs_attention .guided-stage-state { color: var(--warn); }
+.guided-stage.later,
+.guided-stage.unavailable { color: var(--ink-2); }
+.loading-stage { color: var(--ink-3); }
+.project-record {
+  margin: 7px 4px 2px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 0;
+}
+.project-record > summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  list-style: none;
+}
+.project-record > summary::-webkit-details-marker { display: none; }
+.project-record > summary::after { content: "+"; color: var(--ink-3); margin-left: auto; }
+.project-record[open] > summary::after { content: "−"; }
+.project-record > summary:hover { background: var(--surface-2); color: var(--ink); }
+.project-record > summary > span:last-child {
+  order: 2;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.project-record ul { list-style: none; margin: 7px 0 5px; }
+.project-record li { margin: 2px 0; }
+.project-record li > a {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.project-record li > a:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.project-record li > a[aria-current="page"] { color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+.project-record li > a span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.project-record li > a span:last-child { flex-shrink: 0; font-family: var(--mono); font-size: 9.5px; }
+.project-record li.complete > a span:last-child { color: var(--ok); }
+.project-record li.needs_attention > a span:last-child { color: var(--warn); }
+.guided-utilities { display: grid; gap: 2px; }
+.guided-utilities > h2 { margin-bottom: 5px; }
+.guided-utilities a,
+.guided-utilities button {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.guided-utilities a:hover,
+.guided-utilities button:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.guided-utilities .active { color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+.mobile-shell-header,
+.mobile-drawer-layer { display: none; }
 
 /* the main pane fills everything right of the sidebar; content is centered
    inside it (main-inner) so wide monitors get intentional margins instead of
@@ -411,6 +625,7 @@ details.help .help-body li { margin: 4px 0; }
 /* borderless steps since M13E.4 — the strip reads as one instrument row, not
    seven more boxes; state lives in the dot and a quiet tint */
 .loop { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 16px 0 20px; }
+.guided-loop { list-style: none; }
 .loop .step {
   display: flex; align-items: center; gap: 7px;
   background: var(--surface-2);
@@ -428,6 +643,15 @@ details.help .help-body li { margin: 4px 0; }
 .loop .dot.done { background: var(--ok); }
 .loop .dot.draft { background: var(--accent); }
 .loop .dot.stale { background: var(--warn); }
+.loop .step.complete .dot { background: var(--ok); }
+.loop .step.continue,
+.loop .step.ready { background: var(--accent-bg); color: var(--ink); }
+.loop .step.continue .dot,
+.loop .step.ready .dot { background: var(--accent); }
+.loop .step.needs_attention { background: var(--warn-bg); color: var(--ink); }
+.loop .step.needs_attention .dot { background: var(--warn); }
+.loop .step.later,
+.loop .step.unavailable { background: transparent; color: var(--ink-2); }
 
 /* ---- tasks -------------------------------------------------------------- */
 
@@ -1900,35 +2124,120 @@ hr.rule { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
 /* ---- app shell on small screens --------------------------------------------- */
 
-/* below tablet width the sidebar becomes a wrapping top bar: brand row, then
-   nav links, with account/sign-out inline — the main pane gets the full width */
+
+/* M16N: the same guided model becomes a focus-managed drawer below tablet
+   width. These rules intentionally follow the legacy top-bar block so the
+   reviewed deep-link shell keeps one responsive source of truth. */
 @media (max-width: 840px) {
   .shell { flex-direction: column; }
-  .sidebar {
-    position: static;
-    height: auto;
-    width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
+  .desktop-sidebar { display: none; }
+  .mobile-shell-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: 58px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 2px 4px;
-    padding: 10px 12px;
-    border-right: none;
+    gap: 12px;
+    padding: 8px 14px;
     border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(14px);
   }
-  .sidebar .brand { width: 100%; padding: 2px 8px 8px; }
-  .sidebar .nav-section { padding: 4px 6px 4px; }
-  .sidebar .nav-link { padding: 5px 9px; font-size: 12.5px; }
-  .sidebar button.nav-link { width: auto; }
-  .sidebar .sidebar-footer {
-    margin-top: 0;
-    margin-left: auto;
-    border-top: none;
-    padding-top: 0;
+  .mobile-brand {
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--ink);
+    font-size: 14px;
+  }
+  .mobile-brand span { color: var(--accent); }
+  .mobile-brand:hover { text-decoration: none; }
+  .mobile-current-step {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-2);
+    font-size: 12px;
+    text-align: center;
+  }
+  .mobile-menu-button {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .mobile-drawer-layer { position: fixed; inset: 0; z-index: 100; display: block; }
+  .mobile-drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: 0;
+    background: rgba(5, 5, 9, 0.72);
+    cursor: default;
+  }
+  .mobile-drawer {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(360px, calc(100vw - 24px));
+    height: 100dvh;
+    overflow-y: auto;
+    padding: 14px 12px 18px;
+    border-right: 1px solid var(--border-strong);
+    background: var(--surface);
+    box-shadow: 24px 0 60px rgba(0, 0, 0, 0.48);
+    animation: drawer-in 0.16s ease-out;
+  }
+  @keyframes drawer-in { from { transform: translateX(-12px); opacity: 0; } }
+  .mobile-drawer-heading {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    gap: 12px;
   }
+  .mobile-drawer .brand {
+    padding: 4px 10px 10px;
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+  }
+  .mobile-drawer .brand span { color: var(--accent); }
+  .mobile-drawer-close {
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 24px;
+    cursor: pointer;
+  }
+  .mobile-drawer-close:hover { background: var(--surface-2); color: var(--ink); }
+  .mobile-drawer .guided-continue-link,
+  .mobile-drawer .project-home-link { min-height: 46px; }
+  .mobile-drawer .guided-stage { min-height: 38px; }
+  .mobile-drawer .project-record li > a,
+  .mobile-drawer .guided-utilities a,
+  .mobile-drawer .guided-utilities button { min-height: 44px; }
+  .mobile-drawer .sidebar-footer {
+    margin-top: 14px;
+    border-top: 1px solid var(--border);
+    padding: 14px 8px 0;
+    color: var(--ink-3);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .mobile-drawer .sidebar-footer .btn { margin-top: 8px; }
   .main { padding: 20px 14px 60px; }
 }
 

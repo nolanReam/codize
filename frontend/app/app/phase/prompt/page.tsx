@@ -432,7 +432,7 @@ export default function PromptBuilderPage() {
                 {wf.savedAt && (
                   <p className="muted" style={{ marginTop: 12 }}>
                     Use your prompt in your AI coding tool. Then{" "}
-                    <Link href="/app/phase/import">bring back what changed →</Link>
+                    <Link href="/app/phase/import">Bring Back What Changed →</Link>
                   </p>
                 )}
               </>

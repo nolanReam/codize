@@ -327,7 +327,7 @@ function LegacyVerificationLab({
 
   return (
     <>
-      <h1 className="page-title">Verification Lab</h1>
+      <h1 className="page-title">Verification</h1>
       <p className="page-sub">
         A quick honesty check, not homework — mark what you actually tried. It lands in your
         Defense Report.
@@ -664,7 +664,7 @@ function LinkedVerificationBoard({
                     Review your decisions
                   </Link>
                   <Link className="btn primary" href="/app/phase/evidence">
-                    Continue to Evidence
+                    Continue Evidence
                   </Link>
                 </div>
               </div>
@@ -762,7 +762,7 @@ function LinkedVerificationBoard({
                   not-applicable items remain part of the project record.
                 </p>
                 <Link className="btn primary" href="/app/phase/evidence">
-                  Continue to Evidence
+                  Continue Evidence
                 </Link>
               </div>
             )}

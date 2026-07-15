@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
@@ -679,7 +680,7 @@ function LinkedEvidenceBoard({
                 <strong>Evidence record complete</strong>
                 <p>Every selected Verification result now has supporting Evidence or an explanation that Evidence is unavailable.</p>
                 <p>This records the Evidence available for these checks. It does not prove the entire implementation is correct.</p>
-                <Link className="btn primary" href="/app/phase">Return to Project Home</Link>
+                <GuidedContinueAction className="btn primary" />
               </div>
             )}
           </section>
@@ -798,7 +799,7 @@ function LegacyEvidencePanel({
 
   return (
     <>
-      <h1 className="page-title">Evidence Panel</h1>
+      <h1 className="page-title">Evidence</h1>
       <p className="page-sub">Keep one useful piece of supporting material for this phase.</p>
       <div className="workspace">
         <div>

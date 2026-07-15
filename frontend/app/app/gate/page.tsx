@@ -542,7 +542,7 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
               View Defense Report
             </Link>
             <Link href="/app" className="btn">
-              Back to cockpit
+              Back to Project Home
             </Link>
             <Link href="/app/phase" className="btn">
               Open Phase {outcome.current_phase}
@@ -577,16 +577,16 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
           View Defense Report
         </Link>
         <Link href="/app/phase/review" className="btn">
-          Revisit Review Board
+          Revisit Review
         </Link>
         <Link href="/app/phase/evidence" className="btn">
-          Evidence Panel
+          Evidence
         </Link>
         <Link href="/app/phase/verify" className="btn">
-          Verification Lab
+          Verification
         </Link>
         <button className="btn" onClick={onReset}>
-          Back to gate
+          Back to Project Defense
         </button>
       </div>
     </div>
@@ -645,7 +645,7 @@ function PassedView({ gate }: { gate: GateCurrent }) {
     <div className="card">
       <div className="notice ok">You&rsquo;ve passed this phase&rsquo;s defense.</div>
       <p style={{ marginTop: 12 }}>
-        This is the final phase&rsquo;s gate — there&rsquo;s nothing left to defend here. Pull
+        This is the final phase&rsquo;s Project Defense — there&rsquo;s nothing left to defend here. Pull
         everything together in your Project Defense Report.
       </p>
       <div className="row" style={{ marginTop: 14 }}>
@@ -653,7 +653,7 @@ function PassedView({ gate }: { gate: GateCurrent }) {
           Open Defense Report
         </Link>
         <Link href="/app" className="btn">
-          Cockpit
+          Project Home
         </Link>
       </div>
     </div>

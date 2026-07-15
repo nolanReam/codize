@@ -4,6 +4,7 @@
 // backend design and are shown as-is; 5xx bodies are never surfaced.
 
 import { getAccessToken } from "./supabase";
+import { GUIDED_NAVIGATION_REFRESH_EVENT } from "./guidedProjectNavigation";
 import { generationRequestBody } from "./changeMap";
 import { reviewInitializationBody } from "./review";
 import { verificationInitializationBody } from "./verification";
@@ -85,7 +86,18 @@ async function request<T>(
     throw new ApiError(0, "Couldn't reach the Codize backend. Is it running?");
   }
 
-  if (res.ok) return (await res.json()) as T;
+  if (res.ok) {
+    const body = (await res.json()) as T;
+    const method = init.method ?? "GET";
+    if (
+      method !== "GET" &&
+      path !== "/reconnection/acknowledge" &&
+      typeof window !== "undefined"
+    ) {
+      window.dispatchEvent(new Event(GUIDED_NAVIGATION_REFRESH_EVENT));
+    }
+    return body;
+  }
 
   let message =
     res.status >= 500

@@ -239,7 +239,7 @@ export default function BringBackPage() {
                 record now.
                 <div className="row" style={{ marginTop: 8 }}>
                   <Link href="/app/phase/change-map" style={{ color: "inherit", fontWeight: 700 }}>
-                    Create Change Map →
+                    Continue Change Map →
                   </Link>
                   <Link href="/app/phase" style={{ color: "inherit" }}>
                     Back to Build Loop

@@ -24,7 +24,7 @@ describe("Review page lifecycle contract", () => {
 
   it("navigates to Verification without prefilling or creating downstream records", () => {
     expect(source).toContain('href="/app/phase/verify"');
-    expect(source).toContain("Continue to Verification");
+    expect(source).toContain("Continue Verification");
     expect(source).not.toMatch(/saveWorkflowSection\([^)]*verification|createEvidence|verification suggestion/i);
   });
 

@@ -26,7 +26,7 @@ describe("Verification page lifecycle contract", () => {
 
   it("continues to Evidence by navigation only", () => {
     expect(source).toContain('href="/app/phase/evidence"');
-    expect(source).toContain("Continue to Evidence");
+    expect(source).toContain("Continue Evidence");
     expect(source).not.toMatch(/saveWorkflowSection\([^)]*evidence|createEvidence|prefillEvidence/i);
   });
 

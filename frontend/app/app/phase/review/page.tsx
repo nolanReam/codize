@@ -281,7 +281,7 @@ function LegacyReviewBoard({
 
   return (
     <>
-      <h1 className="page-title">Review Board</h1>
+      <h1 className="page-title">Review</h1>
       <p className="page-sub">
         Back from your AI tool? Note what it actually did before you build on it. Every field is
         optional — skip what you don&rsquo;t know.
@@ -602,7 +602,7 @@ function LinkedReviewBoard({
                   <p>No automatic targets need a decision in this Review.</p>
                 )}
                 <Link className="btn primary" href="/app/phase/verify">
-                  Continue to Verification
+                  Continue Verification
                 </Link>
               </div>
             )}

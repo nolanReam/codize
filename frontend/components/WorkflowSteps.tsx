@@ -1,112 +1,31 @@
 "use client";
 
-import Link from "next/link";
+import { useGuidedProjectNavigation } from "./GuidedProjectNavigationProvider";
 
-import { changeMapStepStatus } from "@/lib/changeMap";
-import { evidenceStepStatus } from "@/lib/evidence";
-import { reviewStepStatus } from "@/lib/review";
-import { verificationStepStatus } from "@/lib/verification";
-import type { StoredChangeMap, WorkflowSections } from "@/lib/types";
-
-// The Codize Build Loop as navigable steps. "Generate" is deliberately not a
-// page — that step happens in the student's external AI tool.
-const STEPS: {
-  label: string;
-  href: string | null;
-  section: keyof WorkflowSections | null;
-  changeMap?: boolean;
-  review?: boolean;
-  verification?: boolean;
-  evidence?: boolean;
-  note?: string;
-}[] = [
-  { label: "Plan + Prompt", href: "/app/phase/prompt", section: "prompt_builder" },
-  { label: "Generate", href: null, section: null, note: "in your AI tool" },
-  { label: "Bring Back", href: "/app/phase/import", section: "implementation_import" },
-  { label: "Change Map", href: "/app/phase/change-map", section: null, changeMap: true },
-  { label: "Review", href: "/app/phase/review", section: "review_board", review: true },
-  { label: "Verify", href: "/app/phase/verify", section: "verification", verification: true },
-  { label: "Evidence", href: "/app/phase/evidence", section: "evidence", evidence: true },
-  { label: "Explain", href: "/app/gate", section: null, note: "the gate" },
-  { label: "Commit / Reflect", href: "/app/report", section: null, note: "defense report" },
-];
-
-export default function WorkflowSteps({
-  sections,
-  changeMap,
-  current,
-}: {
-  sections: WorkflowSections | null;
-  changeMap?: StoredChangeMap | null;
-  current?: string;
-}) {
+// Compact page-level orientation driven by the same saved-state model as the
+// desktop and mobile shell. It is deliberately not a second set of module
+// links: the global Continue action owns forward navigation, while completed
+// work remains available through Project Record.
+export default function WorkflowSteps() {
+  const { navigation, state } = useGuidedProjectNavigation();
+  if (state === "error") {
+    return (
+      <p className="muted" role="status">
+        Project progress is temporarily unavailable. Your current page remains open.
+      </p>
+    );
+  }
   return (
-    <div className="loop">
-      {STEPS.map((step, idx) => {
-        const mapStatus = step.changeMap ? changeMapStepStatus(changeMap ?? null) : null;
-        const linkedReviewStatus = step.review
-          ? reviewStepStatus(sections?.review_board ?? null, changeMap ?? null)
-          : null;
-        const linkedVerificationStatus = step.verification
-          ? verificationStepStatus(
-              sections?.verification ?? null,
-              sections?.review_board ?? null
-            )
-          : null;
-        const linkedEvidenceStatus = step.evidence
-          ? evidenceStepStatus(
-              sections?.evidence ?? null,
-              sections?.verification ?? null
-            )
-          : null;
-        const done = step.changeMap
-          ? mapStatus?.tone === "done"
-          : step.review
-            ? linkedReviewStatus?.tone === "done"
-            : step.verification
-              ? linkedVerificationStatus?.tone === "done"
-              : step.evidence
-                ? linkedEvidenceStatus?.tone === "done"
-              : step.section != null && sections?.[step.section] != null;
-        const dotTone = step.changeMap
-          ? mapStatus?.tone
-          : step.review
-            ? linkedReviewStatus?.tone
-            : step.verification
-              ? linkedVerificationStatus?.tone
-              : step.evidence
-                ? linkedEvidenceStatus?.tone
-              : done
-                ? "done"
-                : "idle";
-        const note =
-          mapStatus?.label ??
-          linkedReviewStatus?.label ??
-          linkedVerificationStatus?.label ??
-          linkedEvidenceStatus?.label ??
-          step.note;
-        const inner = (
-          <>
-            <span className={`dot ${dotTone}`} />
-            <span className="n">{String(idx + 1).padStart(2, "0")}</span>
-            <span>{step.label}</span>
-            {note && <span className="n">({note})</span>}
-          </>
-        );
-        const cls = `step${current === step.label ? " current" : ""}`;
-        return (
-          <span key={step.label} style={{ display: "contents" }}>
-            {idx > 0 && <span className="sep">→</span>}
-            {step.href ? (
-              <Link href={step.href} className={cls}>
-                {inner}
-              </Link>
-            ) : (
-              <span className={cls}>{inner}</span>
-            )}
-          </span>
-        );
-      })}
-    </div>
+    <ol className="loop guided-loop" aria-label="Project journey" aria-busy={state === "loading"}>
+      {(state === "loading" ? [] : navigation.journey).map((step, index) => (
+        <li className={`step ${step.state}`} key={step.id}>
+          <span className={`dot ${step.state}`} aria-hidden="true" />
+          <span className="n">{String(index + 1).padStart(2, "0")}</span>
+          <span>{step.label}</span>
+          <span className="n">({step.stateLabel})</span>
+        </li>
+      ))}
+      {state === "loading" && <li className="loading" role="status">Loading project journey</li>}
+    </ol>
   );
 }

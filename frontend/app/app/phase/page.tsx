@@ -4,15 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import Async from "@/components/Async";
+import { useGuidedProjectNavigation } from "@/components/GuidedProjectNavigationProvider";
 import GuideCard from "@/components/GuideCard";
 import WorkflowSteps from "@/components/WorkflowSteps";
 import { ApiError, getCurrentPhase, getPhases, getWorkflow, setTaskCompletion } from "@/lib/api";
-import { derivePhaseNextStep } from "@/lib/changeMap";
 import { phaseGuide } from "@/lib/phaseGuide";
 import type {
   PhaseList,
   PhaseView,
-  StoredChangeMap,
   TaskEntry,
   WorkflowSections,
 } from "@/lib/types";
@@ -20,10 +19,10 @@ import type {
 // The Phase Workspace, framed around the Build Loop — the tasks are the
 // phase's raw material; the loop is how you work through them with AI.
 export default function PhaseBoardPage() {
+  const guided = useGuidedProjectNavigation();
   const [phase, setPhase] = useState<PhaseView | null>(null);
   const [phases, setPhases] = useState<PhaseList | null>(null);
   const [sections, setSections] = useState<WorkflowSections | null>(null);
-  const [changeMap, setChangeMap] = useState<StoredChangeMap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notReady, setNotReady] = useState(false);
@@ -40,7 +39,6 @@ export default function PhaseBoardPage() {
       if (list.status === "fulfilled") setPhases(list.value);
       if (workflow.status === "fulfilled") {
         setSections(workflow.value.sections);
-        setChangeMap(workflow.value.change_map);
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setNotReady(true);
@@ -85,7 +83,7 @@ export default function PhaseBoardPage() {
 
   // Change Map is an AI-drafted/student-reviewed step between the five
   // captured artifacts. It never changes the N/5 count above.
-  const nextStep = derivePhaseNextStep(sections, changeMap);
+  const nextStep = guided.navigation.continueAction;
 
   return (
     <Async loading={loading} error={error} onRetry={load}>
@@ -123,15 +121,34 @@ export default function PhaseBoardPage() {
               {/* The one obvious next step for this phase. */}
               <div className="card primary">
                 <h3>Next step</h3>
-                <p style={{ fontSize: 16, fontWeight: 600 }}>{nextStep.label}</p>
-                <p className="muted" style={{ marginTop: 4 }}>{nextStep.hint}</p>
-                <div className="row" style={{ marginTop: 12 }}>
-                  <Link href={nextStep.href} className="btn primary">
-                    {nextStep.label} →
-                  </Link>
-                </div>
+                {guided.state === "loading" ? (
+                  <p className="muted" role="status" aria-live="polite">
+                    Loading project progress…
+                  </p>
+                ) : guided.state === "error" ? (
+                  <div className="guided-navigation-error" role="alert">
+                    <span>Project progress is temporarily unavailable.</span>
+                    <button type="button" onClick={() => void guided.refresh()}>
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 16, fontWeight: 600 }}>{nextStep.label}</p>
+                    <p className="muted" style={{ marginTop: 4 }}>{nextStep.reason}</p>
+                    <div className="row" style={{ marginTop: 12 }}>
+                      {nextStep.href ? (
+                        <Link href={nextStep.href} className="btn primary">
+                          {nextStep.label} →
+                        </Link>
+                      ) : (
+                        <span className="muted">Available after the cooldown.</span>
+                      )}
+                    </div>
+                  </>
+                )}
                 <div style={{ marginTop: 12 }}>
-                  <WorkflowSteps sections={sections} changeMap={changeMap} />
+                  <WorkflowSteps />
                 </div>
               </div>
 
@@ -177,11 +194,11 @@ export default function PhaseBoardPage() {
               </div>
               {taskError && <div className="notice error">{taskError}</div>}
               <p className="muted" style={{ marginTop: 8 }}>
-                Tick these yourself as you finish building. Only the gate advances the phase.
+                Tick these yourself as you finish building. Only Project Defense advances the phase.
               </p>
 
               <div className="card" style={{ marginTop: 14 }}>
-                <h3>This phase&rsquo;s gate</h3>
+                <h3>This phase&rsquo;s Project Defense</h3>
                 <div className="kv">
                   <span className="k">You&rsquo;ll defend</span>
                   <span>{phase.explanation_gate_targets.join(" · ")}</span>
@@ -192,7 +209,7 @@ export default function PhaseBoardPage() {
                 </div>
                 <div className="row" style={{ marginTop: 12 }}>
                   <Link href="/app/gate" className="btn">
-                    Gate status
+                    Project Defense status
                   </Link>
                 </div>
               </div>
@@ -228,7 +245,7 @@ export default function PhaseBoardPage() {
                     </div>
                   ))}
                   <p className="muted" style={{ marginTop: 8 }}>
-                    Later phases open by passing gates, in order.
+                    Later phases open by passing each Project Defense, in order.
                   </p>
                 </div>
               )}

@@ -2,26 +2,17 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import GuidedProjectNav from "@/components/GuidedProjectNav";
+import GuidedProjectNavigationProvider, {
+  useGuidedProjectNavigation,
+} from "@/components/GuidedProjectNavigationProvider";
 import ReconnectionModal from "@/components/ReconnectionModal";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "@/components/Tutorial";
 import { acknowledgeReconnection, getReconnection } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
 import type { ReconnectionSummary } from "@/lib/types";
-
-const NAV = [
-  { href: "/app", label: "Cockpit", exact: true },
-  { href: "/app/phase", label: "Phase Workspace", exact: true },
-  { href: "/app/phase/prompt", label: "Prompt Builder" },
-  { href: "/app/phase/import", label: "Bring Back What Changed" },
-  { href: "/app/phase/change-map", label: "Change Map" },
-  { href: "/app/phase/review", label: "Review Board" },
-  { href: "/app/phase/evidence", label: "Evidence Panel" },
-  { href: "/app/phase/verify", label: "Verification Lab" },
-  { href: "/app/gate", label: "Project Defense" },
-  { href: "/app/report", label: "Defense Report" },
-];
 
 // One reconnection check per browser session. The contract (backend M11):
 // GET first on every login, THEN acknowledge — immediately when no modal is
@@ -109,59 +100,162 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!ready) return <div className="loading" style={{ padding: 40 }}>checking session</div>;
 
   return (
+    <GuidedProjectNavigationProvider>
+      <ShellFrame
+        email={email}
+        pathname={pathname}
+        onHelp={() => setShowTutorial(true)}
+        onSignOut={() => void signOut()}
+      >
+        {reconnection && (
+          <ReconnectionModal summary={reconnection} busy={ackBusy} onKeepBuilding={keepBuilding} />
+        )}
+        {/* the reconnection modal always wins; the tutorial waits its turn */}
+        {!reconnection && showTutorial && <Tutorial onClose={closeTutorial} />}
+        {children}
+      </ShellFrame>
+    </GuidedProjectNavigationProvider>
+  );
+}
+
+function ShellFrame({
+  children,
+  email,
+  pathname,
+  onHelp,
+  onSignOut,
+}: {
+  children: React.ReactNode;
+  email: string | null;
+  pathname: string;
+  onHelp: () => void;
+  onSignOut: () => void;
+}) {
+  const { navigation, state } = useGuidedProjectNavigation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const trigger = triggerRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusable = () =>
+      Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+        )
+      );
+    focusable()[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      trigger?.focus();
+    };
+  }, [mobileOpen]);
+
+  const closeMobile = () => setMobileOpen(false);
+  const openHelp = () => {
+    closeMobile();
+    window.setTimeout(onHelp, 0);
+  };
+
+  return (
     <div className="shell">
-      {reconnection && (
-        <ReconnectionModal summary={reconnection} busy={ackBusy} onKeepBuilding={keepBuilding} />
-      )}
-      {/* the reconnection modal always wins; the tutorial waits its turn */}
-      {!reconnection && showTutorial && <Tutorial onClose={closeTutorial} />}
-      <aside className="sidebar">
+      <aside className="sidebar desktop-sidebar">
         <div className="brand">
           CODIZE<span>_</span>
         </div>
-        <div className="nav-section">Workspace</div>
-        {NAV.slice(0, 2).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`nav-link${
-              (item.exact ? pathname === item.href : pathname.startsWith(item.href)) ? " active" : ""
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
-        <div className="nav-section">Build Loop</div>
-        {NAV.slice(2, 8).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`nav-link${pathname.startsWith(item.href) ? " active" : ""}`}
-          >
-            {item.label}
-          </Link>
-        ))}
-        <div className="nav-section">Defend</div>
-        {NAV.slice(8).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`nav-link${pathname.startsWith(item.href) ? " active" : ""}`}
-          >
-            {item.label}
-          </Link>
-        ))}
-        <div className="nav-section">Help</div>
-        <button className="nav-link" onClick={() => setShowTutorial(true)}>
-          How Codize works
-        </button>
-        <div className="sidebar-footer">
-          <div style={{ marginBottom: 8 }}>{email}</div>
-          <button className="btn small" onClick={signOut}>
-            Sign out
-          </button>
-        </div>
+        <GuidedProjectNav
+          pathname={pathname}
+          email={email}
+          idPrefix="desktop"
+          onHelp={onHelp}
+          onSignOut={onSignOut}
+        />
       </aside>
+
+      <header className="mobile-shell-header">
+        <Link href="/app" className="mobile-brand" aria-label="Codize Project Home">
+          CODIZE<span>_</span>
+        </Link>
+        <span className="mobile-current-step">
+          {state === "ready" ? navigation.continueAction.label : "Project navigation"}
+        </span>
+        <button
+          ref={triggerRef}
+          type="button"
+          className="mobile-menu-button"
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-project-navigation"
+          onClick={() => setMobileOpen(true)}
+        >
+          <span aria-hidden="true">☰</span>
+          <span>Menu</span>
+        </button>
+      </header>
+
+      {mobileOpen && (
+        <div className="mobile-drawer-layer">
+          <button
+            type="button"
+            className="mobile-drawer-backdrop"
+            aria-label="Close project navigation"
+            onClick={closeMobile}
+          />
+          <div
+            ref={drawerRef}
+            id="mobile-project-navigation"
+            className="mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Project navigation menu"
+          >
+            <div className="mobile-drawer-heading">
+              <div className="brand">
+                CODIZE<span>_</span>
+              </div>
+              <button type="button" className="mobile-drawer-close" onClick={closeMobile}>
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">Close project navigation</span>
+              </button>
+            </div>
+            <GuidedProjectNav
+              pathname={pathname}
+              email={email}
+              idPrefix="mobile"
+              onNavigate={closeMobile}
+              onHelp={openHelp}
+              onSignOut={onSignOut}
+            />
+          </div>
+        </div>
+      )}
+
       <main className="main">
         <div className="main-inner">{children}</div>
       </main>

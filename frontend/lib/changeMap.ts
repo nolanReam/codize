@@ -15,17 +15,7 @@ import type {
   StudentAddedChangeMapDecision,
   WorkflowSections,
 } from "./types";
-import { isLinkedEvidenceArtifact } from "./evidence";
-import {
-  isLinkedReviewArtifact,
-  linkedReviewAllowsVerification,
-  targetFormFromReview,
-} from "./review";
-import {
-  isLinkedVerificationArtifact,
-  linkedVerificationRecorded,
-  targetFormFromVerification,
-} from "./verification";
+import { buildGuidedProjectNavigation } from "./guidedProjectNavigation";
 
 export const CHANGE_MAP_TEXT_MAX = 600;
 export const CHANGE_MAP_NOTE_MAX = 1_000;
@@ -503,145 +493,27 @@ export function derivePhaseNextStep(
   sections: WorkflowSections | null,
   map: StoredChangeMap | null
 ): PhaseNextStep {
-  if (!sections?.prompt_builder) {
-    return {
-      label: "Plan your prompt",
-      href: "/app/phase/prompt",
-      hint: "Turn this phase into one clear ask for your AI tool.",
-    };
-  }
-  if (!sections.implementation_import) {
-    return {
-      label: "Bring Back What Changed",
-      href: "/app/phase/import",
-      hint: "Back from your AI tool? Add the response, diff, changed files, or your own notes.",
-    };
-  }
-  if (!map) {
-    return {
-      label: "Create Change Map",
-      href: "/app/phase/change-map",
-      hint: "Turn the material you brought back into a draft you can review and correct.",
-    };
-  }
-  if (map.stale) {
-    return {
-      label: "Regenerate Change Map",
-      href: "/app/phase/change-map",
-      hint: "Your implementation material changed—review a fresh draft before continuing.",
-    };
-  }
-  if (map.status !== "confirmed") {
-    return {
-      label: "Review Change Map",
-      href: "/app/phase/change-map",
-      hint: "Decide what looks right, what needs correction, and what still needs inspection.",
-    };
-  }
-  if (!sections.review_board) {
-    return {
-      label: "Start Review",
-      href: "/app/phase/review",
-      hint: "Carry the confirmed implementation items forward and make your own decisions.",
-    };
-  }
-  if (isLinkedReviewArtifact(sections.review_board)) {
-    if (sections.review_board.stale) {
-      return {
-        label: "Rebuild Review",
-        href: "/app/phase/review",
-        hint: "Your Change Map changed—deliberately rebuild Review before continuing.",
-      };
-    }
-    const reviewState = targetFormFromReview(sections.review_board);
-    if (!linkedReviewAllowsVerification(sections.review_board, reviewState)) {
-      return {
-        label: "Continue Review",
-        href: "/app/phase/review",
-        hint: "Record a decision for each implementation item, including honest uncertainty.",
-      };
-    }
-    if (!sections.verification) {
-      return {
-        label: "Start Verification",
-        href: "/app/phase/verify",
-        hint: "Review is recorded. Explicitly create suggested checks, then perform them yourself.",
-      };
-    }
-    if (isLinkedVerificationArtifact(sections.verification)) {
-      if (sections.verification.stale) {
-        return {
-          label: "Rebuild Verification",
-          href: "/app/phase/verify",
-          hint: "Review changed—deliberately rebuild the checks before recording more results.",
-        };
-      }
-      const verificationState = targetFormFromVerification(sections.verification);
-      if (
-        sections.verification.verification_targets.length > 0 &&
-        !linkedVerificationRecorded(sections.verification, verificationState)
-      ) {
-        return {
-          label: "Continue Verification",
-          href: "/app/phase/verify",
-          hint: "Perform each suggested check and record what actually happened.",
-        };
-      }
-      if (!sections.evidence) {
-        return {
-          label: "Start Evidence",
-          href: "/app/phase/evidence",
-          hint: "Verification is recorded. Deliberately choose performed checks to support.",
-        };
-      }
-      if (isLinkedEvidenceArtifact(sections.evidence)) {
-        if (sections.evidence.stale) {
-          return {
-            label: "Rebuild Evidence",
-            href: "/app/phase/evidence",
-            hint: "Verification changed—keep the old record visible and deliberately rebuild from current results.",
-          };
-        }
-        if (!sections.evidence.evidence_record_complete) {
-          return {
-            label: "Continue Evidence",
-            href: "/app/phase/evidence",
-            hint: "Add supporting material or explain why Evidence is unavailable for each selected check.",
-          };
-        }
-        return {
-          label: "Start the defense",
-          href: "/app/gate",
-          hint: "The Evidence record is complete. Explain the implementation in your own words.",
-        };
-      }
-    }
-    if (!sections.evidence) {
-      return {
-        label: "Save supporting Evidence",
-        href: "/app/phase/evidence",
-        hint: "Record a test output, screenshot note, commit, or other student-provided support.",
-      };
-    }
-  }
-  // Legacy/manual Review keeps its established evidence-first continuation.
-  if (!sections.evidence) {
-    return {
-      label: "Save supporting Evidence",
-      href: "/app/phase/evidence",
-      hint: "Record a test output, screenshot note, commit, or other student-provided support.",
-    };
-  }
-  if (!sections.verification) {
-    return {
-      label: "Run a quick check",
-      href: "/app/phase/verify",
-      hint: "Mark what you actually checked. Skipped is allowed.",
-    };
-  }
+  const navigation = buildGuidedProjectNavigation({
+    evaluation: {
+      state: "gate_ready",
+      project_status: "active",
+      next_action: "",
+      current_phase: 1,
+      phase_title: "",
+      total_phases: 1,
+      completed_phases: 0,
+      completed_task_count: 0,
+      total_task_count: 0,
+      incomplete_tasks: [],
+      recent_gate: null,
+      unlocks: [],
+    },
+    workflow: sections ? { phase: 1, sections, change_map: map } : null,
+    gate: { phase: 1, phase_title: "", state: "not_started" },
+  });
   return {
-    label: "Start the defense",
-    href: "/app/gate",
-    hint: "All five workflow records are captured. Explain what you built in your own words.",
+    label: navigation.continueAction.label,
+    href: navigation.continueAction.href ?? "/app/phase",
+    hint: navigation.continueAction.reason,
   };
 }

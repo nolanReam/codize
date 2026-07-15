@@ -1,93 +1,61 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import Async from "@/components/Async";
+import { GuidedContinueAction } from "@/components/GuidedProjectNav";
+import { useGuidedProjectNavigation } from "@/components/GuidedProjectNavigationProvider";
 import GuideCard from "@/components/GuideCard";
 import LoopOverview from "@/components/LoopOverview";
 import WorkflowSteps from "@/components/WorkflowSteps";
-import { ApiError, getEvaluation, getIntakeStatus, getWorkflow } from "@/lib/api";
-import type { Evaluation, StoredChangeMap, WorkflowSections } from "@/lib/types";
 
-// Cooldown is amber, not red — it's a wait, not an error (M13E.4).
-const STATE_PILL: Record<string, { label: string; cls: string }> = {
-  in_progress: { label: "IN PROGRESS", cls: "accent" },
-  gate_ready: { label: "GATE READY", cls: "warn" },
-  cooldown: { label: "GATE COOLDOWN", cls: "warn" },
-  complete: { label: "ROADMAP COMPLETE", cls: "ok" },
-};
-
-// The Project Cockpit — the dashboard for your (currently one) project. A
-// brand-new user never lands here: the spec routes signup straight into
-// intake question 1, so this page always has a project to show.
-export default function CockpitPage() {
+// `/app` remains the stable route while the visible student-facing name is
+// Project Home. The one-project selection contract and disabled new-project
+// action are unchanged.
+export default function ProjectHomePage() {
   const router = useRouter();
-  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
-  const [sections, setSections] = useState<WorkflowSections | null>(null);
-  const [changeMap, setChangeMap] = useState<StoredChangeMap | null>(null);
-  const [purpose, setPurpose] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const ev = await getEvaluation();
-      // Spec: a new user goes straight to intake question 1 — no dashboard.
-      if (ev.state === "not_started" || ev.state === "intake_needed" || ev.state === "roadmap_needed") {
-        router.replace("/app/intake");
-        return;
-      }
-      setEvaluation(ev);
-      const [workflow, intake] = await Promise.allSettled([
-        getWorkflow(ev.current_phase ?? 1),
-        getIntakeStatus(),
-      ]);
-      if (workflow.status === "fulfilled") {
-        setSections(workflow.value.sections);
-        setChangeMap(workflow.value.change_map);
-      }
-      if (intake.status === "fulfilled") setPurpose(intake.value.answers?.purpose ?? null);
-      setLoading(false);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't load your workspace.");
-      setLoading(false);
-    }
-  }, [router]);
+  const { state, error, navigation, evaluation, workflow, refresh } =
+    useGuidedProjectNavigation();
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (
+      state === "ready" &&
+      evaluation &&
+      (evaluation.state === "not_started" ||
+        evaluation.state === "intake_needed" ||
+        evaluation.state === "roadmap_needed")
+    ) {
+      router.replace("/app/intake");
+    }
+  }, [evaluation, router, state]);
 
-  const pill = evaluation ? STATE_PILL[evaluation.state] : undefined;
-  const savedCount = sections
-    ? Object.values(sections).filter((s) => s != null).length
+  const pill = state === "ready" && evaluation
+    ? evaluation.state === "complete" || navigation.continueAction.stageId === "report"
+      ? { label: "ROADMAP COMPLETE", cls: "ok" }
+      : evaluation.state === "cooldown"
+        ? { label: "DEFENSE COOLDOWN", cls: "warn" }
+        : navigation.continueAction.stageId === "defense"
+          ? {
+              label: navigation.continueAction.label.startsWith("Continue")
+                ? "DEFENSE ACTIVE"
+                : navigation.continueAction.label.startsWith("Try")
+                  ? "DEFENSE RETRY"
+                  : "DEFENSE READY",
+              cls: "warn",
+            }
+          : { label: "IN PROGRESS", cls: "accent" }
+    : undefined;
+  const savedCount = workflow
+    ? Object.values(workflow.sections).filter((section) => section != null).length
     : 0;
-  const defenseAction = evaluation
-    ? evaluation.state === "complete"
-      ? { href: `/app/report?phase=${evaluation.current_phase ?? 1}`, label: "View Defense Report" }
-      : evaluation.state === "gate_ready"
-        ? {
-            href: "/app/gate",
-            label:
-              evaluation.recent_gate?.outcome === "in_progress"
-                ? "Continue the defense"
-                : "Start the defense",
-          }
-        : evaluation.state === "cooldown"
-          ? { href: "/app/gate", label: "View Defense status" }
-          : { href: "/app/phase", label: "Continue project" }
-    : null;
 
   return (
     <>
       <div className="spread">
         <div>
-          <h1 className="page-title">Project Cockpit</h1>
-          <p className="page-sub">Where you are, and the one thing to do next.</p>
+          <h1 className="page-title">Project Home</h1>
+          <p className="page-sub">Your project, current step, and saved record.</p>
         </div>
         <div className="row">
           {pill && <span className={`pill ${pill.cls}`}>{pill.label}</span>}
@@ -101,44 +69,37 @@ export default function CockpitPage() {
         </div>
       </div>
 
-      <Async loading={loading} error={error} onRetry={load}>
-        {evaluation && (
+      <Async
+        loading={state === "loading"}
+        error={state === "error" ? error ?? "Project progress is temporarily unavailable." : null}
+        onRetry={refresh}
+      >
+        {evaluation && workflow && (
           <div className="workspace">
             <div>
-              {/* 1. The one thing to do next — the page's primary action. */}
               <div className="card primary">
-                <h3>Do this next</h3>
-                <p style={{ fontSize: 17, fontWeight: 600 }}>{evaluation.next_action}</p>
+                <h3>Continue</h3>
+                <p style={{ fontSize: 17, fontWeight: 600 }}>
+                  {navigation.continueAction.label}
+                </p>
+                <p className="muted" style={{ marginTop: 4 }}>
+                  {navigation.continueAction.reason}
+                </p>
                 <div className="row" style={{ marginTop: 12 }}>
-                  {defenseAction && (
-                    <Link href={defenseAction.href} className="btn primary">
-                      {defenseAction.label}
-                    </Link>
-                  )}
-                  {evaluation.state === "cooldown" &&
-                    evaluation.cooldown_seconds_remaining != null && (
-                      <span className="muted">
-                        Gate retry in ~{Math.ceil(evaluation.cooldown_seconds_remaining / 60)} min
-                        — good time to review your work.
-                      </span>
-                    )}
+                  <GuidedContinueAction className="btn primary" />
                 </div>
                 <LoopOverview />
               </div>
 
-              {/* 2. The project, and all progress in one compact card. */}
               <div className="card" style={{ marginTop: 14 }}>
-                <h3>Your project</h3>
-                {purpose ? (
-                  <p style={{ fontSize: 16, fontWeight: 600 }}>&ldquo;{purpose}&rdquo;</p>
-                ) : (
-                  <p className="empty">Your intake purpose will appear here.</p>
-                )}
+                <h3>Active project</h3>
+                <p style={{ fontSize: 16, fontWeight: 600, overflowWrap: "anywhere" }}>
+                  &ldquo;{navigation.projectLabel}&rdquo;
+                </p>
                 <div className="kv" style={{ marginTop: 10 }}>
                   <span className="k">Phase</span>
                   <span>
-                    {evaluation.current_phase} of {evaluation.total_phases} —{" "}
-                    {evaluation.phase_title}
+                    {evaluation.current_phase} of {evaluation.total_phases} — {evaluation.phase_title}
                   </span>
                 </div>
                 <div className="kv">
@@ -153,7 +114,7 @@ export default function CockpitPage() {
                 </div>
                 {evaluation.recent_gate && (
                   <div className="kv">
-                    <span className="k">Latest gate</span>
+                    <span className="k">Latest Defense</span>
                     <span
                       className={`pill ${
                         evaluation.recent_gate.outcome === "passed"
@@ -169,32 +130,21 @@ export default function CockpitPage() {
                 )}
               </div>
 
-              {/* 3. The loop strip — visual, links to each step. */}
               <div className="card" style={{ marginTop: 14 }}>
-                <h3>Build Loop — Phase {evaluation.current_phase}</h3>
-                <WorkflowSteps sections={sections} changeMap={changeMap} />
-                <div className="row" style={{ marginTop: 10 }}>
-                  {(evaluation.state === "complete" || evaluation.state === "cooldown") && (
-                    <Link
-                      href={`/app/report?phase=${evaluation.current_phase ?? 1}`}
-                      className="btn small"
-                    >
-                      View Defense Report
-                    </Link>
-                  )}
-                  <span className="muted">
-                    The Defense Report becomes available after a completed attempt.
-                  </span>
-                </div>
+                <h3>Journey — Phase {evaluation.current_phase}</h3>
+                <WorkflowSteps />
+                <p className="muted">
+                  Completed work stays available in Project Record. Complete means saved, not independently verified.
+                </p>
               </div>
 
               {evaluation.unlocks && evaluation.unlocks.length > 0 && (
                 <div className="card" style={{ marginTop: 14 }}>
                   <h3>Unlocked</h3>
-                  {evaluation.unlocks.map((u) => (
-                    <div className="kv" key={u.id}>
-                      <span className="k">Phase {u.phase}</span>
-                      <span>{u.description}</span>
+                  {evaluation.unlocks.map((unlock) => (
+                    <div className="kv" key={unlock.id}>
+                      <span className="k">Phase {unlock.phase}</span>
+                      <span>{unlock.description}</span>
                     </div>
                   ))}
                 </div>
@@ -202,71 +152,20 @@ export default function CockpitPage() {
             </div>
 
             <aside className="ws-rail" aria-label="Guidance">
-              <GuideCard title="Feeling lost?">
+              <GuideCard title="Project Home">
                 <p>
-                  That&rsquo;s normal on day one. Open <strong>How Codize works</strong> in the
-                  sidebar for the whole loop in nine short steps.
-                </p>
-                <p>
-                  The short version: <strong>Continue project</strong> takes you to your current
-                  phase. Everything else follows from there.
+                  Continue follows the earliest saved step that needs work. Opening an older record does not change it.
                 </p>
               </GuideCard>
-              <GuideCard title="What these words mean">
-                <details className="help">
-                  <summary>Phase</summary>
-                  <div className="help-body">
-                    <p>
-                      One slice of your project (like &ldquo;login&rdquo; or &ldquo;database&rdquo;).
-                      Your roadmap is a fixed sequence of phases; you&rsquo;re always working
-                      exactly one.
-                    </p>
-                  </div>
-                </details>
-                <details className="help">
-                  <summary>Build Loop</summary>
-                  <div className="help-body">
-                    <p>
-                      The work rhythm inside each phase: plan your AI prompt → generate in your
-                      AI tool → review what changed → collect evidence → verify it works →
-                      defend it.
-                    </p>
-                  </div>
-                </details>
-                <details className="help">
-                  <summary>Artifact</summary>
-                  <div className="help-body">
-                    <p>
-                      Anything you save in Codize along the way — your prompt, your review notes,
-                      your evidence, your verification results. They become your Defense Report.
-                    </p>
-                  </div>
-                </details>
-                <details className="help">
-                  <summary>Project Defense (the gate)</summary>
-                  <div className="help-body">
-                    <p>
-                      A short conversation at the end of each phase where you explain what you
-                      built in your own words. Passing it opens the next phase. It&rsquo;s not a
-                      quiz on textbook facts — it&rsquo;s about <em>your</em> project.
-                    </p>
-                  </div>
-                </details>
-                <details className="help">
-                  <summary>Unlock</summary>
-                  <div className="help-body">
-                    <p>
-                      A bonus (like a pre-built component) Codize grants when you&rsquo;re building
-                      consistently well. You can&rsquo;t grind for them — just keep understanding
-                      what you ship.
-                    </p>
-                  </div>
-                </details>
+              <GuideCard title="Two kinds of progress">
+                <p>
+                  Build tasks track the work you perform. Workflow records capture what you planned, reviewed, tested, and recorded.
+                </p>
+                <p>Only Project Defense advances the roadmap phase.</p>
               </GuideCard>
               <GuideCard title="More projects?">
                 <p>
-                  Codize supports one project per account right now, so you can finish what you
-                  started. Multi-project support is planned.
+                  Codize supports one project per account right now. The existing project remains selected here.
                 </p>
               </GuideCard>
             </aside>

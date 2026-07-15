@@ -117,6 +117,25 @@ Before adding anything, check it against the spec: is it explicitly required, is
 
 Report only verified work: audit each completion claim against actual test/tool/MCP output. If something is unverified or failed, say so — never fabricate progress.
 
+## Guided project shell (M16N)
+
+Protected-app navigation has one source of truth:
+`frontend/lib/guidedProjectNavigation.ts`, loaded by
+`GuidedProjectNavigationProvider`. Project Home (`/app`) is always first;
+Continue selects the earliest saved actionable/stale dependency; Journey shows
+the implemented Prompt → Import → Change Map → Review → Verification →
+Evidence → Project Defense → Defense Report order; Project Record holds saved
+and historical deep links. Future Journey rows are non-interactive. Active
+route (`aria-current`) is independent from lifecycle status.
+
+Never progress this shell from local drafts, the currently open route, or
+linked Evidence presence. Use saved artifacts, confirmed/stale Change Map,
+saved Review/Verification decisions, server `evidence_record_complete`, and
+evaluation/gate lifecycle. Manual and legacy workflow order remains supported;
+stale records stay readable and are rebuilt only by the existing explicit page
+actions. Desktop and the focus-managed mobile drawer consume the same model.
+Do not create a parallel sidebar or change workflow N/5.
+
 ## Skill usage
 
 Before implementation, read the relevant local skill files under `.claude/skills/`:
