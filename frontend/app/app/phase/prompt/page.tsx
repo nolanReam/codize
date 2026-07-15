@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
@@ -171,6 +172,7 @@ export default function PromptBuilderPage() {
         One clear ask beats a long conversation. Tap a starter if you&rsquo;re not sure — Codize
         turns it into a strong prompt.
       </p>
+      <AdaptiveStepGuide stage="prompt" />
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>
         <div className="workspace">

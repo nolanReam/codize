@@ -14,6 +14,8 @@ import type {
   ChangeMapUpdateRequest,
   DefenseContextSummary,
   DefenseReport,
+  EntryProfileResponse,
+  EntryProfileUpdate,
   Evaluation,
   EvidenceHandoffPreview,
   EvidenceInitializationResponse,
@@ -121,6 +123,10 @@ async function request<T>(
 export const getIntakeQuestions = () =>
   request<{ questions: IntakeQuestion[] }>("/intake/questions");
 export const getIntakeStatus = () => request<IntakeStatus>("/intake/status");
+export const getEntryProfile = () =>
+  request<EntryProfileResponse>("/intake/entry-profile");
+export const updateEntryProfile = (body: EntryProfileUpdate) =>
+  request<EntryProfileResponse>("/intake/entry-profile", { method: "PUT", body });
 export const submitIntakeAnswer = (question: number, answer: string) =>
   request<IntakeStatus>("/intake/answers", { method: "POST", body: { question, answer } });
 export const completeIntake = () =>

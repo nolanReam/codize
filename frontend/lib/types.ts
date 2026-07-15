@@ -23,6 +23,34 @@ export interface IntakeCompleteResult {
   archetype_name: string;
 }
 
+export type EntrySituation = "starting_fresh" | "already_building" | "stuck";
+export type CodingConfidence = "new_to_code" | "know_basics" | "comfortable";
+export type AiChangeState = "yes" | "not_yet" | "unsure";
+export type RecommendedStart = "prompt_builder" | "implementation_import" | "quick_start";
+export type GuidanceDepth = "more" | "standard" | "minimal";
+
+export interface EntryProfile {
+  schema_version: "1.0";
+  current_situation: EntrySituation | null;
+  coding_confidence: CodingConfidence | null;
+  ai_changed_files: AiChangeState | null;
+  completed: boolean;
+  recommended_start: RecommendedStart | null;
+  guidance_depth: GuidanceDepth;
+  recovery_emphasis: boolean;
+  updated_at: string;
+}
+
+export interface EntryProfileResponse {
+  profile: EntryProfile | null;
+}
+
+export interface EntryProfileUpdate {
+  current_situation?: EntrySituation;
+  coding_confidence?: CodingConfidence;
+  ai_changed_files?: AiChangeState;
+}
+
 export interface TaskEntry {
   task_id: string;
   description: string;

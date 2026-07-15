@@ -18,6 +18,9 @@ itself (`template_service.resolve_archetype`) is fixed and never changes.
 import re
 from datetime import datetime, timezone
 
+from pydantic import ValidationError
+
+from app.schemas.intake import EntryProfileView
 from app.services import template_service
 from app.services.project_repository import ProjectRepository
 
@@ -68,6 +71,11 @@ ANSWER_KEYS = {q["number"]: q["key"] for q in QUESTIONS}
 
 MAX_ANSWER_LENGTH = 4000
 
+# M17 keeps adaptive entry beside (not inside) the phase-scoped workflow
+# records. Existing readers select only numeric phase keys, so this reserved
+# top-level key cannot become a workflow section or affect N/5 progress.
+ENTRY_PROFILE_KEY = "_entry_profile"
+
 ARCHETYPE_NAMES = {aid: name for aid, name in template_service.EXPECTED_TEMPLATES.values()}
 
 
@@ -89,6 +97,137 @@ class IntakeIncompleteError(IntakeError):
 
 class IntakeAlreadyCompletedError(IntakeError):
     """Intake for this project is already completed."""
+
+
+class InvalidEntryProfileError(IntakeError):
+    """Adaptive-entry choices are inconsistent or invalid."""
+
+
+_GUIDANCE_DEPTH = {
+    "new_to_code": "more",
+    "know_basics": "standard",
+    "comfortable": "minimal",
+}
+
+
+def _recommend_start(
+    current_situation: str | None, ai_changed_files: str | None
+) -> str | None:
+    if current_situation == "starting_fresh":
+        return "prompt_builder"
+    if current_situation == "stuck":
+        return "quick_start"
+    if current_situation == "already_building":
+        if ai_changed_files == "not_yet":
+            return "prompt_builder"
+        if ai_changed_files in {"yes", "unsure"}:
+            return "implementation_import"
+    return None
+
+
+def _profile_view(
+    *,
+    current_situation: str | None,
+    coding_confidence: str | None,
+    ai_changed_files: str | None,
+    updated_at: str,
+) -> dict:
+    if current_situation != "already_building":
+        ai_changed_files = None
+    recommended_start = _recommend_start(current_situation, ai_changed_files)
+    completed = bool(current_situation and coding_confidence and recommended_start)
+    return {
+        "schema_version": "1.0",
+        "current_situation": current_situation,
+        "coding_confidence": coding_confidence,
+        "ai_changed_files": ai_changed_files,
+        "completed": completed,
+        "recommended_start": recommended_start if completed else None,
+        "guidance_depth": _GUIDANCE_DEPTH.get(coding_confidence, "standard"),
+        "recovery_emphasis": current_situation == "stuck",
+        "updated_at": updated_at,
+    }
+
+
+def entry_profile_from_project(project: dict | None) -> dict | None:
+    """Return a validated, server-rederived view; malformed history is absent.
+
+    Re-deriving the recommendation prevents persisted derived fields from ever
+    becoming lifecycle authority. The stored student choices remain the only
+    inputs.
+    """
+    artifacts = project.get("workflow_artifacts") if project else None
+    raw = artifacts.get(ENTRY_PROFILE_KEY) if isinstance(artifacts, dict) else None
+    if not isinstance(raw, dict):
+        return None
+    try:
+        stored = EntryProfileView.model_validate(raw)
+    except ValidationError:
+        return None
+    view = _profile_view(
+        current_situation=stored.current_situation,
+        coding_confidence=stored.coding_confidence,
+        ai_changed_files=stored.ai_changed_files,
+        updated_at=stored.updated_at,
+    )
+    try:
+        return EntryProfileView.model_validate(view).model_dump(mode="json")
+    except ValidationError:
+        return None
+
+
+async def get_entry_profile(repo: ProjectRepository, user_id: str) -> dict:
+    return {"profile": entry_profile_from_project(await repo.get_project(user_id))}
+
+
+async def update_entry_profile(
+    repo: ProjectRepository, user_id: str, updates: dict
+) -> dict:
+    """Merge student choices and patch only workflow_artifacts.
+
+    This may create the user's existing one-project row before Q1. It never
+    writes intake answers, classification, roadmap, status, phase, workflow
+    sections, drafts, or downstream records.
+    """
+    project = await repo.get_project(user_id)
+    current = entry_profile_from_project(project)
+    situation = updates.get(
+        "current_situation", current.get("current_situation") if current else None
+    )
+    confidence = updates.get(
+        "coding_confidence", current.get("coding_confidence") if current else None
+    )
+    ai_changed = updates.get(
+        "ai_changed_files", current.get("ai_changed_files") if current else None
+    )
+    if "current_situation" in updates and situation != "already_building":
+        ai_changed = None
+    if ai_changed is not None and situation != "already_building":
+        raise InvalidEntryProfileError(
+            "AI change status applies only when you are already building."
+        )
+
+    profile = _profile_view(
+        current_situation=situation,
+        coding_confidence=confidence,
+        ai_changed_files=ai_changed,
+        updated_at=datetime.now(timezone.utc).isoformat(),
+    )
+    try:
+        stored = EntryProfileView.model_validate(profile).model_dump(mode="json")
+    except ValidationError as exc:
+        raise InvalidEntryProfileError("Invalid entry choices.") from exc
+
+    existing = project.get("workflow_artifacts") if project else None
+    artifacts = dict(existing) if isinstance(existing, dict) else {}
+    artifacts[ENTRY_PROFILE_KEY] = stored
+    if project is None:
+        await repo.create_project(user_id, {"workflow_artifacts": artifacts})
+    else:
+        await repo.update_project(
+            user_id, project["id"], {"workflow_artifacts": artifacts}
+        )
+    return {"profile": stored}
 
 
 def get_questions() -> list[dict]:

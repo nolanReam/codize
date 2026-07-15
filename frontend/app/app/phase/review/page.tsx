@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import GuideCard from "@/components/GuideCard";
 import LinkedReviewTargetRow from "@/components/LinkedReviewTarget";
@@ -135,6 +136,7 @@ function ReviewPrerequisite({
     <>
       <h1 className="page-title">{REVIEW_PAGE_TITLE}</h1>
       <p className="page-sub">Review implementation choices before continuing.</p>
+      <AdaptiveStepGuide stage="review" />
       <div className="workspace">
         <div>
           {phase && (
@@ -287,6 +289,7 @@ function LegacyReviewBoard({
         Back from your AI tool? Note what it actually did before you build on it. Every field is
         optional — skip what you don&rsquo;t know.
       </p>
+      <AdaptiveStepGuide stage="review" />
       <div className="workspace">
         <div>
           <p className="muted review-phase-line">
@@ -461,6 +464,7 @@ function LinkedReviewBoard({
       <h1 className="page-title">{REVIEW_PAGE_TITLE}</h1>
       <p className="page-sub">{REVIEW_PAGE_INTRO}</p>
       <p className="review-honesty">{REVIEW_HONESTY_LINE}</p>
+      <AdaptiveStepGuide stage="review" />
 
       <div className="workspace">
         <div>

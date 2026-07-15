@@ -463,3 +463,15 @@ stages are non-links, current lifecycle and `aria-current=page` are separate,
 and stale records remain readable under Project Record. Mobile uses the same
 model in a modal drawer with focus entry/trap/Escape/return. See
 [[guided-project-shell-conventions]].
+
+**M17 (2026-07-15) — beginner entry and adaptive guidance.** Project Home owns
+the short entry into the existing intake: situation, confidence, and a
+conditional AI-change question, with no preselected answer. The server-derived
+recommendation feeds the existing M16N provider; saved workflow truth always
+wins. The 80% Trap recovery card links to the existing Import page and never
+reimplements Import, Change Map, Review, or Verification. Use the single
+`AdaptiveStepGuide` plus `lib/workflowGuidance.ts` across all eight Journey
+stages; confidence changes initial detail, not workflow requirements. Browser
+storage may remember only a scoped disclosure boolean. Legacy users get
+standard collapsed guidance and can update preferences without reset. See
+[[beginner-entry-adaptive-guidance-conventions]].

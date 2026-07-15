@@ -10,13 +10,21 @@ import {
   useState,
 } from "react";
 
-import { ApiError, getCurrentGate, getEvaluation, getIntakeStatus, getWorkflow } from "@/lib/api";
+import {
+  ApiError,
+  getCurrentGate,
+  getEntryProfile,
+  getEvaluation,
+  getIntakeStatus,
+  getWorkflow,
+} from "@/lib/api";
+import { normalizeEntryProfile } from "@/lib/entryProfile";
 import {
   buildGuidedProjectNavigation,
   GUIDED_NAVIGATION_REFRESH_EVENT,
   type GuidedProjectNavigation,
 } from "@/lib/guidedProjectNavigation";
-import type { Evaluation, GateCurrent, WorkflowPhaseState } from "@/lib/types";
+import type { EntryProfile, Evaluation, GateCurrent, WorkflowPhaseState } from "@/lib/types";
 
 type NavigationLoadState = "loading" | "ready" | "error";
 
@@ -27,6 +35,8 @@ interface GuidedNavigationContextValue {
   evaluation: Evaluation | null;
   workflow: WorkflowPhaseState | null;
   gate: GateCurrent | null;
+  entryProfile: EntryProfile | null;
+  userId: string;
   refresh: () => Promise<void>;
 }
 
@@ -40,8 +50,10 @@ const GuidedNavigationContext = createContext<GuidedNavigationContextValue | nul
 
 export default function GuidedProjectNavigationProvider({
   children,
+  userId,
 }: {
   children: React.ReactNode;
+  userId: string;
 }) {
   const [state, setState] = useState<NavigationLoadState>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +61,7 @@ export default function GuidedProjectNavigationProvider({
   const [workflow, setWorkflow] = useState<WorkflowPhaseState | null>(null);
   const [gate, setGate] = useState<GateCurrent | null>(null);
   const [projectLabel, setProjectLabel] = useState<string | null>(null);
+  const [entryProfile, setEntryProfile] = useState<EntryProfile | null>(null);
   const requestId = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -66,24 +79,30 @@ export default function GuidedProjectNavigationProvider({
         nextEvaluation.state === "roadmap_needed" ||
         nextEvaluation.current_phase == null
       ) {
-        const intake = await getIntakeStatus().catch(() => null);
+        const [intake, entry] = await Promise.all([
+          getIntakeStatus().catch(() => null),
+          getEntryProfile().catch(() => ({ profile: null })),
+        ]);
         if (activeRequest !== requestId.current) return;
         setWorkflow(null);
         setGate(null);
         setProjectLabel(intake?.answers?.purpose ?? null);
+        setEntryProfile(normalizeEntryProfile(entry.profile));
         setState("ready");
         return;
       }
 
-      const [nextWorkflow, nextGate, intake] = await Promise.all([
+      const [nextWorkflow, nextGate, intake, entry] = await Promise.all([
         getWorkflow(nextEvaluation.current_phase),
         getCurrentGate(),
         getIntakeStatus().catch(() => null),
+        getEntryProfile().catch(() => ({ profile: null })),
       ]);
       if (activeRequest !== requestId.current) return;
       setWorkflow(nextWorkflow);
       setGate(nextGate);
       setProjectLabel(intake?.answers?.purpose ?? null);
+      setEntryProfile(normalizeEntryProfile(entry.profile));
       setState("ready");
     } catch (caught) {
       if (activeRequest !== requestId.current) return;
@@ -111,19 +130,35 @@ export default function GuidedProjectNavigationProvider({
   const navigation = useMemo(
     () =>
       state === "ready"
-        ? buildGuidedProjectNavigation({ evaluation, workflow, gate, projectLabel })
+        ? buildGuidedProjectNavigation({
+            evaluation,
+            workflow,
+            gate,
+            projectLabel,
+            entryProfile,
+          })
         : {
             ...EMPTY_NAVIGATION,
             projectLabel: projectLabel?.trim() || "Your project",
             evaluation,
             workflow,
           },
-    [evaluation, gate, projectLabel, state, workflow]
+    [entryProfile, evaluation, gate, projectLabel, state, workflow]
   );
 
   const value = useMemo<GuidedNavigationContextValue>(
-    () => ({ state, error, navigation, evaluation, workflow, gate, refresh }),
-    [error, evaluation, gate, navigation, refresh, state, workflow]
+    () => ({
+      state,
+      error,
+      navigation,
+      evaluation,
+      workflow,
+      gate,
+      entryProfile,
+      userId,
+      refresh,
+    }),
+    [entryProfile, error, evaluation, gate, navigation, refresh, state, userId, workflow]
   );
 
   return (

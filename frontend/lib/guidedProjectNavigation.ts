@@ -7,6 +7,7 @@ import {
 } from "./verification";
 import type {
   Evaluation,
+  EntryProfile,
   GateCurrent,
   WorkflowPhaseState,
   WorkflowSections,
@@ -77,6 +78,7 @@ export interface GuidedNavigationInput {
   workflow: WorkflowPhaseState | null;
   gate: GateCurrent | null;
   projectLabel?: string | null;
+  entryProfile?: EntryProfile | null;
 }
 
 const LABEL_BY_ID = new Map(GUIDED_JOURNEY.map((stage) => [stage.id, stage.label]));
@@ -286,10 +288,22 @@ function buildRecord(
 
 function preActiveModel(input: GuidedNavigationInput): GuidedProjectNavigation {
   const evaluation = input.evaluation;
-  const continueAction =
-    evaluation?.state === "roadmap_needed"
+  const profile = input.entryProfile;
+  const continueAction = evaluation?.state === "not_started" && !profile
+    ? action(
+        null,
+        "Find my starting point",
+        "Answer a few short questions and get one recommended place to begin.",
+        "/app/intake"
+      )
+    : evaluation?.state === "roadmap_needed"
       ? action(null, "Finish project setup", evaluation.next_action, "/app/intake")
-      : action(null, "Start with project intake", evaluation?.next_action ?? "Set up your project first.", "/app/intake");
+      : action(
+          null,
+          profile?.completed ? "Continue project details" : "Continue project setup",
+          evaluation?.next_action ?? "Set up your project first.",
+          "/app/intake"
+        );
   return {
     projectHome: { label: "Project Home", href: "/app" },
     projectLabel: input.projectLabel?.trim() || "Your project",
@@ -322,15 +336,48 @@ export function buildGuidedProjectNavigation(
     journey[GUIDED_JOURNEY.findIndex((item) => item.id === id)] = stage(id, stateValue, reason);
   };
   let continueAction: GuidedContinueAction;
+  const hasWorkflowProgress =
+    Object.values(sections).some((section) => section != null) || map != null;
+  const entryStart =
+    !hasWorkflowProgress &&
+    workflow.phase === 1 &&
+    (evaluation.completed_phases ?? 0) === 0 &&
+    input.entryProfile?.completed
+      ? input.entryProfile.recommended_start
+      : null;
+  const importFirst =
+    !sections.prompt_builder &&
+    (Boolean(sections.implementation_import) ||
+      entryStart === "implementation_import" ||
+      entryStart === "quick_start");
 
-  if (!sections.prompt_builder) {
+  if (!sections.prompt_builder && !importFirst) {
     set("prompt", "continue", "Save the prompt you will use for this phase.");
     continueAction = action("prompt", "Continue Prompt Builder", "Plan one clear ask for your AI tool.");
   } else {
-    set("prompt", "complete", "A prompt is saved for this phase.");
+    if (sections.prompt_builder) {
+      set("prompt", "complete", "A prompt is saved for this phase.");
+    } else {
+      set(
+        "prompt",
+        "later",
+        "This phase began from an existing AI change. Use Prompt Builder before your next change."
+      );
+    }
     if (!sections.implementation_import) {
       set("import", "continue", "Bring back the response, diff, changed files, or your notes.");
-      continueAction = action("import", "Bring Back What Changed", "Record the saved output from your external AI tool.");
+      continueAction = entryStart === "quick_start"
+        ? action(
+            "import",
+            "Start the 80% Trap Quick Start",
+            "Pause the patch loop, then bring back the latest AI change.",
+            "/app?quick-start=1"
+          )
+        : action(
+            "import",
+            "Bring Back What Changed",
+            "Record the saved output from your external AI tool."
+          );
     } else {
       set("import", "complete", "Implementation material is saved for this phase.");
       if (!map) {

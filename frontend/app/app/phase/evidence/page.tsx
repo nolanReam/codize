@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
@@ -79,6 +80,7 @@ function EvidencePageHeading() {
       <h1 className="page-title">{EVIDENCE_PAGE_TITLE}</h1>
       <p className="page-sub">{EVIDENCE_PAGE_INTRO}</p>
       <p className="evidence-honesty">{EVIDENCE_HONESTY_LINE}</p>
+      <AdaptiveStepGuide stage="evidence" />
     </>
   );
 }
@@ -801,6 +803,7 @@ function LegacyEvidencePanel({
     <>
       <h1 className="page-title">Evidence</h1>
       <p className="page-sub">Keep one useful piece of supporting material for this phase.</p>
+      <AdaptiveStepGuide stage="evidence" />
       <div className="workspace">
         <div>
           <p className="muted evidence-phase-line">Evidence for Phase {phase.phase}: {phase.phase_title}</p>

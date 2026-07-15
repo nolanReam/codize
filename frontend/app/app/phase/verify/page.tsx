@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import GuideCard from "@/components/GuideCard";
 import LinkedVerificationTargetRow from "@/components/LinkedVerificationTarget";
@@ -177,6 +178,7 @@ function VerificationPrerequisite({
     <>
       <h1 className="page-title">{VERIFICATION_PAGE_TITLE}</h1>
       <p className="page-sub">Test implementation choices before continuing.</p>
+      <AdaptiveStepGuide stage="verification" />
       <div className="workspace">
         <div>
           {phase && (
@@ -333,6 +335,7 @@ function LegacyVerificationLab({
         A quick honesty check, not homework — mark what you actually tried. It lands in your
         Defense Report.
       </p>
+      <AdaptiveStepGuide stage="verification" />
       <div className="workspace">
         <div>
           <p className="muted" style={{ marginBottom: 14 }}>
@@ -581,6 +584,7 @@ function LinkedVerificationBoard({
       <h1 className="page-title">{VERIFICATION_PAGE_TITLE}</h1>
       <p className="page-sub">{VERIFICATION_PAGE_INTRO}</p>
       <p className="verification-honesty">{VERIFICATION_HONESTY_LINE}</p>
+      <AdaptiveStepGuide stage="verification" />
 
       <div className="workspace">
         <div>

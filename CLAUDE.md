@@ -136,6 +136,26 @@ stale records stay readable and are rebuilt only by the existing explicit page
 actions. Desktop and the focus-managed mobile drawer consume the same model.
 Do not create a parallel sidebar or change workflow N/5.
 
+## Beginner entry and adaptive guidance (M17)
+
+M17 extends the same single-project intake and M16N navigation seams. The
+server-owned deterministic entry profile lives at the reserved top-level
+`workflow_artifacts["_entry_profile"]` key and is exposed only through
+authenticated `GET/PUT /intake/entry-profile`. Clients write the three
+student-choice fields; the backend derives recommendation, explanation depth,
+completion, and recovery emphasis without an LLM. Preference changes patch the
+one metadata key and never reset intake, roadmap, workflow records, tasks,
+gates, or Report history.
+
+The 80% Trap Quick Start is an entry into the existing Bring Back What Changed
+route, not a duplicate import/review/verification product. M16N remains the
+only lifecycle calculator: saved artifacts and stale dependencies outrank the
+initial recommendation, Import-first work continues to Change Map, and Prompt
+is marked for the next change rather than forced retroactively. One shared
+`AdaptiveStepGuide` supplies typed static guidance for all eight Journey stages.
+Legacy users default to standard collapsed guidance. See
+[[beginner-entry-adaptive-guidance-conventions]].
+
 ## Skill usage
 
 Before implementation, read the relevant local skill files under `.claude/skills/`:

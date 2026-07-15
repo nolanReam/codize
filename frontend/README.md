@@ -395,3 +395,25 @@ the shell. Existing routes, manual/legacy records, workflow N/5, save/rebuild
 flows, backend lifecycle, and Report truth rules are unchanged. The mobile
 version is a focus-managed modal drawer with Escape, trapped Tab focus, return
 focus, and the same model as desktop.
+
+## Status (M17)
+
+Beginner entry now sits inside the existing Project Home and intake flow. A
+new student answers one situation question, one coding-confidence question,
+and—only when already building—whether AI has changed files. The server stores
+those choices in the current project's reserved `_entry_profile` workflow
+metadata and deterministically derives the starting recommendation, guidance
+depth, and recovery emphasis. There is no LLM call, separate project, or
+parallel onboarding lifecycle.
+
+`AdaptiveStepGuide` is the one progressive explanation component across
+Prompt, Import, Change Map, Review, Verification, Evidence, Defense, and
+Report. Its content is static and typed; confidence controls initial detail,
+while its disclosure preference is a harmless user/project/stage-scoped
+browser boolean. Project Home and the M16N provider consume the same entry
+profile. Starting-fresh students begin at Prompt Builder; already-building
+students with changes can begin at Import; the 80% Trap Quick Start routes to
+the existing Bring Back What Changed page and then rejoins Change Map, Review,
+and Verification. Saved workflow state always outranks an old recommendation.
+Legacy profiles receive standard collapsed guidance and may update preferences
+without resetting intake, roadmap, artifacts, tasks, gates, or navigation.

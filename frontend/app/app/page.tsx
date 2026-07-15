@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { QuickStartPanel, StartingPathSummary } from "@/components/AdaptiveEntry";
 import Async from "@/components/Async";
 import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import { useGuidedProjectNavigation } from "@/components/GuidedProjectNavigationProvider";
@@ -11,8 +15,13 @@ import WorkflowSteps from "@/components/WorkflowSteps";
 // Project Home. The one-project selection contract and disabled new-project
 // action are unchanged.
 export default function ProjectHomePage() {
-  const { state, error, navigation, evaluation, workflow, refresh } =
+  const { state, error, navigation, evaluation, workflow, entryProfile, refresh } =
     useGuidedProjectNavigation();
+  const [showQuickStart, setShowQuickStart] = useState(false);
+
+  useEffect(() => {
+    setShowQuickStart(new URLSearchParams(window.location.search).get("quick-start") === "1");
+  }, []);
 
   const pill = state === "ready" && evaluation
     ? evaluation.state === "complete" || navigation.continueAction.stageId === "report"
@@ -62,7 +71,18 @@ export default function ProjectHomePage() {
           <div className="workspace project-home-setup">
             <div>
               <div className="card primary">
-                <h2>Continue project setup</h2>
+                <h2>
+                  {!entryProfile
+                    ? "Let’s find the right place to start"
+                    : entryProfile.completed
+                      ? "Finish your project details"
+                      : "Continue finding your starting point"}
+                </h2>
+                {!entryProfile && (
+                  <p className="muted">
+                    Answer a few short questions. Codize will recommend one starting point and guide you from there.
+                  </p>
+                )}
                 <p style={{ fontSize: 17, fontWeight: 600 }}>
                   {navigation.continueAction.label}
                 </p>
@@ -73,6 +93,7 @@ export default function ProjectHomePage() {
                   <GuidedContinueAction className="btn primary" />
                 </div>
               </div>
+              {entryProfile?.completed && <StartingPathSummary profile={entryProfile} />}
             </div>
             <aside className="ws-rail" aria-label="Guidance">
               <GuideCard title="Project Home">
@@ -84,7 +105,12 @@ export default function ProjectHomePage() {
             </aside>
           </div>
         )}
-        {evaluation && workflow && (
+        {evaluation && workflow && showQuickStart && entryProfile?.recovery_emphasis && (
+          <div className="entry-layout">
+            <QuickStartPanel />
+          </div>
+        )}
+        {evaluation && workflow && (!showQuickStart || !entryProfile?.recovery_emphasis) && (
           <div className="workspace">
             <div>
               <div className="card primary">
@@ -100,6 +126,21 @@ export default function ProjectHomePage() {
                 </div>
                 <LoopOverview />
               </div>
+
+              {entryProfile?.completed ? (
+                <StartingPathSummary profile={entryProfile} />
+              ) : (
+                <section className="starting-path-summary" aria-labelledby="guidance-preference-title">
+                  <div>
+                    <p className="entry-kicker">Guidance</p>
+                    <h3 id="guidance-preference-title">Standard guidance</h3>
+                    <p className="muted">This legacy project keeps its current workflow and a safe default explanation depth.</p>
+                  </div>
+                  <Link className="text-link" href="/app/intake?preferences=1">
+                    Update guidance preferences
+                  </Link>
+                </section>
+              )}
 
               <div className="card" style={{ marginTop: 14 }}>
                 <h3>Active project</h3>

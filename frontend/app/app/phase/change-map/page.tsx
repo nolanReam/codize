@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import { ChangeMapErrorNotice, SourceReferences } from "@/components/ChangeMapSafety";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
@@ -675,6 +676,7 @@ export default function ChangeMapPage() {
       <p className="page-sub">
         {CHANGE_MAP_PAGE_INTRO} <strong>{CHANGE_MAP_HONESTY_LINE}</strong>
       </p>
+      <AdaptiveStepGuide stage="change_map" />
 
       <p className="sr-only" aria-live="polite">
         {generating

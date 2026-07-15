@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
@@ -160,6 +161,7 @@ export default function BringBackPage() {
       <p className="page-sub">
         {PAGE_INTRO} <strong>{PAGE_REASSURANCE}</strong>
       </p>
+      <AdaptiveStepGuide stage="import" />
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>
         <div className="workspace">

@@ -187,3 +187,14 @@ exactly as before; N/5 is not the Journey lifecycle. Local drafts, pathname,
 and section presence alone never complete linked Evidence. Stale artifacts
 stay readable through Project Record and existing deep links; rebuild remains
 an explicit existing page mutation. See [[guided-project-shell-conventions]].
+
+M17 reserves the non-phase top-level key `_entry_profile` inside the existing
+`projects.workflow_artifacts` JSONB. It is project metadata, not one of the
+five captured workflow sections, never counts toward N/5, and is ignored by
+numeric phase readers. Authenticated `GET/PUT /intake/entry-profile` is its only
+public write seam. The client owns only the three choice fields; the server
+normalizes the conditional answer and re-derives recommendation, depth,
+completion, and recovery emphasis. The update patches the existing JSONB
+column only and preserves phase artifacts and every lifecycle field. There is
+no migration, parallel store, or provider call. See
+[[beginner-entry-adaptive-guidance-conventions]].

@@ -24,6 +24,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [email, setEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [reconnection, setReconnection] = useState<ReconnectionSummary | null>(null);
   const [ackBusy, setAckBusy] = useState(false);
@@ -40,12 +41,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         return;
       }
       setEmail(data.session.user.email ?? null);
+      setUserId(data.session.user.id);
       setReady(true);
 
       // First visit ever on this browser: open the "How Codize works" guide.
       // Dismissing stamps localStorage, so returning users are never blocked;
       // the sidebar button reopens it on demand.
-      if (!localStorage.getItem(TUTORIAL_SEEN_KEY)) setShowTutorial(true);
+      // M17 makes adaptive entry the first-use task. The broader tutorial
+      // remains available from Help without covering that focused decision.
 
       if (!sessionStorage.getItem(RECONNECT_FLAG)) {
         try {
@@ -97,10 +100,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   }
 
-  if (!ready) return <div className="loading" style={{ padding: 40 }}>checking session</div>;
+  if (!ready || !userId) return <div className="loading" style={{ padding: 40 }}>checking session</div>;
 
   return (
-    <GuidedProjectNavigationProvider>
+    <GuidedProjectNavigationProvider userId={userId}>
       <ShellFrame
         email={email}
         pathname={pathname}

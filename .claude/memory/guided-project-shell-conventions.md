@@ -73,3 +73,14 @@ building guidance, the 80% Trap Quick Start, patch-loop recovery entry,
 Guided/Builder/Recovery entry, progressive beginner explanations, and adaptive
 recommendations. It must feed/reuse this shared M16N model and shell. It must
 not create a parallel sidebar or alternate lifecycle state machine.
+
+Implemented M17 keeps this exact boundary. `GuidedProjectNavigationProvider`
+loads the entry profile beside its existing evaluation/workflow/gate/intake
+snapshot and passes it into `guidedProjectNavigation.ts`. A completed profile
+may choose Prompt, Import, or the Quick Start presentation, but only while the
+project is still at its untouched first phase. Real saved Import continues to
+Change Map even when Prompt is absent; Prompt is labeled for the next change.
+Any saved/stale downstream dependency uses the established M16N priority and
+overrides entry history. Legacy missing/malformed profiles preserve the prior
+shell and receive standard guidance. No second sidebar, lifecycle helper, or
+workflow completion field exists.

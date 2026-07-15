@@ -32,6 +32,8 @@ FIVE_ANSWERS = {
 
 ALL_ROUTES = (
     ("GET", "/intake/questions"),
+    ("GET", "/intake/entry-profile"),
+    ("PUT", "/intake/entry-profile"),
     ("GET", "/intake/status"),
     ("POST", "/intake/answers"),
     ("POST", "/intake/complete"),
@@ -85,6 +87,62 @@ def test_questions_route_returns_the_five_spec_questions(client):
         "What problem do you want to solve, and who does solving it help?"
     )
     assert [q["number"] for q in questions] == [1, 2, 3, 4, 5]
+
+
+def test_entry_profile_route_persists_only_student_choices_and_server_derives_fields(client):
+    resp = client.put(
+        "/intake/entry-profile",
+        json={
+            "current_situation": "already_building",
+            "coding_confidence": "new_to_code",
+            "ai_changed_files": "yes",
+        },
+        headers=auth_headers(),
+    )
+    assert resp.status_code == 200
+    profile = resp.json()["profile"]
+    assert profile["recommended_start"] == "implementation_import"
+    assert profile["guidance_depth"] == "more"
+    assert profile["completed"] is True
+    assert client.get("/intake/entry-profile", headers=auth_headers()).json()["profile"] == profile
+
+
+@pytest.mark.parametrize(
+    "forged",
+    [
+        {"recommended_start": "report"},
+        {"guidance_depth": "minimal"},
+        {"workflow_complete": True},
+        {"stale": False},
+        {"defense_ready": True},
+    ],
+)
+def test_entry_profile_rejects_server_owned_or_unknown_fields(client, forged):
+    resp = client.put(
+        "/intake/entry-profile", json=forged, headers=auth_headers()
+    )
+    assert resp.status_code == 422
+    assert resp.json() == {"error": {"status": 422, "message": "Invalid request."}}
+
+
+def test_hidden_ai_change_field_is_rejected_outside_already_building(client):
+    resp = client.put(
+        "/intake/entry-profile",
+        json={"current_situation": "stuck", "ai_changed_files": "yes"},
+        headers=auth_headers(),
+    )
+    assert resp.status_code == 422
+
+
+def test_entry_profiles_are_owner_scoped(client):
+    client.put(
+        "/intake/entry-profile",
+        json={"current_situation": "stuck", "coding_confidence": "know_basics"},
+        headers=auth_headers(USER_A),
+    )
+    assert client.get(
+        "/intake/entry-profile", headers=auth_headers(USER_B)
+    ).json() == {"profile": None}
 
 
 def test_full_intake_flow_through_routes(client):

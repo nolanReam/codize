@@ -594,3 +594,22 @@ JWKS URL: `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
   `user_id == sub` itself).
 - UI hiding is never security; every protected endpoint enforces this
   dependency.
+
+## Beginner entry profile (M17)
+
+`GET /intake/entry-profile` and `PUT /intake/entry-profile` reuse the existing
+authenticated, owner-filtered project/intake architecture. Student-owned
+choices are stored at `projects.workflow_artifacts["_entry_profile"]`, a
+reserved non-phase key; numeric phase readers continue to ignore it. If the
+student has not answered intake Q1 yet, PUT creates the same single project row
+that intake would create—never a second onboarding project.
+
+The client may write only situation, coding confidence, and the conditional AI
+change answer. The service re-derives `completed`, `recommended_start`,
+`guidance_depth`, and `recovery_emphasis` on every read/write, drops the
+irrelevant conditional answer, and fails malformed historical metadata safe to
+no profile. Updating preferences patches only `workflow_artifacts`; roadmap,
+status, task progress, phases, gates, unlocks, and intake answers are untouched.
+The feature imports no provider and makes zero LLM calls. It adds no migration
+and does not alter classification, prompts, evaluation, PASS/FAIL, retries,
+cooldowns, or Report truth.

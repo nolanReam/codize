@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import DefenseReportView from "@/components/DefenseReportView";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import { ApiError, getDefenseReport, getEvaluation } from "@/lib/api";
 import { buildReportMarkdown, reportIsReady } from "@/lib/report";
 import type { DefenseReport } from "@/lib/types";
@@ -109,6 +110,7 @@ export default function ReportPage() {
           </div>
         )}
       </div>
+      <AdaptiveStepGuide stage="report" />
 
       {copied && (
         <p className="sr-only" role="status" aria-live="polite">

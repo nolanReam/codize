@@ -6,6 +6,7 @@ import pytest
 
 from app.services import intake_service
 from app.services.intake_service import (
+    ENTRY_PROFILE_KEY,
     QUESTIONS,
     IntakeAlreadyCompletedError,
     IntakeIncompleteError,
@@ -13,9 +14,12 @@ from app.services.intake_service import (
     InvalidAnswerError,
     classify_archetype,
     complete_intake,
+    entry_profile_from_project,
+    get_entry_profile,
     get_status,
     normalize_answer,
     submit_answer,
+    update_entry_profile,
 )
 from tests.fakes import InMemoryProjectRepository
 
@@ -38,6 +42,159 @@ def run(coro):
 def answer_all_five(repo, user=USER):
     for n in (1, 2, 3, 4, 5):
         run(submit_answer(repo, user, n, FIVE_ANSWERS[n]))
+
+
+# --- adaptive entry profile (M17) --------------------------------------------
+
+@pytest.mark.parametrize(
+    ("situation", "ai_changed", "recommended", "recovery"),
+    [
+        ("starting_fresh", None, "prompt_builder", False),
+        ("already_building", "not_yet", "prompt_builder", False),
+        ("already_building", "yes", "implementation_import", False),
+        ("already_building", "unsure", "implementation_import", False),
+        ("stuck", None, "quick_start", True),
+    ],
+)
+def test_entry_recommendation_is_deterministic(
+    situation, ai_changed, recommended, recovery
+):
+    repo = InMemoryProjectRepository()
+    updates = {
+        "current_situation": situation,
+        "coding_confidence": "know_basics",
+    }
+    if ai_changed is not None:
+        updates["ai_changed_files"] = ai_changed
+    profile = run(update_entry_profile(repo, USER, updates))["profile"]
+    assert profile["completed"] is True
+    assert profile["recommended_start"] == recommended
+    assert profile["recovery_emphasis"] is recovery
+
+
+@pytest.mark.parametrize(
+    ("confidence", "depth"),
+    [
+        ("new_to_code", "more"),
+        ("know_basics", "standard"),
+        ("comfortable", "minimal"),
+    ],
+)
+def test_coding_confidence_changes_guidance_not_features(confidence, depth):
+    repo = InMemoryProjectRepository()
+    profile = run(
+        update_entry_profile(
+            repo,
+            USER,
+            {"current_situation": "starting_fresh", "coding_confidence": confidence},
+        )
+    )["profile"]
+    assert profile["guidance_depth"] == depth
+    assert profile["recommended_start"] == "prompt_builder"
+
+
+def test_partial_entry_profile_resumes_without_a_default_situation():
+    repo = InMemoryProjectRepository()
+    profile = run(
+        update_entry_profile(repo, USER, {"coding_confidence": "new_to_code"})
+    )["profile"]
+    assert profile["current_situation"] is None
+    assert profile["completed"] is False
+    assert profile["recommended_start"] is None
+    assert run(get_entry_profile(repo, USER))["profile"] == profile
+
+
+def test_irrelevant_ai_change_choice_is_rejected_and_situation_change_clears_it():
+    repo = InMemoryProjectRepository()
+    with pytest.raises(intake_service.InvalidEntryProfileError):
+        run(update_entry_profile(repo, USER, {"ai_changed_files": "yes"}))
+    run(
+        update_entry_profile(
+            repo,
+            USER,
+            {
+                "current_situation": "already_building",
+                "coding_confidence": "know_basics",
+                "ai_changed_files": "yes",
+            },
+        )
+    )
+    changed = run(
+        update_entry_profile(repo, USER, {"current_situation": "starting_fresh"})
+    )["profile"]
+    assert changed["ai_changed_files"] is None
+    assert changed["recommended_start"] == "prompt_builder"
+
+
+def test_entry_profile_uses_reserved_json_key_and_preserves_workflow_and_lifecycle():
+    repo = InMemoryProjectRepository()
+    project = run(
+        repo.create_project(
+            USER,
+            {
+                "status": "active",
+                "roadmap": {"phases": []},
+                "workflow_artifacts": {
+                    "1": {"prompt_builder": {"generated_prompt": "saved"}}
+                },
+            },
+        )
+    )
+    before = dict(project)
+    run(update_entry_profile(repo, USER, {"coding_confidence": "comfortable"}))
+    after = run(repo.get_project(USER))
+    assert after["workflow_artifacts"]["1"] == before["workflow_artifacts"]["1"]
+    assert after["workflow_artifacts"][ENTRY_PROFILE_KEY]["guidance_depth"] == "minimal"
+    for key in (
+        "status",
+        "roadmap",
+        "current_phase",
+        "task_progress",
+        "gate_history_summary",
+        "intake_purpose",
+        "intake_completed_at",
+        "archetype_id",
+    ):
+        assert after[key] == before[key]
+
+
+def test_entry_profile_creation_reuses_the_one_project_intake_architecture():
+    repo = InMemoryProjectRepository()
+    run(update_entry_profile(repo, USER, {"current_situation": "starting_fresh"}))
+    status = run(get_status(repo, USER))
+    assert status["started"] is True
+    assert status["next_question"] == 1
+    assert len(repo._rows) == 1
+    run(submit_answer(repo, USER, 1, FIVE_ANSWERS[1]))
+    assert len(repo._rows) == 1
+
+
+def test_malformed_historical_entry_profile_is_ignored_safely():
+    repo = InMemoryProjectRepository()
+    project = run(
+        repo.create_project(
+            USER,
+            {"workflow_artifacts": {ENTRY_PROFILE_KEY: {"recommended_start": "report"}}},
+        )
+    )
+    assert entry_profile_from_project(project) is None
+    assert run(get_entry_profile(repo, USER)) == {"profile": None}
+
+
+def test_entry_profile_update_does_not_call_a_provider(monkeypatch):
+    repo = InMemoryProjectRepository()
+    monkeypatch.setattr(
+        "app.services.llm_service.get_llm_service",
+        lambda: (_ for _ in ()).throw(AssertionError("provider must not be called")),
+    )
+    profile = run(
+        update_entry_profile(
+            repo,
+            USER,
+            {"current_situation": "stuck", "coding_confidence": "new_to_code"},
+        )
+    )["profile"]
+    assert profile["recommended_start"] == "quick_start"
 
 
 # --- question definitions ------------------------------------------------------

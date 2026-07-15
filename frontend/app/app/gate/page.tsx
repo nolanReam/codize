@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
 import DefenseContextSummaryBlock, {
   type DefenseContextSummaryState,
 } from "@/components/DefenseContextSummary";
@@ -208,6 +209,7 @@ export default function GatePage() {
         </div>
         {pill && !outcome && <span className={`pill ${pill.cls}`}>{pill.label}</span>}
       </div>
+      <AdaptiveStepGuide stage="defense" />
 
       <Async loading={loading} error={error} onRetry={load}>
         <div className="defense-page-body">

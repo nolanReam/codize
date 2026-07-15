@@ -7,6 +7,7 @@ import {
 } from "./guidedProjectNavigation";
 import type {
   Evaluation,
+  EntryProfile,
   GateCurrent,
   LinkedEvidenceArtifact,
   LinkedReviewBoardArtifact,
@@ -155,6 +156,19 @@ const gate = (patch: Partial<GateCurrent> = {}): GateCurrent => ({
   ...patch,
 });
 
+const entryProfile = (patch: Partial<EntryProfile> = {}): EntryProfile => ({
+  schema_version: "1.0",
+  current_situation: "starting_fresh",
+  coding_confidence: "know_basics",
+  ai_changed_files: null,
+  completed: true,
+  recommended_start: "prompt_builder",
+  guidance_depth: "standard",
+  recovery_emphasis: false,
+  updated_at: "2026-07-15T00:00:00Z",
+  ...patch,
+});
+
 const build = (
   sectionPatch: Partial<WorkflowSections> = {},
   map: StoredChangeMap | null = confirmedMap(),
@@ -192,9 +206,104 @@ describe("guided project navigation model", () => {
       gate: null,
     });
     expect(model.projectHome).toEqual({ label: "Project Home", href: "/app" });
-    expect(model.continueAction).toMatchObject({ label: "Start with project intake", href: "/app/intake" });
+    expect(model.continueAction).toMatchObject({ label: "Find my starting point", href: "/app/intake" });
     expect(model.journey.every((item) => item.state === "later")).toBe(true);
     expect(model.projectRecord).toEqual([]);
+  });
+
+  it("keeps partial entry in the shared pre-active setup action", () => {
+    const model = buildGuidedProjectNavigation({
+      evaluation: evaluation({ state: "intake_needed", current_phase: undefined }),
+      workflow: null,
+      gate: null,
+      entryProfile: entryProfile({ completed: false, recommended_start: null }),
+    });
+    expect(model.continueAction).toMatchObject({
+      label: "Continue project setup",
+      href: "/app/intake",
+    });
+  });
+
+  it("uses the deterministic recommendation only before workflow work begins", () => {
+    const emptySections = {
+      prompt_builder: null,
+      implementation_import: null,
+      review_board: null,
+      verification: null,
+      evidence: null,
+    };
+    const importStart = buildGuidedProjectNavigation({
+      evaluation: evaluation(),
+      workflow: workflow(emptySections, null),
+      gate: gate(),
+      entryProfile: entryProfile({
+        current_situation: "already_building",
+        ai_changed_files: "yes",
+        recommended_start: "implementation_import",
+      }),
+    });
+    expect(importStart.continueAction).toMatchObject({
+      label: "Bring Back What Changed",
+      stageId: "import",
+      href: "/app/phase/import",
+    });
+    expect(importStart.journey[0].state).toBe("later");
+    expect(importStart.journey[1].state).toBe("continue");
+
+    const quickStart = buildGuidedProjectNavigation({
+      evaluation: evaluation(),
+      workflow: workflow(emptySections, null),
+      gate: gate(),
+      entryProfile: entryProfile({
+        current_situation: "stuck",
+        recommended_start: "quick_start",
+        recovery_emphasis: true,
+      }),
+    });
+    expect(quickStart.continueAction).toMatchObject({
+      label: "Start the 80% Trap Quick Start",
+      href: "/app?quick-start=1",
+    });
+  });
+
+  it("lets saved Import state override an old recommendation and continues Change Map", () => {
+    const model = buildGuidedProjectNavigation({
+      evaluation: evaluation(),
+      workflow: workflow(
+        {
+          prompt_builder: null,
+          review_board: null,
+          verification: null,
+          evidence: null,
+        },
+        null
+      ),
+      gate: gate(),
+      entryProfile: entryProfile({
+        current_situation: "stuck",
+        recommended_start: "quick_start",
+        recovery_emphasis: true,
+      }),
+    });
+    expect(model.continueAction).toMatchObject({
+      label: "Continue Change Map",
+      stageId: "change_map",
+    });
+    expect(model.journey[1].state).toBe("complete");
+  });
+
+  it("does not reuse a phase-one entry recommendation in a later phase", () => {
+    const model = buildGuidedProjectNavigation({
+      evaluation: evaluation({ current_phase: 2, completed_phases: 1 }),
+      workflow: { ...workflow({ prompt_builder: null, implementation_import: null, review_board: null, verification: null, evidence: null }, null), phase: 2 },
+      gate: gate({ phase: 2 }),
+      entryProfile: entryProfile({
+        current_situation: "already_building",
+        ai_changed_files: "yes",
+        recommended_start: "implementation_import",
+      }),
+    });
+    expect(model.continueAction.stageId).toBe("prompt");
   });
 
   it("does not guess progress when required saved navigation state is missing", () => {

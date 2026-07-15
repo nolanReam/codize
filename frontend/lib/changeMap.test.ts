@@ -681,9 +681,17 @@ describe("phase next-step logic and N/5 preservation", () => {
     });
   });
 
-  it("keeps Prompt first, preserves manual Review continuation, and preserves N/5", () => {
-    expect(derivePhaseNextStep(sections({ prompt_builder: null }), null).label).toBe(
+  it("keeps Prompt first for an empty phase, respects a saved Import start, preserves manual Review continuation, and preserves N/5", () => {
+    expect(
+      derivePhaseNextStep(
+        sections({ prompt_builder: null, implementation_import: null }),
+        null
+      ).label
+    ).toBe(
       "Continue Prompt Builder"
+    );
+    expect(derivePhaseNextStep(sections({ prompt_builder: null }), null).label).toBe(
+      "Continue Change Map"
     );
     const confirmed = map({ status: "confirmed", confirmed_at: "2026-07-13T11:00:00Z" });
     expect(

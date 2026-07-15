@@ -65,7 +65,7 @@ describe("guided project shell contract", () => {
   });
 
   it("uses the shared provider and saved-state refresh for both desktop and mobile", () => {
-    expect(layout).toContain("<GuidedProjectNavigationProvider>");
+    expect(layout).toContain("<GuidedProjectNavigationProvider userId={userId}>");
     expect(layout.match(/<GuidedProjectNav\s/g)).toHaveLength(2);
     expect(provider).toContain("GUIDED_NAVIGATION_REFRESH_EVENT");
     expect(provider).toContain("getEvaluation()");

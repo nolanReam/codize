@@ -4,17 +4,21 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
+import AdaptiveEntry from "@/components/AdaptiveEntry";
 import GuideCard from "@/components/GuideCard";
 import {
   ApiError,
   completeIntake,
   generateRoadmap,
+  getEntryProfile,
   getIntakeQuestions,
   getIntakeStatus,
   submitIntakeAnswer,
+  updateEntryProfile,
 } from "@/lib/api";
 import { useDraft } from "@/lib/drafts";
-import type { IntakeQuestion, IntakeStatus } from "@/lib/types";
+import { normalizeEntryProfile, recommendationFor } from "@/lib/entryProfile";
+import type { EntryProfile, EntryProfileUpdate, IntakeQuestion, IntakeStatus } from "@/lib/types";
 
 // Per-question beginner guidance (M13E.1): helper text, an example
 // placeholder, and optional tap-to-fill starter chips. The question TEXT is
@@ -109,14 +113,31 @@ export default function IntakePage() {
   const [archetypeName, setArchetypeName] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [entryProfile, setEntryProfile] = useState<EntryProfile | null>(null);
+  const [entryMode, setEntryMode] = useState(false);
+  const [preferencesOnly, setPreferencesOnly] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [q, s] = await Promise.all([getIntakeQuestions(), getIntakeStatus()]);
+      const [q, s, entry] = await Promise.all([
+        getIntakeQuestions(),
+        getIntakeStatus(),
+        getEntryProfile(),
+      ]);
+      const safeProfile = normalizeEntryProfile(entry.profile);
       setQuestions(q.questions);
       setStatus(s);
+      setEntryProfile(safeProfile);
+      const preferenceRequest = new URLSearchParams(window.location.search).get("preferences") === "1";
+      setPreferencesOnly(preferenceRequest);
+      setEntryMode(
+        !preferenceRequest &&
+        s.answered_questions.length === 0 &&
+        !s.completed &&
+        !safeProfile?.completed
+      );
       setLoading(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't load intake.");
@@ -201,7 +222,8 @@ export default function IntakePage() {
     setGenerateError(null);
     try {
       await generateRoadmap();
-      router.replace("/app/phase");
+      const recommendation = recommendationFor(entryProfile);
+      router.replace(recommendation?.href ?? "/app/phase/prompt");
     } catch (err) {
       // 502 = LLM output discarded by the fail-closed validator — a normal,
       // retryable outcome; nothing was stored.
@@ -219,6 +241,37 @@ export default function IntakePage() {
   const answeredCount = status?.answered_questions.length ?? 0;
   const readyToFinish =
     status != null && !status.completed && status.next_question === null && answeredCount === 5;
+
+  async function saveEntry(updates: EntryProfileUpdate): Promise<EntryProfile> {
+    const result = await updateEntryProfile(updates);
+    const saved = normalizeEntryProfile(result.profile);
+    if (!saved) throw new Error("Your saved guidance choices could not be read safely.");
+    setEntryProfile(saved);
+    return saved;
+  }
+
+  if (!loading && status && (entryMode || preferencesOnly)) {
+    return (
+      <>
+        <h1 className="page-title">
+          {preferencesOnly ? "Guidance Preferences" : "Find Your Starting Point"}
+        </h1>
+        <p className="page-sub">
+          {preferencesOnly
+            ? "Choose how much explanation Codize shows. Your saved project work will not change."
+            : "A few short choices help Codize recommend one sensible place to begin."}
+        </p>
+        <div className="entry-layout">
+          <AdaptiveEntry
+            profile={entryProfile}
+            preferencesOnly={preferencesOnly}
+            onSave={saveEntry}
+            onContinue={() => setEntryMode(false)}
+          />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
