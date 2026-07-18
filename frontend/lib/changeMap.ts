@@ -552,7 +552,7 @@ export function derivePhaseNextStep(
   });
   return {
     label: navigation.continueAction.label,
-    href: navigation.continueAction.href ?? "/app/phase",
+    href: navigation.continueAction.href ?? "/app#current-work",
     hint: navigation.continueAction.reason,
   };
 }

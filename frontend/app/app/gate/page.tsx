@@ -301,7 +301,7 @@ function BlockedView({
             Back to Project Home
           </Link>
         )}
-        <Link href="/app/phase" className="btn">
+        <Link href="/app#current-work" className="btn">
           Review phase tasks
         </Link>
       </div>
@@ -414,7 +414,7 @@ function ReadyView({
         <button className="btn primary" onClick={onBegin} disabled={busy}>
           {busy ? "Starting…" : "Begin defense"}
         </button>
-        <Link href="/app/phase" className="btn">
+        <Link href="/app#current-phase" className="btn">
           Review the phase first
         </Link>
       </div>
@@ -608,7 +608,7 @@ function Outcome({ outcome, onReset }: { outcome: GateEvaluationResult; onReset:
             <Link href="/app" className="btn">
               Back to Project Home
             </Link>
-            <Link href="/app/phase" className="btn">
+            <Link href="/app#current-phase" className="btn">
               Open Phase {outcome.current_phase}
             </Link>
           </div>
@@ -696,8 +696,8 @@ function CooldownView({ gate }: { gate: GateCurrent }) {
         <Link href="/app/phase/review" className="btn">
           Revisit your work
         </Link>
-        <Link href="/app/phase" className="btn">
-          Phase workspace
+        <Link href="/app" className="btn">
+          Project Home
         </Link>
       </div>
     </div>

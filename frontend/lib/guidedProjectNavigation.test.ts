@@ -413,7 +413,7 @@ describe("guided project navigation model", () => {
       completed_task_count: 1,
       incomplete_tasks: [{ task_id: "human-1", description: "Inspect the route" }],
     });
-    expect(model.continueAction).toMatchObject({ label: "Finish phase build tasks", href: "/app/phase", stageId: null });
+    expect(model.continueAction).toMatchObject({ label: "Finish phase build tasks", href: "/app#current-work", stageId: null });
     expect(model.journey[6].state).toBe("later");
   });
 
@@ -535,6 +535,7 @@ describe("guided project navigation model", () => {
     expect(routeIsActive("/app/phase/evidence", "/app/phase/change-map")).toBe(false);
     expect(routeIsActive("/app/phase/prompt", "/app/phase")).toBe(false);
     expect(routeIsActive("/app", "/app")).toBe(true);
+    expect(routeIsActive("/app", "/app#current-work")).toBe(true);
     expect(routeIsActive("/app/report", "/app/report?phase=1")).toBe(true);
   });
 });

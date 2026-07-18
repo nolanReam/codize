@@ -456,8 +456,8 @@ gate, and evaluator behavior are unchanged. Full rules:
 
 **M16N (2026-07-14) — guided project shell.** `/app` remains the route and is
 visibly Project Home. `lib/guidedProjectNavigation.ts` is the single typed,
-pure lifecycle model used by desktop/mobile shell, Project Home, Phase
-Workspace, compact Journey, Continue, and Project Record. The provider reads
+pure lifecycle model used by desktop/mobile shell, Project Home, compact
+Journey, Continue, and Project Record. The provider reads
 saved evaluation/workflow/gate/intake state and refreshes after confirmed API
 mutations; it never reads drafts or derives progress from pathname. Future
 stages are non-links, current lifecycle and `aria-current=page` are separate,
@@ -489,3 +489,19 @@ when blocked. Active/cooldown/retry/complete stay distinct. Change Map 502 UI is
 one focused alert with an exact source-matching correction, retry, Import review,
 and explicit manual fallback only when no map exists. See
 [[project-classification-and-product-truth-conventions]].
+
+**M18B.1 (2026-07-18) — one Home and simplified navigation.** Project Home is
+the sole global orientation dashboard: short project identity → current phase
+and deterministic plain-language purpose → one shared Continue → one ordered
+AI-appropriate/student-owned current-work list → compact workflow position →
+collapsed roadmap → compact Project Record access → preferences/controls. It
+reuses the existing phase GET/PATCH contracts; workflow saves never complete a
+build task and only Defense advances phases. The former Phase Workspace UI is
+gone, `/app/phase` redirects to `/app#current-phase`, and task-blocked Continue
+targets `/app#current-work`; child workflow routes remain unchanged. The shell
+removes Phase Workspace, hides identity/Journey/Record before roadmap, keeps
+Journey and Project Record collapsed, groups the mobile disclosures
+exclusively, and attaches `aria-controls` only while the drawer exists. M18A
+Journey/Continue/Defense/Report priority and truth contracts are unchanged.
+M18B.2 alone may add selected phase-assignment state and Prompt Builder binding;
+M18B.1 stores no selection and implements no recommendation algorithm.

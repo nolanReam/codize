@@ -168,7 +168,7 @@ const GUIDES: { match: RegExp; guide: PhaseGuide }[] = [
 
 const FALLBACK: PhaseGuide = {
   meaning:
-    "This phase builds one specific slice of your project — read the core concept and tasks above for what it covers. Work it in small steps: ask AI for one thing at a time, then review what came back.",
+    "This phase builds one specific slice of your project. Use the core concept and current work to keep its purpose and scope clear before moving on.",
   asks: [
     "Explain what this phase's first task involves before writing any code.",
     "Help me with the first task of this phase — one small step at a time.",

@@ -9,8 +9,8 @@ retries, cooldowns, Report truth, or database schema.
 `frontend/lib/guidedProjectNavigation.ts` is the shared typed deterministic
 model. `GuidedProjectNavigationProvider` loads existing server state from
 evaluation, the current phase workflow view, current gate, and intake status.
-Desktop sidebar, mobile drawer, global Continue, Project Home, Phase Workspace,
-compact Journey, and Project Record consume that same model. Successful API
+Desktop sidebar, mobile drawer, global Continue, Project Home, compact Journey,
+and Project Record consume that same model. Successful API
 mutations emit one refresh event; GETs never do, so there is no request loop.
 
 Never create a second lifecycle helper. `derivePhaseNextStep` remains only as
@@ -30,6 +30,9 @@ link never changes Continue.
 - Project Record is a native disclosure using the existing deep links. It
   contains only saved/current historical work, including prior-phase Reports.
   It is a project record, not proof or independent verification.
+- Project Home is the sole orientation dashboard. It owns the current phase's
+  plain-language purpose, one ordered AI-appropriate/student-owned task list,
+  compact workflow position, collapsed roadmap, and compact Record access.
 
 ## Saved-state authority and priority
 
@@ -45,7 +48,7 @@ navigation.
 Continue selects the earliest dependency needing work: stale Change Map,
 Review, Verification, then Evidence before any downstream stage. Evidence
 incomplete remains current. After Evidence completion, remaining saved build
-tasks route to Phase Workspace so Defense is never offered before backend
+tasks route to Project Home's `#current-work` section so Defense is never offered before backend
 eligibility. Defense then distinguishes Start, Continue, Try again, cooldown
 (non-action), and final View Defense Report. A failed attempt remains in the
 record without being called complete.
@@ -65,6 +68,14 @@ Home and a stable shell; failure preserves Project Home/current content and
 offers retry without guessed stage state. Future, complete, current, and stale
 meaning always appears in text, not color alone; reduced-motion and current
 focus styles remain global.
+
+M18B.1 removes Phase Workspace from desktop and mobile navigation. The bare
+`/app/phase` route remains only as a compatibility redirect to
+`/app#current-phase`; workflow child routes under `/app/phase/*` are unchanged.
+Before a roadmap exists, the shell shows only Project Home, setup Continue,
+Help, and account controls. Once active, Journey and Project Record are compact
+disclosures; the mobile pair shares an exclusive disclosure group. The closed
+Menu button has no `aria-controls` relationship until the drawer exists.
 
 ## Exact M17 seam
 
@@ -93,3 +104,12 @@ cooldown, retry, and completed attempts remain resumable/reportable even when
 an upstream artifact later becomes stale. The stale record stays visibly
 flagged, but it cannot redirect the primary Continue action away from the
 existing Defense lifecycle.
+
+## Exact M18B.2 seam
+
+M18B.2 may add explicit selected phase-assignment/task state and bind Prompt
+Builder to that selection. It must reuse Project Home's ordered current-work
+list, the existing phase task ids/data, and the shared Continue lifecycle. It
+must not restore Phase Workspace, create a second task recommendation model,
+infer assignment selection from checkbox completion, or change roadmap/gate
+authority. M18B.1 stores no selection and Prompt Builder remains unbound.

@@ -169,7 +169,7 @@ function defenseBlockerAction(gate: GateCurrent | null): GuidedContinueAction | 
     return action("evidence", "Continue Evidence", blocker.detail);
   }
   if (code === "build_tasks_incomplete") {
-    return action(null, "Finish phase build tasks", blocker.detail, "/app/phase");
+    return action(null, "Finish phase build tasks", blocker.detail, "/app#current-work");
   }
   return action("defense", "Review Defense readiness", blocker.detail);
 }
@@ -474,7 +474,7 @@ export function buildGuidedProjectNavigation(
                     null,
                     "Finish phase build tasks",
                     `${evaluation.incomplete_tasks?.length ?? 0} build task(s) remain before Project Defense.`,
-                    "/app/phase"
+                    "/app#current-work"
                   );
                 } else if (evaluation.state === "complete" || gate?.state === "passed") {
                   set("defense", "complete", "The final Project Defense is complete.");
@@ -601,7 +601,7 @@ export function buildGuidedProjectNavigation(
 }
 
 export function routeIsActive(pathname: string, href: string): boolean {
-  const path = href.split("?")[0];
+  const path = href.split(/[?#]/)[0];
   if (path === "/app" || path === "/app/phase") return pathname === path;
   return pathname === path || pathname.startsWith(`${path}/`);
 }

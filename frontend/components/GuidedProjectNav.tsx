@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 
-import { useGuidedProjectNavigation } from "./GuidedProjectNavigationProvider";
 import { routeIsActive } from "@/lib/guidedProjectNavigation";
+import { useGuidedProjectNavigation } from "./GuidedProjectNavigationProvider";
 
 export function GuidedContinueAction({
   className = "guided-continue-link",
@@ -51,29 +51,30 @@ export default function GuidedProjectNav({
   onSignOut: () => void;
 }) {
   const { navigation, state, error, refresh } = useGuidedProjectNavigation();
+  const activeWorkflow = state === "ready" && navigation.workflow !== null;
   const continueIsCurrent =
     state === "ready" &&
     navigation.continueAction.href != null &&
+    !navigation.continueAction.href.includes("#") &&
     routeIsActive(pathname, navigation.continueAction.href);
   const recordContainsCurrent =
     !continueIsCurrent &&
     navigation.projectRecord.some((item) => routeIsActive(pathname, item.href));
-  const phaseWorkspaceIsCurrent = pathname === "/app/phase" && !continueIsCurrent;
   const journeyCurrentId =
-    pathname !== "/app" &&
-    !continueIsCurrent &&
-    !recordContainsCurrent &&
-    !phaseWorkspaceIsCurrent
+    pathname !== "/app" && !continueIsCurrent && !recordContainsCurrent
       ? navigation.journey.find((item) => routeIsActive(pathname, item.href))?.id ?? null
       : null;
+  const mobileDisclosureGroup =
+    idPrefix === "mobile" ? "mobile-project-navigation-sections" : undefined;
 
   return (
     <>
-      <div className="project-identity" aria-label="Active project">
-        <span className="project-identity-label">Active project</span>
-        <strong title={navigation.projectLabel}>{navigation.projectLabel}</strong>
-        {navigation.phaseLabel && <span>{navigation.phaseLabel}</span>}
-      </div>
+      {activeWorkflow && (
+        <div className="project-identity" aria-label="Active project">
+          <span className="project-identity-label">Active project</span>
+          <strong title={navigation.projectLabel}>{navigation.projectLabel}</strong>
+        </div>
+      )}
 
       <nav aria-label="Project navigation" className="guided-project-nav">
         <Link
@@ -120,82 +121,75 @@ export default function GuidedProjectNav({
           )}
         </section>
 
-        <section className="guided-nav-section" aria-labelledby={`${idPrefix}-journey`}>
-          <h2 id={`${idPrefix}-journey`}>Journey</h2>
-          {state === "error" ? (
-            <p className="guided-nav-muted">Saved journey state is unavailable. Your current page remains open.</p>
-          ) : (
-            <ol className="guided-journey" aria-busy={state === "loading"}>
-              {state === "loading"
-                ? Array.from({ length: 8 }, (_, index) => (
-                    <li className="guided-stage loading-stage" key={index}>
-                      <span className="guided-stage-index">{String(index + 1).padStart(2, "0")}</span>
-                      <span>Loading stage</span>
-                    </li>
-                  ))
-                : navigation.journey.map((item, index) => (
-                    <li
-                      className={`guided-stage ${item.state}${journeyCurrentId === item.id ? " viewing" : ""}`}
-                      aria-current={journeyCurrentId === item.id ? "page" : undefined}
-                      key={item.id}
-                    >
-                      <span className="guided-stage-index" aria-hidden="true">
-                        {item.state === "complete" ? "✓" : String(index + 1).padStart(2, "0")}
-                      </span>
-                      <span className="guided-stage-copy">
-                        <span>{item.label}</span>
-                        <span className="guided-stage-state">{item.stateLabel}</span>
-                      </span>
-                      <span className="sr-only">{item.reason}</span>
-                    </li>
-                  ))}
-            </ol>
-          )}
-        </section>
-
-        <details className="project-record" open={recordContainsCurrent || undefined}>
-          <summary>
-            <span>Project Record</span>
-            {state === "ready" && <span>{navigation.projectRecord.length}</span>}
-          </summary>
-          <p>Saved workflow history. These records are not independent verification.</p>
-          {state === "ready" && navigation.projectRecord.length > 0 ? (
-            <ul>
-              {navigation.projectRecord.map((item) => {
-                const current =
-                  !continueIsCurrent && routeIsActive(pathname, item.href);
-                return (
-                  <li key={item.id} className={item.state}>
-                    <Link
-                      href={item.href}
-                      aria-current={current ? "page" : undefined}
-                      onClick={onNavigate}
-                    >
-                      <span>{item.label}</span>
-                      <span>{item.stateLabel}</span>
-                    </Link>
-                    {item.description && <p>{item.description}</p>}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="guided-nav-muted">
-              {state === "loading" ? "Loading saved records…" : "Saved workflow records will appear here."}
-            </p>
-          )}
-        </details>
-
-        <section className="guided-nav-section guided-utilities" aria-labelledby={`${idPrefix}-project-tools`}>
-          <h2 id={`${idPrefix}-project-tools`}>Project tools</h2>
-          <Link
-            href="/app/phase"
-            className={phaseWorkspaceIsCurrent ? "active" : ""}
-            aria-current={phaseWorkspaceIsCurrent ? "page" : undefined}
-            onClick={onNavigate}
+        {activeWorkflow && (
+          <details
+            className="guided-journey-disclosure"
+            open={journeyCurrentId != null || undefined}
+            name={mobileDisclosureGroup}
           >
-            Phase Workspace
-          </Link>
+            <summary>
+              <span>Journey</span>
+              <span>{navigation.journey.length}</span>
+            </summary>
+            <ol className="guided-journey">
+              {navigation.journey.map((item, index) => (
+                <li
+                  className={`guided-stage ${item.state}${journeyCurrentId === item.id ? " viewing" : ""}`}
+                  aria-current={journeyCurrentId === item.id ? "page" : undefined}
+                  key={item.id}
+                >
+                  <span className="guided-stage-index" aria-hidden="true">
+                    {item.state === "complete" ? "✓" : String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="guided-stage-copy">
+                    <span>{item.label}</span>
+                    <span className="guided-stage-state">{item.stateLabel}</span>
+                  </span>
+                  <span className="sr-only">{item.reason}</span>
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
+
+        {activeWorkflow && (
+          <details
+            className="project-record"
+            open={recordContainsCurrent || undefined}
+            name={mobileDisclosureGroup}
+          >
+            <summary>
+              <span>Project Record</span>
+              <span>{navigation.projectRecord.length}</span>
+            </summary>
+            <p>Saved workflow history. These records are not independent verification.</p>
+            {navigation.projectRecord.length > 0 ? (
+              <ul>
+                {navigation.projectRecord.map((item) => {
+                  const current = !continueIsCurrent && routeIsActive(pathname, item.href);
+                  return (
+                    <li key={item.id} className={item.state}>
+                      <Link
+                        href={item.href}
+                        aria-current={current ? "page" : undefined}
+                        onClick={onNavigate}
+                      >
+                        <span>{item.label}</span>
+                        <span>{item.stateLabel}</span>
+                      </Link>
+                      {item.description && <p>{item.description}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="guided-nav-muted">Saved workflow records will appear here.</p>
+            )}
+          </details>
+        )}
+
+        <section className="guided-nav-section guided-utilities" aria-labelledby={`${idPrefix}-help`}>
+          <h2 id={`${idPrefix}-help`}>Help</h2>
           <button type="button" onClick={onHelp}>
             How Codize works
           </button>

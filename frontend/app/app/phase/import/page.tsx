@@ -243,8 +243,8 @@ export default function BringBackPage() {
                   <Link href="/app/phase/change-map" style={{ color: "inherit", fontWeight: 700 }}>
                     Continue Change Map →
                   </Link>
-                  <Link href="/app/phase" style={{ color: "inherit" }}>
-                    Back to Build Loop
+                  <Link href="/app#current-work" style={{ color: "inherit" }}>
+                    Back to current work
                   </Link>
                 </div>
               </div>

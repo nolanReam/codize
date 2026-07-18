@@ -214,7 +214,8 @@ function ShellFrame({
           type="button"
           className="mobile-menu-button"
           aria-expanded={mobileOpen}
-          aria-controls="mobile-project-navigation"
+          aria-controls={mobileOpen ? "mobile-project-navigation" : undefined}
+          aria-haspopup="dialog"
           onClick={() => setMobileOpen(true)}
         >
           <span aria-hidden="true">☰</span>

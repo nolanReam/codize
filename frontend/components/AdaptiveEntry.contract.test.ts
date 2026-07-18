@@ -46,7 +46,9 @@ describe("M17 adaptive entry UI contract", () => {
   });
 
   it("keeps setup status honest and makes pre-workflow profile errors retryable", () => {
-    expect(home).toContain('state === "ready" && evaluation && workflow');
+    expect(home).toContain("{evaluation && workflow && (");
+    expect(home).toContain('error={state === "error"');
+    expect(home).not.toContain("DEFENSE READY");
     expect(provider).toContain("getEntryProfile(),");
     expect(
       provider.match(/getEntryProfile\(\)\.catch\(\(\) => \(\{ profile: null \}\)\)/g)
