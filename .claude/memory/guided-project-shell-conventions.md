@@ -84,3 +84,12 @@ Any saved/stale downstream dependency uses the established M16N priority and
 overrides entry history. Legacy missing/malformed profiles preserve the prior
 shell and receive standard guidance. No second sidebar, lifecycle helper, or
 workflow completion field exists.
+
+M18A-R makes two authority rules explicit. The backend readiness blocker is the
+final prerequisite authority before offering a new Defense attempt; the shell
+must not reconstruct typed validity from raw section presence. Once a Defense
+attempt exists, its lifecycle is the continuation authority: in-progress,
+cooldown, retry, and completed attempts remain resumable/reportable even when
+an upstream artifact later becomes stale. The stale record stays visibly
+flagged, but it cannot redirect the primary Continue action away from the
+existing Defense lifecycle.

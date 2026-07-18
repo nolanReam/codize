@@ -111,6 +111,32 @@ def test_empty_state_has_all_sections_null():
     assert all(v is None for v in state["sections"].values())
 
 
+def test_corrupt_implementation_import_is_absent_from_the_client_workflow_view():
+    repo = InMemoryProjectRepository()
+    project = seed_active_project(repo)
+    run(
+        repo.update_project(
+            USER,
+            project["id"],
+            {
+                "workflow_artifacts": {
+                    "1": {
+                        "implementation_import": {
+                            "source_kind": "git_diff",
+                            "content": None,
+                            "changed_files": [],
+                            "student_summary": None,
+                            "saved_at": "malformed",
+                        }
+                    }
+                }
+            },
+        )
+    )
+    state = run(get_phase_artifacts(repo, USER, 1))
+    assert state["sections"]["implementation_import"] is None
+
+
 def test_entry_profile_is_not_a_phase_artifact_or_countable_section():
     repo = InMemoryProjectRepository()
     project = seed_active_project(repo)

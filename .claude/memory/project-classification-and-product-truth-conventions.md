@@ -70,3 +70,16 @@ explicitly selected phase assignment/task. It must consume the M18A classifier,
 canonical Journey, Defense-readiness, and Change Map recovery contracts rather
 than redefining them. M18A does not remove routes, redesign the tutorial, add a
 learning system, or implement assignment selection.
+
+## M18A-R audit hardening
+
+Classification evidence is product-behavior evidence, not vocabulary. Ignore
+quoted documentation examples and clauses that only describe how the student
+uses an AI coding tool; retain model/provider wording when the product itself
+sends prompts or returns generated, summarized, or analyzed output. Scripted
+chatbots and ordinary external APIs are not AI features. Explicit exclusions
+are evaluated item-by-item across coordinated lists, including `without`,
+`out of scope`, `future`, and `not yet planned`; a double negative is not an
+exclusion. When building the deterministic fallback, remove only AI-tool-use
+meta clauses from the purpose so strict browser-local scope validation still
+attacks the actual product requirements.

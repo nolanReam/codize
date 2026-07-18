@@ -1,4 +1,4 @@
-// "Bring Back What AI Changed" (M15B) — pure helpers for the implementation
+// "Bring Back What Changed" (M15B) — pure helpers for the implementation
 // import page. Everything here is deterministic and unit-tested: source-kind
 // labels, form ↔ backend payload shaping, and the save-blocking rules. The
 // page stays a thin consumer.
@@ -26,7 +26,7 @@ export const CHANGED_FILE_ENTRY_MAX = 300;
 // The page's load-bearing copy, exported so tests can hold it to the product
 // rules (beginner-friendly title, "you do not need every item" reassurance,
 // no internal enum names anywhere a student can read).
-export const PAGE_TITLE = "Bring Back What AI Changed";
+export const PAGE_TITLE = "Bring Back What Changed";
 export const PAGE_INTRO =
   "After you use AI, bring back whatever you have so you can keep track of what changed before moving on.";
 export const PAGE_REASSURANCE = "You do not need every item — add the material you have.";

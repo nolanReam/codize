@@ -46,7 +46,8 @@ import type {
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
-    message: string
+    message: string,
+    public readonly code?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -115,7 +116,8 @@ async function request<T>(
       // keep the generic message
     }
   }
-  throw new ApiError(res.status, message);
+  const code = res.headers.get("X-Codize-Error-Code") ?? undefined;
+  throw new ApiError(res.status, message, code);
 }
 
 // --- intake ------------------------------------------------------------------

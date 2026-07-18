@@ -1,4 +1,4 @@
-"""Implementation import tests (M15A) — the "Bring Back What AI Changed"
+"""Implementation import tests (M15A) — the "Bring Back What Changed"
 workflow section: strict validation, formatting preservation, normalization,
 per-phase persistence, secret safety, the untrusted-data boundary, the M15C
 read seam, and the guarantee that raw imports never enter the M14 Defense

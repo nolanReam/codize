@@ -9,6 +9,7 @@ redaction and injection behavior are asserted on exactly what a provider
 would have received.
 """
 
+import asyncio
 import json
 import logging
 
@@ -137,6 +138,45 @@ def test_manual_recovery_never_overwrites_an_existing_readable_map():
     with pytest.raises(ChangeMapExistsError):
         run(create_manual_change_map(repo, USER, 1))
     assert get_change_map(run(repo.get_project(USER)), 1).generated_at == existing["generated_at"]
+
+
+def test_concurrent_manual_recovery_creates_one_authoritative_empty_draft():
+    class BarrierRepository(InMemoryProjectRepository):
+        def __init__(self):
+            super().__init__()
+            self.waiting = 0
+            self.release = None
+
+        async def update_workflow_artifacts_if_current(
+            self, user_id, project_id, expected, replacement
+        ):
+            if self.release is None:
+                self.release = asyncio.Event()
+            self.waiting += 1
+            if self.waiting == 2:
+                self.release.set()
+            await self.release.wait()
+            return await super().update_workflow_artifacts_if_current(
+                user_id, project_id, expected, replacement
+            )
+
+    repo = BarrierRepository()
+    seed_active_project(repo)
+    run(save_section(repo, USER, 1, "implementation_import", IMPORT_PAYLOAD))
+
+    async def race():
+        return await asyncio.gather(
+            create_manual_change_map(repo, USER, 1),
+            create_manual_change_map(repo, USER, 1),
+            return_exceptions=True,
+        )
+
+    results = run(race())
+    assert sum(isinstance(result, dict) for result in results) == 1
+    assert sum(isinstance(result, ChangeMapExistsError) for result in results) == 1
+    project = run(repo.get_project(USER))
+    assert get_change_map(project, 1).items == []
+    assert workflow_service.get_implementation_import(project, 1) is not None
 
 
 # --- extraction view: redaction before truncation --------------------------------
@@ -464,8 +504,9 @@ def test_two_invalid_outputs_store_nothing_and_raise_retryable(caplog):
     repo = seed_with_import()
     bad = json.dumps({"items": [{**VALID_ITEM, "draft_text": "Added `user_score_cache()`."}]})
     with caplog.at_level(logging.WARNING):
-        with pytest.raises(ChangeMapGenerationError):
+        with pytest.raises(ChangeMapGenerationError) as caught:
             run(generate_change_map(repo, llm_with(bad, bad), USER, 1))
+    assert caught.value.kind == "grounding_rejected"
     project = run(repo.get_project(USER))
     assert get_change_map(project, 1) is None
     # Logs carry issue categories only — never the raw import material.
@@ -475,8 +516,9 @@ def test_two_invalid_outputs_store_nothing_and_raise_retryable(caplog):
 
 def test_provider_failure_is_immediate_retryable_502_shape():
     repo = seed_with_import()
-    with pytest.raises(ChangeMapGenerationError):
+    with pytest.raises(ChangeMapGenerationError) as caught:
         generate(repo, LLMService([ScriptedLLM([])]))  # exhausted → LLMError
+    assert caught.value.kind == "provider_unavailable"
     assert get_change_map(run(repo.get_project(USER)), 1) is None
 
 
@@ -484,8 +526,9 @@ def test_generation_temperature_is_zero_and_attempts_bounded():
     repo = seed_with_import()
     bad = "not json"
     scripted = ScriptedLLM([bad, bad, bad, bad])
-    with pytest.raises(ChangeMapGenerationError):
+    with pytest.raises(ChangeMapGenerationError) as caught:
         run(generate_change_map(repo, LLMService([scripted]), USER, 1))
+    assert caught.value.kind == "invalid_output"
     assert len(scripted.calls) == 2  # never more than the bounded attempts
     assert all(temp == 0.0 for _, temp in scripted.calls)
 

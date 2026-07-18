@@ -140,6 +140,40 @@ function evidenceIsComplete(sections: WorkflowSections): boolean {
   return !evidence.stale && evidence.evidence_record_complete;
 }
 
+function defenseBlockerAction(gate: GateCurrent | null): GuidedContinueAction | null {
+  if (
+    gate?.state !== "not_started" ||
+    gate.readiness?.state !== "not_ready" ||
+    !gate.readiness.blockers.length
+  ) {
+    return null;
+  }
+  const blocker = gate.readiness.blockers[0];
+  const code = blocker.code;
+  if (code === "prompt_missing") {
+    return action("prompt", "Continue Prompt Builder", blocker.detail);
+  }
+  if (code === "import_missing") {
+    return action("import", "Bring Back What Changed", blocker.detail);
+  }
+  if (code.startsWith("change_map_")) {
+    return action("change_map", "Continue Change Map", blocker.detail);
+  }
+  if (code.startsWith("review_")) {
+    return action("review", "Continue Review", blocker.detail);
+  }
+  if (code.startsWith("verification_")) {
+    return action("verification", "Continue Verification", blocker.detail);
+  }
+  if (code.startsWith("evidence_")) {
+    return action("evidence", "Continue Evidence", blocker.detail);
+  }
+  if (code === "build_tasks_incomplete") {
+    return action(null, "Finish phase build tasks", blocker.detail, "/app/phase");
+  }
+  return action("defense", "Review Defense readiness", blocker.detail);
+}
+
 function recordItem(
   stageId: GuidedStageId,
   state: ProjectRecordItem["state"],
@@ -430,6 +464,7 @@ export function buildGuidedProjectNavigation(
                 continueAction = action("evidence", "Continue Evidence", "Address each selected result with support or an unavailable reason.");
               } else {
                 set("evidence", "complete", "The Evidence record is complete.");
+                const readinessAction = defenseBlockerAction(gate);
                 const tasksRemain =
                   evaluation.state === "in_progress" &&
                   (evaluation.incomplete_tasks?.length ?? 0) > 0;
@@ -466,6 +501,14 @@ export function buildGuidedProjectNavigation(
                       : `Retry opens in about ${minutes} minute${minutes === 1 ? "" : "s"}.`,
                     null
                   );
+                } else if (readinessAction) {
+                  const blockerStage = readinessAction.stageId;
+                  if (blockerStage) {
+                    set(blockerStage, "needs_attention", readinessAction.reason);
+                  } else {
+                    set("defense", "later", readinessAction.reason);
+                  }
+                  continueAction = readinessAction;
                 } else if (evaluation.recent_gate?.outcome === "failed") {
                   set("defense", "needs_attention", "The saved attempt needs another try.");
                   continueAction = action("defense", "Try Project Defense again", "Review the feedback, then begin another attempt.");
@@ -499,6 +542,47 @@ export function buildGuidedProjectNavigation(
   }
   if (isLinkedEvidenceArtifact(sections.evidence) && sections.evidence.stale) {
     set("evidence", "needs_attention", "Verification changed after this Evidence was created.");
+  }
+
+  // Once a Defense lifecycle exists, it is the authoritative continuation.
+  // Upstream edits remain visible as needs-attention records, but they never
+  // strand an active attempt, hide a cooldown, or displace its saved Report.
+  if (gate?.state === "in_progress") {
+    set("defense", "continue", "A saved Defense attempt is in progress.");
+    continueAction = action(
+      "defense",
+      "Continue Project Defense",
+      "Resume the saved question or answer."
+    );
+  } else if (gate?.state === "cooldown") {
+    const seconds = gate.cooldown_seconds_remaining ?? evaluation.cooldown_seconds_remaining;
+    const minutes = seconds == null ? null : Math.max(1, Math.ceil(seconds / 60));
+    set("defense", "needs_attention", "A retry opens after the current cooldown.");
+    continueAction = action(
+      "defense",
+      "Project Defense cooldown",
+      minutes == null
+        ? "Review your work while the saved cooldown finishes."
+        : `Retry opens in about ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+      null
+    );
+  } else if (gate?.state === "passed" || evaluation.state === "complete") {
+    const phase = evaluation.current_phase ?? workflow.phase;
+    set("defense", "complete", "The final Project Defense is complete.");
+    set("report", "continue", "The saved Defense Report is available.");
+    continueAction = action(
+      "report",
+      "View Defense Report",
+      "Review the project record and its preserved uncertainty.",
+      `/app/report?phase=${phase}`
+    );
+  } else if (gate?.readiness?.state === "retry") {
+    set("defense", "needs_attention", "The saved attempt is ready for another try.");
+    continueAction = action(
+      "defense",
+      "Try Project Defense again",
+      "Review the feedback, then begin another attempt."
+    );
   }
 
   return {

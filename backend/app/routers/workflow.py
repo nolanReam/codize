@@ -60,7 +60,11 @@ def _change_map_http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, change_map_service.InvalidChangeMapUpdateError):
         return HTTPException(status_code=422, detail=str(exc))
     if isinstance(exc, change_map_service.ChangeMapGenerationError):
-        return HTTPException(status_code=502, detail=str(exc))
+        return HTTPException(
+            status_code=502,
+            detail=str(exc),
+            headers={"X-Codize-Error-Code": f"change_map_{exc.kind}"},
+        )
     # workspace not ready / import required / already exists / stale /
     # pending items / already confirmed
     return HTTPException(status_code=409, detail=str(exc))

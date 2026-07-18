@@ -1,6 +1,6 @@
 # Implementation import conventions (Milestone 15A)
 
-**Product purpose:** "Bring Back What AI Changed" — after using their prompt
+**Product purpose:** "Bring Back What Changed" — after using their prompt
 in an external AI tool, the student brings the implementation material back
 into Codize (pasted AI response, git diff, code snippet, changed-file list,
 and/or their own summary) so later milestones can help them organize it.

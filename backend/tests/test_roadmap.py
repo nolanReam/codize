@@ -378,6 +378,26 @@ def test_studyflow_gets_a_strict_browser_only_roadmap_without_invented_systems()
     assert project["roadmap"] is None
 
 
+def test_browser_roadmap_omits_coding_tool_language_from_product_purpose():
+    repo = InMemoryProjectRepository()
+    seed_project(
+        repo,
+        archetype_id=3,
+        intake_purpose="Help students track homework. I use Gemini when coding.",
+        intake_scope=(
+            "A browser-only tracker using local storage. No accounts, backend, "
+            "database, or AI features."
+        ),
+        intake_stack="Plain HTML, CSS, JavaScript",
+    )
+    result = run(generate_roadmap(repo, LLMService([FailingProvider()]), USER))
+    serialized = json.dumps(result["roadmap"]).lower()
+    assert result["roadmap"]["archetype_name"] == "Browser App"
+    assert len(result["roadmap"]["phases"]) == 7
+    assert "gemini" not in serialized
+    assert "local storage" in serialized
+
+
 def test_browser_scope_drift_is_discarded_without_weakening_structure_validation():
     repo = InMemoryProjectRepository()
     seed_project(

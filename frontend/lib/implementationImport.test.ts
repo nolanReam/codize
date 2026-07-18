@@ -268,7 +268,7 @@ describe("local draft safety (existing drafts utilities)", () => {
 
 describe("page copy honors the product rules", () => {
   it("uses the beginner-friendly title, not the internal name", () => {
-    expect(PAGE_TITLE).toBe("Bring Back What AI Changed");
+    expect(PAGE_TITLE).toBe("Bring Back What Changed");
     expect(PAGE_TITLE).not.toMatch(/implementation import/i);
   });
 

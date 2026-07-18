@@ -212,3 +212,12 @@ metadata, refuses overwrite, and requires at least one student-authored item
 before confirmation. It creates no references or downstream artifacts and
 weakens none of the existing generation, schema, provenance, grounding, or
 confirmation validation.
+
+M18A-R hardens that recovery boundary. Provider unavailability, structurally
+invalid output, and grounding rejection have distinct safe error codes carried
+in a response header; the frontend uses those codes for corrective copy while
+continuing to hide 5xx bodies. Empty manual-map creation uses the repository's
+compare-and-swap seam, so concurrent requests cannot overwrite one another:
+one authoritative draft wins and every loser returns the existing-map conflict.
+Workflow reads validate Implementation Import through its typed model before
+exposing it, keeping client presence aligned with Defense-readiness truth.

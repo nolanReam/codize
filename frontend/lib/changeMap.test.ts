@@ -24,6 +24,7 @@ import {
   deriveReviewProgress,
   deriveSavePayload,
   effectiveDisplayText,
+  generationFailureCopy,
   generationRequestBody,
   groupItemsByCategory,
   hasOnlyQuestionItems,
@@ -500,6 +501,17 @@ describe("generation, status, sparse, and stale helpers", () => {
     expect(CHANGE_MAP_GENERATION_CORRECTION).toContain("file or source");
     expect(CHANGE_MAP_GENERATION_CORRECTION).toContain("file name beside each change");
     expect(CHANGE_MAP_GENERATION_CORRECTION).not.toContain("clearer summary");
+  });
+
+  it("maps provider, malformed-output, and grounding failures to honest corrections", () => {
+    const provider = generationFailureCopy("provider_unavailable");
+    const malformed = generationFailureCopy("invalid_output");
+    const grounding = generationFailureCopy("grounding_rejected");
+    expect(provider.correction).toMatch(/service did not respond/i);
+    expect(provider.correction).not.toMatch(/file|source/i);
+    expect(malformed.correction).toMatch(/safe structure/i);
+    expect(malformed.correction).not.toMatch(/match every drafted change/i);
+    expect(grounding.correction).toContain("file or source");
   });
   it("omits the normal generation body and sends replace_existing only deliberately", () => {
     expect(generationRequestBody(false)).toBeUndefined();

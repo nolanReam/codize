@@ -38,6 +38,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["Retry-After", "X-Codize-Error-Code"],
     )
     register_error_handlers(app)
     app.include_router(health.router)

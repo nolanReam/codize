@@ -21,8 +21,7 @@ import {
   categoryExplanation,
   categoryLabel,
   CHANGE_MAP_CATEGORY_ORDER,
-  CHANGE_MAP_GENERATION_FAILURE,
-  CHANGE_MAP_GENERATION_CORRECTION,
+  type ChangeMapGenerationFailureKind,
   CHANGE_MAP_HONESTY_LINE,
   CHANGE_MAP_NOTE_MAX,
   CHANGE_MAP_PAGE_INTRO,
@@ -37,6 +36,7 @@ import {
   deriveSavePayload,
   deriveChangeMapPageModel,
   groupItemsByCategory,
+  generationFailureCopy,
   hasOnlyQuestionItems,
   humanSafeStatusCopy,
   isReviewDirty,
@@ -357,11 +357,13 @@ function StudentAddedItem({
 }
 
 function GenerationFailure({
+  kind,
   replacing,
   onRetry,
   onManual,
   manualBusy,
 }: {
+  kind: ChangeMapGenerationFailureKind;
   replacing: boolean;
   onRetry: () => void;
   onManual?: () => void;
@@ -369,6 +371,7 @@ function GenerationFailure({
 }) {
   const alertRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => alertRef.current?.focus(), []);
+  const copy = generationFailureCopy(kind);
   return (
     <div
       ref={alertRef}
@@ -376,12 +379,12 @@ function GenerationFailure({
       role="alert"
       tabIndex={-1}
     >
-      <strong>{CHANGE_MAP_GENERATION_FAILURE}</strong>
+      <strong>{copy.title}</strong>
       <p>
         Your saved implementation material is unchanged
         {replacing ? ", and the current Change Map is still here" : ""}.
       </p>
-      <p>{CHANGE_MAP_GENERATION_CORRECTION}</p>
+      <p>{copy.correction}</p>
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn primary" type="button" onClick={onRetry}>
           Try again
@@ -407,6 +410,8 @@ export default function ChangeMapPage() {
   const [generating, setGenerating] = useState(false);
   const [manualCreating, setManualCreating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
+  const [generationFailureKind, setGenerationFailureKind] =
+    useState<ChangeMapGenerationFailureKind>("invalid_output");
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -520,6 +525,14 @@ export default function ChangeMapPage() {
       setRegenerateOpen(false);
     } catch (error) {
       if (error instanceof ApiError && error.status === 502) {
+        const code = error.code?.replace("change_map_", "");
+        setGenerationFailureKind(
+          code === "grounding_rejected" ||
+            code === "provider_unavailable" ||
+            code === "invalid_output"
+            ? code
+            : "invalid_output"
+        );
         setGenerationFailed(true);
       } else {
         setGenerationError(
@@ -761,7 +774,7 @@ export default function ChangeMapPage() {
                   Codize can draft a Change Map.
                 </p>
                 <Link href="/app/phase/import" className="btn primary">
-                  Bring Back What AI Changed
+                  Bring Back What Changed
                 </Link>
               </div>
             )}
@@ -802,6 +815,7 @@ export default function ChangeMapPage() {
 
             {generationFailed && (
               <GenerationFailure
+                kind={generationFailureKind}
                 replacing={retryIsReplacement}
                 onRetry={() => void runGeneration(retryIsReplacement)}
                 onManual={retryIsReplacement ? undefined : () => void runManualCreation()}
@@ -836,7 +850,7 @@ export default function ChangeMapPage() {
                       </button>
                     ) : (
                       <Link href="/app/phase/import" className="btn primary">
-                        Bring Back What AI Changed
+                        Bring Back What Changed
                       </Link>
                     )}
                   </div>

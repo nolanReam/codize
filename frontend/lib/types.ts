@@ -409,7 +409,7 @@ export interface VerificationSaveRequest
   target_updates?: VerificationTargetUpdateRequest[];
 }
 
-// "Bring Back What AI Changed" (M15A backend / M15B UI). Student-provided,
+// "Bring Back What Changed" (M15A backend / M15B UI). Student-provided,
 // self-reported material — never verified, never proof of correctness.
 export type ImplementationImportSourceKind =
   | "ai_response"

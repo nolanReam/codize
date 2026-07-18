@@ -2,7 +2,7 @@
 
 Durable storage for the student-authored v3 Build Loop sections
 (prompt_builder, review_board, evidence, verification, and — since M15A —
-implementation_import, the "Bring Back What AI Changed" material), phase-
+implementation_import, the "Bring Back What Changed" material), phase-
 scoped, in the projects.workflow_artifacts JSONB column (task_progress
 precedent: outside the roadmap jsonb, so storing artifacts can never mutate
 the fixed structure).
@@ -91,6 +91,16 @@ def _stored_sections(project: dict, phase_number: int) -> dict:
 
 def _phase_view(project: dict, phase_number: int) -> dict:
     stored = _stored_sections(project, phase_number)
+    # A raw dict is not enough to call an Import present. Formal Defense uses
+    # the typed seam below, so the client-facing workflow view must apply the
+    # same corruption boundary or global navigation can advertise downstream
+    # readiness that the server will correctly refuse.
+    if "implementation_import" in stored:
+        imported = get_implementation_import(project, phase_number)
+        if imported is None:
+            stored.pop("implementation_import", None)
+        else:
+            stored["implementation_import"] = imported.model_dump(mode="json")
     # Review is the one additive section with a server-derived read view:
     # linked Change Map bindings/snapshots are persisted, while initialized /
     # stale are computed on read and can never be client-controlled.
@@ -204,6 +214,26 @@ async def store_change_map(
     artifacts[str(phase_number)] = phase_map
     return await repo.update_project(
         user_id, project["id"], {"workflow_artifacts": artifacts}
+    )
+
+
+async def store_change_map_if_current(
+    repo: ProjectRepository,
+    user_id: str,
+    project: dict,
+    phase_number: int,
+    data: dict,
+) -> dict | None:
+    """Store a map only when no concurrent artifact write has occurred."""
+    existing = project.get("workflow_artifacts")
+    expected = existing if isinstance(existing, dict) else {}
+    artifacts = dict(expected)
+    phase_map = artifacts.get(str(phase_number))
+    phase_map = dict(phase_map) if isinstance(phase_map, dict) else {}
+    phase_map[CHANGE_MAP_KEY] = copy.deepcopy(data)
+    artifacts[str(phase_number)] = phase_map
+    return await repo.update_workflow_artifacts_if_current(
+        user_id, project["id"], expected, artifacts
     )
 
 

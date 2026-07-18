@@ -429,6 +429,69 @@ describe("guided project navigation model", () => {
     expect(complete.journey[7].state).toBe("continue");
   });
 
+  it("uses formal Defense readiness as the final prerequisite authority", () => {
+    const blocked = build({}, confirmedMap(), {
+      recent_gate: { outcome: "failed", summary: "Try again" },
+    }, {
+      readiness: {
+        state: "not_ready",
+        formal_ready: false,
+        blockers: [{
+          code: "verification_stale",
+          label: "Verification is stale",
+          detail: "Rebuild Verification from the current Review.",
+        }],
+      },
+    });
+    expect(blocked.continueAction).toMatchObject({
+      label: "Continue Verification",
+      href: "/app/phase/verify",
+      stageId: "verification",
+    });
+    expect(blocked.journey[4]).toMatchObject({ state: "needs_attention" });
+  });
+
+  it("never lets readiness recomputation displace an active Defense attempt", () => {
+    const active = build({}, confirmedMap({ stale: true }), {}, {
+      state: "in_progress",
+      gate_session_id: "gate-1",
+      next_action: "turn2",
+      readiness: {
+        state: "not_ready",
+        formal_ready: false,
+        blockers: [{
+          code: "evidence_stale",
+          label: "Evidence is stale",
+          detail: "Rebuild Evidence.",
+        }],
+      },
+    });
+    expect(active.continueAction).toMatchObject({
+      label: "Continue Project Defense",
+      href: "/app/gate",
+    });
+    expect(active.journey[2]).toMatchObject({ state: "needs_attention" });
+    expect(active.journey[6]).toMatchObject({ state: "continue" });
+  });
+
+  it("keeps cooldown, retry, and completed Defense authoritative over stale records", () => {
+    const staleMap = confirmedMap({ stale: true });
+    expect(
+      build({}, staleMap, { state: "cooldown", cooldown_seconds_remaining: 300 }, {
+        state: "cooldown",
+        cooldown_seconds_remaining: 300,
+      }).continueAction
+    ).toMatchObject({ label: "Project Defense cooldown", href: null });
+    expect(
+      build({}, staleMap, { recent_gate: { outcome: "failed", summary: "Try again" } }, {
+        readiness: { state: "retry", formal_ready: false, blockers: [] },
+      }).continueAction
+    ).toMatchObject({ label: "Try Project Defense again", href: "/app/gate" });
+    expect(
+      build({}, staleMap, { state: "complete" }, { state: "passed" }).continueAction
+    ).toMatchObject({ label: "View Defense Report", href: "/app/report?phase=1" });
+  });
+
   it("keeps a failed Defense and its Report in Project Record without calling it complete", () => {
     const model = build({}, confirmedMap(), {
       state: "cooldown",

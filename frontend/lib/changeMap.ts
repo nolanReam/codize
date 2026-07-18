@@ -37,6 +37,37 @@ export const CHANGE_MAP_GENERATION_FAILURE =
   "Codize could not create a safely grounded Change Map from this material yet.";
 export const CHANGE_MAP_GENERATION_CORRECTION =
   "Codize could not match every drafted change to a saved file or source. If you edit the Import, put the changed file name beside each change.";
+export const CHANGE_MAP_INVALID_OUTPUT_CORRECTION =
+  "The draft Codize received did not match the required safe structure. Try again; your saved Import is unchanged.";
+export const CHANGE_MAP_PROVIDER_CORRECTION =
+  "The drafting service did not respond. Try again without changing your Import, or create the map yourself.";
+
+export type ChangeMapGenerationFailureKind =
+  | "grounding_rejected"
+  | "invalid_output"
+  | "provider_unavailable";
+
+export function generationFailureCopy(kind: ChangeMapGenerationFailureKind): {
+  title: string;
+  correction: string;
+} {
+  if (kind === "provider_unavailable") {
+    return {
+      title: "Codize could not reach the Change Map drafting service.",
+      correction: CHANGE_MAP_PROVIDER_CORRECTION,
+    };
+  }
+  if (kind === "invalid_output") {
+    return {
+      title: "Codize could not use the Change Map draft it received.",
+      correction: CHANGE_MAP_INVALID_OUTPUT_CORRECTION,
+    };
+  }
+  return {
+    title: CHANGE_MAP_GENERATION_FAILURE,
+    correction: CHANGE_MAP_GENERATION_CORRECTION,
+  };
+}
 
 export const CHANGE_MAP_CATEGORY_ORDER: readonly ChangeMapCategory[] = [
   "changed_file",

@@ -129,6 +129,14 @@ class InvalidChangeMapUpdateError(ChangeMapError):
 class ChangeMapGenerationError(ChangeMapError):
     """The provider call failed or its output stayed invalid — nothing stored."""
 
+    def __init__(self, message: str, *, kind: str = "invalid_output") -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
+class ChangeMapConflictError(ChangeMapError):
+    """Concurrent workflow writes prevented a safe manual-map creation."""
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -503,7 +511,9 @@ async def _generate_validated(
         try:
             raw = await llm.complete(composed, EXTRACTION_TEMPERATURE)
         except llm_service.LLMError as exc:
-            raise ChangeMapGenerationError(_GENERIC_FAILURE) from exc
+            raise ChangeMapGenerationError(
+                _GENERIC_FAILURE, kind="provider_unavailable"
+            ) from exc
 
         generated = parse_generated(raw)
         if generated is None:
@@ -518,7 +528,10 @@ async def _generate_validated(
             continue
         # Issue categories only — never raw output, never raw import material.
         logger.warning("change map generation rejected twice: %s", issues[:10])
-        raise ChangeMapGenerationError(_GENERIC_FAILURE)
+        raise ChangeMapGenerationError(
+            _GENERIC_FAILURE,
+            kind="invalid_output" if generated is None else "grounding_rejected",
+        )
     raise ChangeMapGenerationError(_GENERIC_FAILURE)  # pragma: no cover
 
 
@@ -579,34 +592,41 @@ async def create_manual_change_map(
     source reference, downstream record, or readiness state is fabricated.
     Existing maps are never overwritten by this recovery seam.
     """
-    project = await phase_service.load_active_project(repo, user_id)
-    phase_service.require_phase(project, phase_number)
-    imported = workflow_service.get_implementation_import(project, phase_number)
-    if imported is None:
-        raise ImportRequiredError(
-            "Bring back implementation material for this phase before creating a Change Map."
-        )
-    if workflow_service.get_change_map(project, phase_number) is not None:
-        raise ChangeMapExistsError(
-            "A Change Map already exists for this phase. Keep it or use the explicit regeneration path."
-        )
+    for _attempt in range(3):
+        project = await phase_service.load_active_project(repo, user_id)
+        phase_service.require_phase(project, phase_number)
+        imported = workflow_service.get_implementation_import(project, phase_number)
+        if imported is None:
+            raise ImportRequiredError(
+                "Bring back implementation material for this phase before creating a Change Map."
+            )
+        if workflow_service.get_change_map(project, phase_number) is not None:
+            raise ChangeMapExistsError(
+                "A Change Map already exists for this phase. Keep it or use the explicit regeneration path."
+            )
 
-    extraction = build_extraction_view(imported)
-    stored = {
-        "schema_version": CHANGE_MAP_SCHEMA_VERSION,
-        "status": "draft",
-        "source_import_saved_at": imported.saved_at or "",
-        "generated_at": _now_iso(),
-        "confirmed_at": None,
-        "source_redacted": extraction.redacted,
-        "source_truncated": extraction.truncated,
-        "items": [],
-    }
-    validated = StoredChangeMap.model_validate(stored)
-    project = await workflow_service.store_change_map(
-        repo, user_id, project, phase_number, stored
+        extraction = build_extraction_view(imported)
+        stored = {
+            "schema_version": CHANGE_MAP_SCHEMA_VERSION,
+            "status": "draft",
+            "source_import_saved_at": imported.saved_at or "",
+            "generated_at": _now_iso(),
+            "confirmed_at": None,
+            "source_redacted": extraction.redacted,
+            "source_truncated": extraction.truncated,
+            "items": [],
+        }
+        validated = StoredChangeMap.model_validate(stored)
+        updated = await workflow_service.store_change_map_if_current(
+            repo, user_id, project, phase_number, stored
+        )
+        if updated is not None:
+            return _client_view(updated, phase_number, validated)
+
+    raise ChangeMapConflictError(
+        "Your phase record changed while the manual Change Map was being created. "
+        "Review the current record and try again."
     )
-    return _client_view(project, phase_number, validated)
 
 
 # ---------------------------------------------------------------------------

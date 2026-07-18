@@ -6,6 +6,10 @@ import copy
 import pytest
 
 from app.services import intake_service
+from app.services.project_capability_service import (
+    derive_project_capabilities,
+    explicit_exclusions,
+)
 from app.services.intake_service import (
     ENTRY_PROFILE_KEY,
     QUESTIONS,
@@ -481,6 +485,92 @@ def test_product_focused_ai_feature_language_still_selects_ai_archetype():
         "The application calls an LLM to summarize uploaded notes and provides an AI assistant.",
         "HTML and Python",
     ) == 1
+
+
+@pytest.mark.parametrize("field", ("purpose", "scope", "stack"))
+@pytest.mark.parametrize(
+    "meta_language",
+    [
+        "I use Claude to help write the code.",
+        "AI generated several connected functions that I do not understand.",
+        "I want help reviewing AI-generated files.",
+        "I use ChatGPT when I get stuck.",
+        "The app was mostly generated using Cursor.",
+        "Codex changed multiple files.",
+        "I want to learn how to code properly with AI.",
+        "I am worried the AI code may break.",
+    ],
+)
+def test_ai_tool_language_never_becomes_a_product_feature_in_q1_q2_or_q3(
+    field, meta_language
+):
+    answers = {
+        "purpose": "Help students track homework.",
+        "scope": "A browser-only tracker using local storage. No backend or database.",
+        "stack": "Plain HTML, CSS, and JavaScript.",
+    }
+    answers[field] += " " + meta_language
+    assert classify_archetype(
+        answers["purpose"], answers["scope"], answers["stack"]
+    ) == 3
+
+
+@pytest.mark.parametrize(
+    "feature",
+    [
+        "The app contains a chatbot that answers questions.",
+        "Users submit notes and an LLM summarizes them.",
+        "The application sends prompts to Gemini.",
+        "The product generates study questions using AI.",
+        "The app analyzes text using a language model.",
+        "An AI assistant is one of the intended user-facing features.",
+        "The product uses Gemini to answer user questions.",
+        "The product uses OpenAI API to answer users.",
+        "Gemini",
+    ],
+)
+def test_legitimate_ai_product_phrasing_remains_ai_powered(feature):
+    assert classify_archetype(feature, "A web app.", "React") == 1
+
+
+def test_negative_chatbot_clause_does_not_erase_a_different_ai_feature():
+    assert classify_archetype(
+        "The product uses an LLM to summarize notes, but has no chatbot.",
+        "A web app.",
+        "React",
+    ) == 1
+
+
+def test_explicit_exclusions_handle_lists_future_forms_and_double_negatives():
+    exclusions = explicit_exclusions(
+        "No backend or database; accounts are out of scope.",
+        "The first version will not include notifications. AI is not in this version.",
+        "Browser localStorage.",
+    )
+    assert {"backend", "database", "accounts", "notifications", "ai"} <= exclusions
+    assert "backend" not in explicit_exclusions(
+        "I do not want no backend.", "A shared app.", "React"
+    )
+    assert "backend" in explicit_exclusions(
+        "The backend is not yet planned.", "A browser app.", "JavaScript"
+    )
+    contracted = explicit_exclusions(
+        "AI isn't planned; neither backend nor database will be included.",
+        "A browser app.",
+        "JavaScript",
+    )
+    assert {"ai", "backend", "database"} <= contracted
+
+
+def test_scripted_chatbot_and_external_non_llm_api_are_not_ai_features():
+    for scope in (
+        "The app has a chatbot-style interface with scripted responses.",
+        "The app uses an external API, but not an LLM.",
+        "It is called AI StudyFlow, but it contains no AI behavior.",
+        "Documentation example: 'LLM'. The product is a static checklist.",
+    ):
+        capabilities = derive_project_capabilities("A web app.", scope, "React")
+        assert capabilities.ai_feature is False
 
 
 def test_explicit_no_ai_feature_wins_over_meta_tool_language_deterministically():

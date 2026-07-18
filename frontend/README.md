@@ -53,7 +53,7 @@ app/
       prompt/page.tsx   Prompt Builder (deterministic, client-side; beginner
                         phase explanation + starter-ask chips via lib/phaseGuide;
                         after a save, hands off to "bring back what changed")
-      import/page.tsx   Bring Back What AI Changed (M15B) — the implementation
+      import/page.tsx   Bring Back What Changed (M15B) — the implementation
                         import: source-kind radio chips, verbatim pasted
                         material (mono textarea, honest 40k counter — never
                         clipped), optional changed files / own summary / tool
@@ -260,7 +260,7 @@ unchanged. No backend or migration change was needed.
 
 ## Status (M15B)
 
-The **Bring Back What AI Changed** page (`app/app/phase/import`) completes the
+The **Bring Back What Changed** page (`app/app/phase/import`) completes the
 loop's missing middle: after using their prompt in an external AI tool, the
 student brings the result back — pasted AI response, git diff, code snippet,
 changed-file list, and/or their own summary — before reviewing it.

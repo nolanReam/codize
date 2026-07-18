@@ -28,7 +28,7 @@ import {
 } from "@/lib/implementationImport";
 import { useWorkflowSection } from "@/lib/useWorkflowSection";
 
-// "Bring Back What AI Changed" — the step between using an external AI tool
+// "Bring Back What Changed" — the step between using an external AI tool
 // and reviewing its work. Storage only: what's saved is the student's own
 // record (self-reported, never verified); Codize runs no analysis on it.
 export default function BringBackPage() {

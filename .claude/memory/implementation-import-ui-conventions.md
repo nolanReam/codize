@@ -1,6 +1,6 @@
 # Implementation import UI conventions (Milestone 15B)
 
-**User-facing name:** the page title is **"Bring Back What AI Changed"**
+**User-facing name:** the page title is **"Bring Back What Changed"**
 (`lib/implementationImport.ts::PAGE_TITLE`); the Build Loop strip step is
 "Bring Back" and the sidebar link is "Bring Back What Changed". The internal
 name `implementation_import` is schema/service vocabulary only — a unit test

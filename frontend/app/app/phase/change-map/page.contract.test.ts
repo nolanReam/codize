@@ -7,7 +7,8 @@ const source = readFileSync(resolve(process.cwd(), "app/app/phase/change-map/pag
 describe("Change Map M18A recovery contract", () => {
   it("announces an exact correction, preserves retry, and offers explicit manual authorship", () => {
     expect(source).toContain('role="alert"');
-    expect(source).toContain("CHANGE_MAP_GENERATION_CORRECTION");
+    expect(source).toContain("generationFailureCopy");
+    expect(source).toContain('error.code?.replace("change_map_", "")');
     expect(source).toContain("Try again");
     expect(source).toContain("Create a Change Map manually");
     expect(source).toContain("createManualChangeMap");

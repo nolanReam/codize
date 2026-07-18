@@ -192,6 +192,7 @@ def test_provider_failure_is_502_with_nothing_stored(client):
     )
     resp = generate(client)
     assert resp.status_code == 502
+    assert resp.headers["X-Codize-Error-Code"] == "change_map_provider_unavailable"
     client.app.dependency_overrides.pop(get_llm_service)
     stored = client.get("/workflow/1", headers=auth_headers()).json()
     assert stored["change_map"] is None

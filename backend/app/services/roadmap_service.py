@@ -18,7 +18,12 @@ import logging
 import re
 from pathlib import Path
 
-from app.services import llm_service, roadmap_scope_service, template_service
+from app.services import (
+    llm_service,
+    project_capability_service,
+    roadmap_scope_service,
+    template_service,
+)
 from app.services.llm_service import LLMService
 from app.services.project_repository import ProjectRepository
 
@@ -223,9 +228,13 @@ def build_fallback_roadmap(template: dict, project: dict) -> dict:
     archetype template — no LLM, no network. Structure is the template's (so it
     always passes validate_roadmap_structure); wording is lightly personalized
     by substituting the verbatim intake purpose into the template's
-    personalization slots. No hallucinated or unsupported requirements."""
+    personalization slots. Student AI-tool meta-language is omitted so it is
+    not repeated as a product requirement. No hallucinated or unsupported
+    requirements."""
     roadmap = copy.deepcopy(template)
-    purpose = (project.get("intake_purpose") or "").strip() or "your project"
+    purpose = project_capability_service.product_purpose_text(
+        (project.get("intake_purpose") or "").strip()
+    ) or "your project"
     if len(purpose) > _MAX_PURPOSE_IN_TEMPLATE:
         purpose = purpose[: _MAX_PURPOSE_IN_TEMPLATE - 1].rstrip() + "…"
 

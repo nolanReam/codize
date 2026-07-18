@@ -258,7 +258,7 @@ grants prevent clients from bypassing it. Verify a deployed migration with
 `scripts/verify_workflow_artifact_write_boundary.sql` and
 `scripts/verify_workflow_artifact_write_boundary.py`.
 
-### Implementation import (M15A — "Bring Back What AI Changed")
+### Implementation import (M15A — "Bring Back What Changed")
 
 `implementation_import` is the student's own record of what an external AI
 tool produced: a pasted AI response, git diff, code snippet, changed-file

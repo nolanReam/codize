@@ -329,7 +329,7 @@ your saved artifacts" rail copy corrected (questions draw on recorded work;
 pass/fail stays about the student's own explanation). Refresh = fetch on
 mount; no polling, no query library.
 
-**M15B (2026-07-13) — "Bring Back What AI Changed" page.** The fifth
+**M15B (2026-07-13) — "Bring Back What Changed" page.** The fifth
 workflow-section page (`app/app/phase/import`) — see
 [[implementation-import-ui-conventions]] for the full rules. Frontend-only:
 one `WorkflowSectionName` extension + pure `lib/implementationImport.ts`

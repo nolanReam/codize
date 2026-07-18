@@ -674,7 +674,7 @@ _LEADING_BLANK_LINES = re.compile(r"^(?:[ \t]*\r?\n)+")
 
 
 class ImplementationImportArtifact(_Artifact):
-    """"Bring Back What AI Changed" (M15A): implementation material the student
+    """"Bring Back What Changed" (M15A): implementation material the student
     brings back after using an external AI tool — a pasted AI response, git
     diff, code snippet, changed-file list, and/or their own summary.
 
