@@ -506,8 +506,9 @@ export default function IntakePage() {
           <aside className="ws-rail" aria-label="Guidance">
             <GuideCard title="How intake works">
               <p>
-                Your five answers tell Codize what you&rsquo;re building and what you already
-                know. From them it picks a project type and builds your phase roadmap.
+                Your project answers tell Codize what you&rsquo;re building and choose the roadmap
+                shape. Your experience answer only adjusts how concepts are explained; it never
+                turns your project into an AI-powered app.
               </p>
               <p>
                 <strong>You can edit any answer</strong> until you press Finish — nothing is
@@ -526,8 +527,9 @@ export default function IntakePage() {
                 <summary>What&rsquo;s a &ldquo;project type&rdquo;?</summary>
                 <div className="help-body">
                   <p>
-                    Codize sorts every project into one of three shapes — AI-powered app, REST API
-                    backend, or full-stack web app — and uses the matching roadmap structure.
+                    Codize uses the closest of three stored roadmap structures, then keeps the
+                    student-facing label accurate to the capabilities you described. A local
+                    browser project can be labeled simply &ldquo;Browser App.&rdquo;
                   </p>
                 </div>
               </details>

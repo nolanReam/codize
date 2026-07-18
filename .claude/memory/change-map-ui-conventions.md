@@ -96,7 +96,8 @@ reviewed/stale status. It has no workflow section key, so cockpit and phase
 remain **N/5 captured** and build tasks remain separate. Phase next action is:
 Prompt (if absent) → Bring Back (if import absent) → Create Change Map → Review
 or Regenerate Change Map → Review implementation decisions (only after map
-confirmation) → the existing Evidence/Verification/Gate sequence. Successful
+confirmation) → Verification → Evidence → Project Defense → Defense Report,
+matching `frontend/lib/workflowJourney.ts`. Successful
 Implementation Import save offers Create Change Map plus Back to Build Loop;
 it never auto-generates.
 

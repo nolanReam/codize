@@ -187,6 +187,10 @@ export const generateChangeMap = (phase: number, replaceExisting = false) => {
     ...(body ? { body } : {}),
   });
 };
+export const createManualChangeMap = (phase: number) =>
+  request<ChangeMapMutationResult>(`/workflow/${phase}/change-map/manual`, {
+    method: "POST",
+  });
 
 export const updateChangeMap = (phase: number, payload: ChangeMapUpdateRequest) =>
   request<ChangeMapMutationResult>(`/workflow/${phase}/change-map`, {

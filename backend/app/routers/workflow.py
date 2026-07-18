@@ -131,6 +131,21 @@ async def generate_change_map(
         raise _change_map_http_error(exc)
 
 
+@router.post("/{phase_number}/change-map/manual")
+async def create_manual_change_map(
+    phase_number: int,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    """Explicit no-provider recovery: an empty, student-authored draft."""
+    try:
+        return await change_map_service.create_manual_change_map(
+            repo, user.user_id, phase_number
+        )
+    except (phase_service.PhaseWorkspaceError, change_map_service.ChangeMapError) as exc:
+        raise _change_map_http_error(exc)
+
+
 @router.put("/{phase_number}/change-map")
 async def update_change_map(
     phase_number: int,

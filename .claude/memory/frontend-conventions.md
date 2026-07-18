@@ -231,7 +231,8 @@ Pages that need contextual help use `.workspace` (grid: content column +
 goes (GuideCard cards: what the page is, examples, glossary), never
 full-width paragraphs. The shell had NO mobile rules before M13E.1; ≤840px
 the sidebar is now a wrapping top bar (`.shell` column, footer inline via
-`margin-left: auto`). (2) **Tutorial**: `components/Tutorial.tsx`, 9 steps,
+`margin-left: auto`). (2) **Tutorial**: `components/Tutorial.tsx` (originally 9
+steps in M13E.1; now derived from the canonical eight-stage Journey),
 auto-opens once per browser (`codize:tutorial-seen` in localStorage), sidebar
 Help section reopens it. It deliberately closes via button/Escape/backdrop —
 do NOT copy the reconnection modal's locked-dismissal pattern, which is
@@ -475,3 +476,16 @@ stages; confidence changes initial detail, not workflow requirements. Browser
 storage may remember only a scoped disclosure boolean. Legacy users get
 standard collapsed guidance and can update preferences without reset. See
 [[beginner-entry-adaptive-guidance-conventions]].
+
+**M18A (2026-07-17) — product truth and lifecycle safety.**
+`lib/workflowJourney.ts` is now the canonical exact eight-stage student-facing
+Journey: Prompt Builder → Bring Back What Changed → Change Map → Review →
+Verification → Evidence → Project Defense → Defense Report. Guided navigation,
+tutorial, compact loop, and landing workflow panel derive from it; external AI
+generation is an action between Prompt and Import, not a route/stage. Formal
+Defense consumes backend `readiness`, uses neutral blocked styling, lists exact
+prerequisites, and preserves the shared global Continue action; Begin is absent
+when blocked. Active/cooldown/retry/complete stay distinct. Change Map 502 UI is
+one focused alert with an exact source-matching correction, retry, Import review,
+and explicit manual fallback only when no map exists. See
+[[project-classification-and-product-truth-conventions]].

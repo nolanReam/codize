@@ -568,6 +568,47 @@ async def generate_change_map(
     return _client_view(project, phase_number, StoredChangeMap.model_validate(stored))
 
 
+async def create_manual_change_map(
+    repo: ProjectRepository,
+    user_id: str,
+    phase_number: int,
+) -> dict:
+    """Create an empty student-authored recovery map without a provider call.
+
+    The student must add at least one item before confirmation. No AI claim,
+    source reference, downstream record, or readiness state is fabricated.
+    Existing maps are never overwritten by this recovery seam.
+    """
+    project = await phase_service.load_active_project(repo, user_id)
+    phase_service.require_phase(project, phase_number)
+    imported = workflow_service.get_implementation_import(project, phase_number)
+    if imported is None:
+        raise ImportRequiredError(
+            "Bring back implementation material for this phase before creating a Change Map."
+        )
+    if workflow_service.get_change_map(project, phase_number) is not None:
+        raise ChangeMapExistsError(
+            "A Change Map already exists for this phase. Keep it or use the explicit regeneration path."
+        )
+
+    extraction = build_extraction_view(imported)
+    stored = {
+        "schema_version": CHANGE_MAP_SCHEMA_VERSION,
+        "status": "draft",
+        "source_import_saved_at": imported.saved_at or "",
+        "generated_at": _now_iso(),
+        "confirmed_at": None,
+        "source_redacted": extraction.redacted,
+        "source_truncated": extraction.truncated,
+        "items": [],
+    }
+    validated = StoredChangeMap.model_validate(stored)
+    project = await workflow_service.store_change_map(
+        repo, user_id, project, phase_number, stored
+    )
+    return _client_view(project, phase_number, validated)
+
+
 # ---------------------------------------------------------------------------
 # Student update flow (no LLM call)
 # ---------------------------------------------------------------------------
@@ -693,6 +734,10 @@ async def confirm_change_map(
             "— regenerate the Change Map before confirming it."
         )
     pending = sum(1 for i in stored.items if i.student_decision == "pending_review")
+    if not stored.items:
+        raise ChangeMapPendingItemsError(
+            "Add at least one change in your own words before confirming this manual Change Map."
+        )
     if pending:
         raise ChangeMapPendingItemsError(
             f"{pending} item(s) are still pending review — decide on every "

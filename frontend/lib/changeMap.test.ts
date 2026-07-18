@@ -9,6 +9,7 @@ import {
   CHANGE_MAP_CATEGORY_ORDER,
   CHANGE_MAP_DECISION_LABELS,
   CHANGE_MAP_GENERATION_FAILURE,
+  CHANGE_MAP_GENERATION_CORRECTION,
   CHANGE_MAP_HONESTY_LINE,
   CHANGE_MAP_PAGE_INTRO,
   CHANGE_MAP_PAGE_TITLE,
@@ -421,6 +422,13 @@ describe("student-only update payload", () => {
 });
 
 describe("dirty state and confirmation readiness", () => {
+  it("requires student-authored content before an empty manual map can be confirmed", () => {
+    const manual = map({ items: [] });
+    expect(confirmationReadiness(manual, reviewStateFromMap(manual), false)).toEqual({
+      allowed: false,
+      message: "Add at least one change in your own words before confirming this manual Change Map.",
+    });
+  });
   it("detects real edits and reconciles cleanly to the server map", () => {
     const stored = map();
     const state = reviewStateFromMap(stored);
@@ -487,6 +495,12 @@ describe("dirty state and confirmation readiness", () => {
 });
 
 describe("generation, status, sparse, and stale helpers", () => {
+  it("gives a file/source-specific correction instead of asking for a clearer summary", () => {
+    expect(CHANGE_MAP_GENERATION_FAILURE).toContain("safely grounded");
+    expect(CHANGE_MAP_GENERATION_CORRECTION).toContain("file or source");
+    expect(CHANGE_MAP_GENERATION_CORRECTION).toContain("file name beside each change");
+    expect(CHANGE_MAP_GENERATION_CORRECTION).not.toContain("clearer summary");
+  });
   it("omits the normal generation body and sends replace_existing only deliberately", () => {
     expect(generationRequestBody(false)).toBeUndefined();
     expect(generationRequestBody(true)).toEqual({ replace_existing: true });

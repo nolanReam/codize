@@ -43,6 +43,7 @@ from pathlib import Path
 
 from app.services import (
     defense_context_service,
+    defense_readiness_service,
     grounding_service,
     llm_service,
     phase_service,
@@ -170,6 +171,10 @@ class GateOutOfOrderError(GateError):
 
 class AnchorInvalidError(GateError):
     """The anchor statement names no concrete implementation element."""
+
+
+class GatePreparationError(GateError):
+    """Formal Project Defense preparation is incomplete."""
 
 
 class GateGenerationError(GateError):
@@ -636,6 +641,12 @@ async def start_gate(
         remaining = cooldown_remaining(latest)
         if remaining > 0:
             raise GateCooldownError(remaining)
+    readiness = defense_readiness_service.preparation(project, phase)
+    if not readiness["formal_ready"]:
+        first = readiness["blockers"][0]
+        raise GatePreparationError(
+            f"Project Defense is not ready yet. {first['detail']}"
+        )
     session = await gate_repo.create_session(
         user_id, {"project_id": project["id"], "phase_id": phase["phase"], "turns": []}
     )
@@ -864,11 +875,22 @@ async def get_current_gate(
     base = {"phase": phase["phase"], "phase_title": phase["phase_title"]}
 
     if latest is None:
-        return {**base, "state": "not_started", "anchor_prompt": ANCHOR_PROMPT}
+        readiness = defense_readiness_service.preparation(project, phase)
+        return {
+            **base,
+            "state": "not_started",
+            "anchor_prompt": ANCHOR_PROMPT,
+            "readiness": readiness,
+        }
     if latest.get("passed") is True:
         # Only reachable on the final phase — passing any earlier phase
         # advances current_phase, so its sessions are no longer "current".
-        return {**base, "state": "passed", "reason": latest.get("reason")}
+        return {
+            **base,
+            "state": "passed",
+            "reason": latest.get("reason"),
+            "readiness": defense_readiness_service.lifecycle_view("complete"),
+        }
     if latest.get("passed") is False:
         remaining = cooldown_remaining(latest)
         if remaining > 0:
@@ -877,8 +899,17 @@ async def get_current_gate(
                 "state": "cooldown",
                 "reason": latest.get("reason"),
                 "cooldown_seconds_remaining": remaining,
+                "readiness": defense_readiness_service.lifecycle_view("cooldown"),
             }
-        return {**base, "state": "not_started", "anchor_prompt": ANCHOR_PROMPT}
+        readiness = defense_readiness_service.preparation(project, phase)
+        if readiness["formal_ready"]:
+            readiness = {**readiness, "state": "retry"}
+        return {
+            **base,
+            "state": "not_started",
+            "anchor_prompt": ANCHOR_PROMPT,
+            "readiness": readiness,
+        }
 
     view = {
         **base,
@@ -887,6 +918,7 @@ async def get_current_gate(
         "next_action": _next_step(latest),
         "anchor_statement": latest.get("anchor_statement"),
         "turns": _turns_view(latest),
+        "readiness": defense_readiness_service.lifecycle_view("in_progress"),
     }
     if view["next_action"] == "turn1":
         view["anchor_prompt"] = ANCHOR_PROMPT

@@ -5,6 +5,13 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(resolve(process.cwd(), "app/app/gate/page.tsx"), "utf8");
 
 describe("Project Defense M16C.2 contract", () => {
+  it("does not expose a formal start action when server readiness is false", () => {
+    expect(source).toContain("gate.readiness?.formal_ready === false");
+    expect(source).toContain("Not ready for formal Project Defense yet");
+    expect(source).toContain("defense-prerequisites");
+    expect(source).toContain("continueAction={guided.navigation.continueAction}");
+    expect(source).not.toContain('not_started: { label: "READY TO DEFEND"');
+  });
   it("keeps the existing gate lifecycle and answer limits", () => {
     for (const call of ["startGate", "submitGateAnchor", "submitGateAnswer", "evaluateGate"]) {
       expect(source).toContain(call);

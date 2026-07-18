@@ -35,6 +35,8 @@ export const CHANGE_MAP_HONESTY_LINE =
   "This is a draft—not proof that the implementation is correct.";
 export const CHANGE_MAP_GENERATION_FAILURE =
   "Codize could not create a safely grounded Change Map from this material yet.";
+export const CHANGE_MAP_GENERATION_CORRECTION =
+  "Codize could not match every drafted change to a saved file or source. If you edit the Import, put the changed file name beside each change.";
 
 export const CHANGE_MAP_CATEGORY_ORDER: readonly ChangeMapCategory[] = [
   "changed_file",
@@ -363,6 +365,12 @@ export function confirmationReadiness(
   }
   if (hasUnsavedChanges) {
     return { allowed: false, message: "Save your review before confirming the map." };
+  }
+  if (map.items.length === 0 && state.studentAddedItems.length === 0) {
+    return {
+      allowed: false,
+      message: "Add at least one change in your own words before confirming this manual Change Map.",
+    };
   }
   const pending = pendingItemIds(map, state).length;
   if (pending > 0) {

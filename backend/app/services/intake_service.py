@@ -15,13 +15,12 @@ LLM call replaces `_derive_classification_signals`; the tiebreaker mapping
 itself (`template_service.resolve_archetype`) is fixed and never changes.
 """
 
-import re
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
 from app.schemas.intake import EntryProfileView
-from app.services import template_service
+from app.services import project_capability_service, template_service
 from app.services.project_repository import ProjectRepository, RepositoryError
 
 # The five mandatory questions, verbatim from the master spec. Question 1 is
@@ -326,8 +325,11 @@ async def complete_intake(repo: ProjectRepository, user_id: str) -> dict:
         raise IntakeIncompleteError(
             f"Intake is not complete: question {missing} is unanswered."
         )
-    archetype_id = classify_archetype(
+    capabilities = project_capability_service.derive_project_capabilities(
         project["intake_purpose"], project["intake_scope"], project["intake_stack"]
+    )
+    archetype_id = template_service.resolve_archetype(
+        capabilities.ai_feature, capabilities.frontend_or_database
     )
     await repo.update_project(
         user_id,
@@ -340,37 +342,20 @@ async def complete_intake(repo: ProjectRepository, user_id: str) -> dict:
     return {
         "completed": True,
         "archetype_id": archetype_id,
-        "archetype_name": ARCHETYPE_NAMES[archetype_id],
+        "archetype_name": project_capability_service.classification_name(
+            archetype_id, capabilities, ARCHETYPE_NAMES
+        ),
     }
 
 
 # --- classification ------------------------------------------------------------
 
-_LLM_CORE_TERMS = (
-    "llm", "llms", "language model", "gpt", "chatgpt", "claude", "openai",
-    "anthropic", "gemini", "chatbot", "ai",
-)
-_FRONTEND_DB_TERMS = (
-    "frontend", "front-end", "front end", "react", "next.js", "nextjs", "vue",
-    "svelte", "angular", "html", "css", "website", "web app", "webapp", "ui",
-    "dashboard", "database", "db", "postgres", "postgresql", "mysql", "sqlite",
-    "mongodb", "supabase", "full-stack", "full stack", "fullstack",
-)
-
-
-def _mentions_any(text: str, terms: tuple[str, ...]) -> bool:
-    return any(re.search(rf"\b{re.escape(t)}\b", text) for t in terms)
-
-
-def _derive_classification_signals(text: str) -> tuple[bool, bool]:
-    """Deterministic keyword fallback for the two tiebreaker booleans. The
-    temperature-0 LLM classification call replaces exactly this function."""
-    lowered = text.lower()
-    return _mentions_any(lowered, _LLM_CORE_TERMS), _mentions_any(lowered, _FRONTEND_DB_TERMS)
-
-
 def classify_archetype(purpose: str, scope: str, stack: str) -> int:
     """Exactly one of archetypes 1/2/3, never a fourth: the return value comes
     from the spec's fixed tiebreaker, whatever produced the signals."""
-    llm_core, frontend_or_db = _derive_classification_signals(f"{purpose} {scope} {stack}")
-    return template_service.resolve_archetype(llm_core, frontend_or_db)
+    capabilities = project_capability_service.derive_project_capabilities(
+        purpose, scope, stack
+    )
+    return template_service.resolve_archetype(
+        capabilities.ai_feature, capabilities.frontend_or_database
+    )

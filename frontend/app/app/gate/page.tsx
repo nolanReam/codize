@@ -10,6 +10,7 @@ import DefenseContextSummaryBlock, {
 } from "@/components/DefenseContextSummary";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
+import { useGuidedProjectNavigation } from "@/components/GuidedProjectNavigationProvider";
 import {
   ApiError,
   evaluateGate,
@@ -30,7 +31,7 @@ import type {
 
 // Cooldown is amber, not red — a study break, not an error (M13E.4).
 const STATE_PILL: Record<GateCurrent["state"], { label: string; cls: string }> = {
-  not_started: { label: "READY TO DEFEND", cls: "accent" },
+  not_started: { label: "PROJECT DEFENSE", cls: "accent" },
   in_progress: { label: "DEFENSE IN PROGRESS", cls: "warn" },
   cooldown: { label: "COOLDOWN", cls: "warn" },
   passed: { label: "PASSED", cls: "ok" },
@@ -48,6 +49,7 @@ function pendingTurnNumber(gate: GateCurrent): number {
 // evaluation. Raw scores, evaluator reasoning, and internal prompts never reach
 // this UI by backend design; this page only shows what the backend returns.
 export default function GatePage() {
+  const guided = useGuidedProjectNavigation();
   const [gate, setGate] = useState<GateCurrent | null>(null);
   const [phase, setPhase] = useState<PhaseView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -195,7 +197,15 @@ export default function GatePage() {
 
   if (notReady) return <NotReady title="Project Defense" />;
 
-  const pill = gate ? STATE_PILL[gate.state] : undefined;
+  const pill = gate
+    ? gate.state === "not_started" && gate.readiness?.formal_ready === false
+      ? { label: "NOT READY YET", cls: "warn" }
+      : gate.state === "not_started" && gate.readiness?.state === "retry"
+        ? { label: "READY TO RETRY", cls: "warn" }
+        : gate.state === "not_started"
+          ? { label: "READY FOR PROJECT DEFENSE", cls: "accent" }
+          : STATE_PILL[gate.state]
+    : undefined;
 
   return (
     <>
@@ -233,6 +243,11 @@ export default function GatePage() {
                     <CooldownView gate={gate} />
                   ) : gate.state === "passed" ? (
                     <PassedView gate={gate} />
+                  ) : gate.readiness?.formal_ready === false ? (
+                    <BlockedView
+                      gate={gate}
+                      continueAction={guided.navigation.continueAction}
+                    />
                   ) : (
                     <ReadyView
                       phase={phase}
@@ -255,6 +270,53 @@ export default function GatePage() {
         </div>
       </Async>
     </>
+  );
+}
+
+function BlockedView({
+  gate,
+  continueAction,
+}: {
+  gate: GateCurrent;
+  continueAction: {
+    label: string;
+    href: string | null;
+    reason: string;
+  };
+}) {
+  const blockers = gate.readiness?.blockers ?? [];
+  return (
+    <section className="card primary" aria-labelledby="defense-not-ready-title">
+      <div className="notice info" role="status" aria-live="polite">
+        <strong id="defense-not-ready-title">Not ready for formal Project Defense yet</strong>
+        <p>Finish the current phase record first. Nothing has failed, and your saved work remains available.</p>
+      </div>
+      <div className="row defense-recovery-actions" aria-describedby="defense-not-ready-title">
+        {continueAction.href ? (
+          <Link href={continueAction.href} className="btn primary">
+            {continueAction.label}
+          </Link>
+        ) : (
+          <Link href="/app" className="btn primary">
+            Back to Project Home
+          </Link>
+        )}
+        <Link href="/app/phase" className="btn">
+          Review phase tasks
+        </Link>
+      </div>
+      <p className="muted defense-recovery-reason">{continueAction.reason}</p>
+      {blockers.length > 0 && (
+        <ol className="defense-prerequisites" aria-label="Project Defense prerequisites">
+          {blockers.map((blocker) => (
+            <li key={blocker.code}>
+              <strong>{blocker.label}</strong>
+              <span>{blocker.detail}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 

@@ -55,7 +55,8 @@ def test_active_attempt_uses_stable_server_snapshot_after_workflow_changes():
     run(gate_service.submit_anchor(repo, gates, llm, USER, started["gate_session_id"], ANCHOR))
     before = run(report_service.build_report_context(repo, gates, USER, 1))
     assert before.workflow_context_source == "defense_attempt"
-    assert before.workflow_context.evidence.state == "missing"
+    assert before.workflow_context.evidence.state == "manual"
+    assert before.workflow_context.evidence.manual_summary == "Student-provided observation."
 
     run(save_section(repo, USER, 1, "evidence", {
         "entries": [{"kind": "note", "content": "Added only after Defense began."}],

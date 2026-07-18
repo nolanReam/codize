@@ -32,6 +32,7 @@ from app.services.change_map_service import (
     build_extraction_view,
     confirm_change_map,
     confirmed_items,
+    create_manual_change_map,
     generate_change_map,
     parse_generated,
     render_import_block,
@@ -93,6 +94,49 @@ def llm_with(*responses):
 
 def generate(repo, llm, phase=1, replace=False):
     return run(generate_change_map(repo, llm, USER, phase, replace_existing=replace))
+
+
+def test_manual_recovery_starts_empty_preserves_import_and_requires_student_authorship():
+    repo = seed_with_import()
+    before_import = run(repo.get_project(USER))["workflow_artifacts"]["1"]["implementation_import"]
+
+    manual = run(create_manual_change_map(repo, USER, 1))
+    assert manual["status"] == "draft"
+    assert manual["items"] == []
+    assert manual["source_import_saved_at"] == before_import["saved_at"]
+    assert run(repo.get_project(USER))["workflow_artifacts"]["1"]["implementation_import"] == before_import
+
+    with pytest.raises(ChangeMapPendingItemsError, match="Add at least one change"):
+        run(confirm_change_map(repo, USER, 1))
+
+    updated = run(
+        update_change_map(
+            repo,
+            USER,
+            1,
+            {
+                "updates": [],
+                "student_added_items": [{
+                    "category": "changed_file",
+                    "student_text": "I changed app/routes/tasks.py.",
+                    "student_note": "This is my own record.",
+                    "student_decision": "confirmed",
+                }],
+            },
+        )
+    )
+    assert updated["items"][0]["origin"] == "student_added"
+    confirmed = run(confirm_change_map(repo, USER, 1))
+    assert confirmed["status"] == "confirmed"
+    assert all(item["origin"] == "student_added" for item in confirmed["items"])
+
+
+def test_manual_recovery_never_overwrites_an_existing_readable_map():
+    repo = seed_with_import()
+    existing = generate(repo, llm_with(VALID_OUTPUT))
+    with pytest.raises(ChangeMapExistsError):
+        run(create_manual_change_map(repo, USER, 1))
+    assert get_change_map(run(repo.get_project(USER)), 1).generated_at == existing["generated_at"]
 
 
 # --- extraction view: redaction before truncation --------------------------------

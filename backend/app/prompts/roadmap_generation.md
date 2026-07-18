@@ -12,6 +12,7 @@ You are personalizing a pre-defined curriculum template. You may change wording 
 2. What the app does, in their words: {{INTAKE_DESCRIPTION}}
 3. Languages/frameworks they are comfortable with: {{INTAKE_STACK}}
 4. Self-assessed understanding of AI-generated code: {{INTAKE_SELF_ASSESSMENT}}
+   This answer describes the student's experience, not the product. Use it only to calibrate explanations. Never infer an AI feature, provider, API, backend, database, framework, or other product capability from this answer.
 5. Rough deadline: {{INTAKE_DEADLINE}}
 
 ## Your job

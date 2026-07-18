@@ -2,33 +2,28 @@
 
 import { useEffect, useRef } from "react";
 
-// "How Codize works" — the first-use tutorial (M13E.1). Unlike the
-// reconnection modal (spec-locked to its button), this one is deliberately
-// easy to leave: the button, Escape, or clicking the backdrop all close it.
-// Whether it shows (localStorage first-visit flag) is the app shell's job;
-// this component only renders the guide.
+import { WORKFLOW_JOURNEY, type WorkflowJourneyStageId } from "@/lib/workflowJourney";
 
 export const TUTORIAL_SEEN_KEY = "codize:tutorial-seen";
 
-const STEPS: { title: string; body: string }[] = [
-  { title: "Start with a project idea", body: "Codize asks five short questions about it. Plain language is perfect — no technical terms needed." },
-  { title: "Codize turns it into phases", body: "You get a roadmap sized for your kind of project, one phase at a time." },
-  { title: "Plan before you ask AI", body: "For each phase, use the Prompt Builder first. It helps you figure out what to ask — even if you don't know yet." },
-  { title: "Generate in your own AI tool", body: "Paste the prompt into Claude, Cursor, ChatGPT, Copilot — whatever you use. Codize doesn't write your code." },
-  { title: "Bring back what changed", body: "Paste the AI response, diff, or your own notes into Codize, then note what you accepted, rejected, or edited. This is where you stay in control." },
-  { title: "Submit evidence", body: "A repo link, a commit, test output — small proof that the work is real." },
-  { title: "Verify behavior", body: "Check it actually works, including one way it could fail. Trust what you proved, not what looked done." },
-  { title: "Defend what you built", body: "At the end of each phase, explain your work in your own words. Pass the defense, unlock the next phase." },
-  { title: "Export your Defense Report", body: "Everything above becomes a report you can bring to a demo, class, or interview." },
-];
+const BODY_BY_STAGE: Record<WorkflowJourneyStageId, string> = {
+  prompt: "Plan one scoped ask, then use that prompt in your own AI tool.",
+  import: "Return with the response, diff, changed files, or your own summary.",
+  change_map: "Correct Codize's draft of what appears to have changed; it is not proof.",
+  review: "Record what you decide to keep, revise, remove, test, or inspect.",
+  verification: "Perform checks and record passed, failed, skipped, or not-applicable results honestly.",
+  evidence: "Add available support for recorded results without overstating it.",
+  defense: "Explain your implementation in your own words after the phase record is ready.",
+  report: "Open the provenance-aware record of your workflow and Defense outcome.",
+};
 
 export default function Tutorial({ onClose }: { onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -41,18 +36,18 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="How Codize works"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <span className="pill accent">How Codize works</span>
         <p className="muted" style={{ marginTop: 14 }}>
-          One loop, nine steps. You&rsquo;ll learn it by doing it — this is just the map. Reopen
-          it anytime from the sidebar.
+          After five intake questions and a phase roadmap, every phase follows the same eight-stage
+          Journey. Reopen this map anytime from Help.
         </p>
         <ol className="tutorial-steps">
-          {STEPS.map((s) => (
-            <li key={s.title}>
+          {WORKFLOW_JOURNEY.map((stage) => (
+            <li key={stage.id}>
               <span>
-                <strong>{s.title}.</strong> {s.body}
+                <strong>{stage.label}.</strong> {BODY_BY_STAGE[stage.id]}
               </span>
             </li>
           ))}
@@ -63,7 +58,7 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
           style={{ width: "100%", marginTop: 12 }}
           onClick={onClose}
         >
-          Got it — let&rsquo;s build
+          Got it &mdash; let&rsquo;s build
         </button>
       </div>
     </div>

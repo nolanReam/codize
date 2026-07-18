@@ -133,11 +133,11 @@ def test_all_tasks_complete_is_gate_ready_with_gate_action():
 
 def test_gate_pass_moves_evaluation_to_the_next_phase():
     projects, gates, unlocks = make_repos()
-    seed_active_project(projects)
+    seed_active_project(projects, defense_ready=True)
     run_full_gate(projects, gates, verdict=PASS_VERDICT, unlocks=unlocks)
 
     result = evaluation(projects, gates, unlocks)
-    assert result["state"] == "in_progress"
+    assert result["state"] == "gate_ready"
     assert result["current_phase"] == 2
     assert result["completed_phases"] == 1
     assert result["recent_gate"]["outcome"] == "passed"
@@ -147,7 +147,7 @@ def test_gate_pass_moves_evaluation_to_the_next_phase():
 
 def test_recent_fail_is_cooldown_with_retry_action():
     projects, gates, unlocks = make_repos()
-    seed_active_project(projects)
+    seed_active_project(projects, defense_ready=True)
     run_full_gate(projects, gates, verdict=FAIL_VERDICT, unlocks=unlocks)
 
     result = evaluation(projects, gates, unlocks)
@@ -164,7 +164,7 @@ def test_mid_flight_gate_session_is_gate_ready_with_resume_action():
     from app.services.gate_service import start_gate, submit_anchor
 
     projects, gates, unlocks = make_repos()
-    seed_active_project(projects)
+    seed_active_project(projects, defense_ready=True)
     sid = run(start_gate(projects, gates, USER))["gate_session_id"]
     run(submit_anchor(projects, gates, ScriptedLLM(["Q1?"]), USER, sid, ANCHOR))
 
@@ -176,7 +176,7 @@ def test_mid_flight_gate_session_is_gate_ready_with_resume_action():
 
 def test_final_phase_pass_is_complete_with_unlocks_earned():
     projects, gates, unlocks = make_repos()
-    project = seed_active_project(projects)
+    project = seed_active_project(projects, defense_ready=True)
     total = len(project["roadmap"]["phases"])
     for _ in range(total):  # PASS_VERDICT scores 8 → consecutive-quality unlocks
         run_full_gate(projects, gates, verdict=PASS_VERDICT, unlocks=unlocks)
@@ -198,7 +198,7 @@ def test_final_phase_pass_is_complete_with_unlocks_earned():
 
 def test_evaluation_is_a_pure_read():
     projects, gates, unlocks = make_repos()
-    seed_active_project(projects)
+    seed_active_project(projects, defense_ready=True)
     run(phase_service.set_task_completion(projects, USER, 1, "ai-1", True))
     run_full_gate(projects, gates, verdict=PASS_VERDICT, unlocks=unlocks)
     run_full_gate(projects, gates, verdict=PASS_VERDICT, unlocks=unlocks)
@@ -210,7 +210,7 @@ def test_evaluation_is_a_pure_read():
 
 def test_evaluation_leaks_no_scores_thresholds_or_internals():
     projects, gates, unlocks = make_repos()
-    seed_active_project(projects)
+    seed_active_project(projects, defense_ready=True)
     run_full_gate(projects, gates, verdict=PASS_VERDICT, unlocks=unlocks)
     run_full_gate(projects, gates, verdict=PASS_VERDICT, unlocks=unlocks)
 
@@ -225,7 +225,7 @@ def test_evaluation_leaks_no_scores_thresholds_or_internals():
 
 def test_users_only_see_their_own_evaluation():
     projects, gates, unlocks = make_repos()
-    seed_active_project(projects, USER)
+    seed_active_project(projects, USER, defense_ready=True)
     run_full_gate(projects, gates, user=USER, verdict=PASS_VERDICT, unlocks=unlocks)
 
     other = evaluation(projects, gates, unlocks, user=OTHER_USER)

@@ -2071,6 +2071,35 @@ fieldset.evidence-status-picker legend { color: var(--ink-2); font-size: 13px; p
 }
 
 /* ---- artifact-aware Project Defense + Defense Report (M16C.2) ------------ */
+.defense-prerequisites {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  padding-left: 22px;
+}
+
+.defense-recovery-actions {
+  margin-top: 14px;
+}
+
+.defense-recovery-reason {
+  margin: 8px 0 0;
+}
+
+.defense-prerequisites li {
+  padding-left: 4px;
+}
+
+.defense-prerequisites strong,
+.defense-prerequisites span {
+  display: block;
+}
+
+.defense-prerequisites span {
+  color: var(--ink-2);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
 
 .section-title { font-family: var(--sans); font-size: 22px; letter-spacing: -0.02em; margin-bottom: 10px; }
 .field-label { display: block; color: var(--ink); font-size: 13px; font-weight: 700; margin: 12px 0 3px; }

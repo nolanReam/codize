@@ -9,13 +9,20 @@ import { ChangeMapErrorNotice, SourceReferences } from "@/components/ChangeMapSa
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
-import { ApiError, confirmChangeMap, generateChangeMap, updateChangeMap } from "@/lib/api";
+import {
+  ApiError,
+  confirmChangeMap,
+  createManualChangeMap,
+  generateChangeMap,
+  updateChangeMap,
+} from "@/lib/api";
 import {
   aiUncertaintyLabel,
   categoryExplanation,
   categoryLabel,
   CHANGE_MAP_CATEGORY_ORDER,
   CHANGE_MAP_GENERATION_FAILURE,
+  CHANGE_MAP_GENERATION_CORRECTION,
   CHANGE_MAP_HONESTY_LINE,
   CHANGE_MAP_NOTE_MAX,
   CHANGE_MAP_PAGE_INTRO,
@@ -352,24 +359,38 @@ function StudentAddedItem({
 function GenerationFailure({
   replacing,
   onRetry,
+  onManual,
+  manualBusy,
 }: {
   replacing: boolean;
   onRetry: () => void;
+  onManual?: () => void;
+  manualBusy: boolean;
 }) {
+  const alertRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => alertRef.current?.focus(), []);
   return (
-    <div className="notice info generation-failure" role="alert">
+    <div
+      ref={alertRef}
+      className="notice info generation-failure"
+      role="alert"
+      tabIndex={-1}
+    >
       <strong>{CHANGE_MAP_GENERATION_FAILURE}</strong>
       <p>
         Your saved implementation material is unchanged
         {replacing ? ", and the current Change Map is still here" : ""}.
       </p>
-      <p className="muted">
-        Adding a short summary or clearer changed-file list may help Codize ground the draft.
-      </p>
+      <p>{CHANGE_MAP_GENERATION_CORRECTION}</p>
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn primary" type="button" onClick={onRetry}>
           Try again
         </button>
+        {onManual && (
+          <button className="btn" type="button" onClick={onManual} disabled={manualBusy}>
+            {manualBusy ? "Creating manual map…" : "Create a Change Map manually"}
+          </button>
+        )}
         <Link className="btn" href="/app/phase/import">
           Review imported material
         </Link>
@@ -384,6 +405,7 @@ export default function ChangeMapPage() {
   const [review, setReview] = useState<ChangeMapReviewState | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [manualCreating, setManualCreating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -507,6 +529,27 @@ export default function ChangeMapPage() {
       if (error instanceof ApiError && error.status === 409) await wf.reload();
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function runManualCreation() {
+    if (!wf.phase || manualCreating || map) return;
+    setManualCreating(true);
+    setGenerationError(null);
+    try {
+      const created = await createManualChangeMap(wf.phase.phase);
+      draftAppliedFor.current = null;
+      setMap(created);
+      setReview(reviewStateFromMap(created));
+      setEditMode(true);
+      setGenerationFailed(false);
+    } catch (error) {
+      setGenerationError(
+        error instanceof ApiError ? error.message : "Couldn’t create a manual Change Map. Try again."
+      );
+      if (error instanceof ApiError && error.status === 409) await wf.reload();
+    } finally {
+      setManualCreating(false);
     }
   }
 
@@ -761,6 +804,8 @@ export default function ChangeMapPage() {
               <GenerationFailure
                 replacing={retryIsReplacement}
                 onRetry={() => void runGeneration(retryIsReplacement)}
+                onManual={retryIsReplacement ? undefined : () => void runManualCreation()}
+                manualBusy={manualCreating}
               />
             )}
 

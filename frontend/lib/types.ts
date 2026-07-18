@@ -667,6 +667,18 @@ export interface GateTurn {
 
 export type GateNextAction = "turn1" | "turn2" | "turn3" | "evaluate";
 
+export interface DefenseReadinessBlocker {
+  code: string;
+  label: string;
+  detail: string;
+}
+
+export interface DefenseReadiness {
+  state: "not_ready" | "ready" | "in_progress" | "cooldown" | "retry" | "complete";
+  formal_ready: boolean;
+  blockers: DefenseReadinessBlocker[];
+}
+
 export interface GateCurrent {
   phase: number;
   phase_title: string;
@@ -678,6 +690,7 @@ export interface GateCurrent {
   next_action?: GateNextAction;
   anchor_statement?: string | null;
   turns?: GateTurn[];
+  readiness?: DefenseReadiness;
 }
 
 export interface GateStartResult {

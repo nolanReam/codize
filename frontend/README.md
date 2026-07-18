@@ -3,7 +3,11 @@
 The Codize v3 **AI Workflow Workspace** — a Next.js (App Router) frontend that
 makes the Codize Build Loop visible and usable:
 
-**Plan → Prompt → Generate → Bring Back → Change Map → Review → Verify → Explain → Commit/Reflect**
+**Prompt Builder → Bring Back What Changed → Change Map → Review → Verification → Evidence → Project Defense → Defense Report**
+
+`lib/workflowJourney.ts` is the canonical typed student-facing Journey. External
+AI generation happens between Prompt Builder and Bring Back; it is not a
+Codize route or an additional stage.
 
 It is an engineering cockpit, not a roadmap/checklist/quiz app. Design language:
 high-contrast dark, violet accent, mono for technical text (see `app/globals.css`
@@ -417,3 +421,21 @@ the existing Bring Back What Changed page and then rejoins Change Map, Review,
 and Verification. Saved workflow state always outranks an old recommendation.
 Legacy profiles receive standard collapsed guidance and may update preferences
 without resetting intake, roadmap, artifacts, tasks, gates, or navigation.
+
+## Product truth and lifecycle safety (M18A)
+
+Project capability answers select the roadmap shape; AI-tool usage and the
+student's self-assessment do not. The intake completion view renders the
+server-owned plain label, including `Browser App` for explicitly local projects.
+
+Formal Project Defense is available only when the current phase's required
+workflow records are current/compatible and every phase task is complete.
+`GET /gate/current` returns the safe readiness state and blockers; direct links
+render the same global Continue action and never expose Begin while blocked.
+Active attempts remain resumable, and cooldown/retry/complete keep their
+existing meanings.
+
+Change Map generation failure preserves Import and any existing map. The page
+announces one correction, offers retry, and can create an explicit empty manual
+draft. Manual recovery requires the student to add at least one bounded item
+before confirmation and never fabricates references or downstream completion.

@@ -99,7 +99,7 @@ export default function LandingPage() {
             Leave with <em>proof of process</em>.
           </h2>
           <p className="lead" style={{ "--i": 2 } as React.CSSProperties}>
-            Planned. Prompted. Reviewed. Verified. Defended. Exportable.
+            Prompted. Mapped. Reviewed. Verified. Evidenced. Defended. Exportable.
           </p>
         </Reveal>
         <Reveal className="report-stage">
@@ -110,12 +110,14 @@ export default function LandingPage() {
             </div>
             <div className="report-body mono">
               <p className="rl h"># Project Defense Report</p>
-              <p className="rl dim">study planner · phase 3 · full-stack web app</p>
-              <p className="rl">## What I planned <span className="ok">✓</span></p>
-              <p className="rl">## What I prompted <span className="ok">✓</span> <span className="dim">2 scoped prompts</span></p>
-              <p className="rl">## What I reviewed <span className="ok">✓</span> <span className="dim">accepted 5 · rejected 1</span></p>
-              <p className="rl">## Submitted evidence <span className="dim">self-reported verification</span></p>
-              <p className="rl">## Defense <span className="ok">PASS</span> <span className="dim">defended in 3 turns</span></p>
+              <p className="rl dim">study planner &middot; phase 3 &middot; browser app</p>
+              <p className="rl">## Prompt Builder <span className="ok">&#10003;</span></p>
+              <p className="rl">## Bring Back What Changed <span className="ok">&#10003;</span></p>
+              <p className="rl">## Change Map <span className="dim">reviewed draft</span></p>
+              <p className="rl">## Review <span className="dim">kept 5 &middot; revised 1</span></p>
+              <p className="rl">## Verification <span className="dim">student-recorded results</span></p>
+              <p className="rl">## Evidence <span className="dim">student-provided support</span></p>
+              <p className="rl">## Project Defense <span className="ok">PASS</span></p>
             </div>
           </div>
           <p className="report-note muted" style={{ "--i": 1 } as React.CSSProperties}>

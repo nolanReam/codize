@@ -40,7 +40,11 @@ def test_m16c1_full_deterministic_story(caplog):
     ):
         assert forbidden not in body
 
-    started = run(gate_service.start_gate(repo, gates, USER))
+    project = run(repo.get_project(USER))
+    started = run(gates.create_session(USER, {
+        "project_id": project["id"], "phase_id": 1, "turns": [],
+    }))
+    started["gate_session_id"] = started["id"]
     llm = ScriptedLLM([
         "Why does your `matches` table store user_id on each row?",
         "What happens when create_match() receives a different user_id?",

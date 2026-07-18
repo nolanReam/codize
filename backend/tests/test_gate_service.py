@@ -62,19 +62,94 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def seed_active_project(repo, user=USER, archetype_id=2):
+def seed_active_project(repo, user=USER, archetype_id=2, *, defense_ready=False):
     fields = {**INTAKE_FIELDS,
               "intake_completed_at": "2026-07-02T00:00:00+00:00",
               "archetype_id": archetype_id}
     run(repo.create_project(user, fields))
     run(roadmap_service.generate_roadmap(repo, LLMService([StubProvider()]), user))
-    return run(repo.get_project(user))
+    project = run(repo.get_project(user))
+    if not defense_ready:
+        return project
+    saved_at = "2026-07-16T12:00:00+00:00"
+    task_progress = {}
+    workflow_artifacts = {}
+    for phase in project["roadmap"]["phases"]:
+        number = str(phase["phase"])
+        task_progress[number] = [
+            *(f"ai-{index}" for index, _ in enumerate(phase["ai_appropriate_tasks"], 1)),
+            *(f"human-{index}" for index, _ in enumerate(phase["human_required_tasks"], 1)),
+        ]
+        workflow_artifacts[number] = {
+            "prompt_builder": {"generated_prompt": "Add the match flow", "saved_at": saved_at},
+            "implementation_import": {
+                "source_kind": "manual_summary",
+                "content": None,
+                "changed_files": ["app/routes/matches.py"],
+                "student_summary": "Added the match flow.",
+                "tool_name": None,
+                "saved_at": saved_at,
+            },
+            "change_map": {
+                "schema_version": "1.0",
+                "status": "confirmed",
+                "source_import_saved_at": saved_at,
+                "generated_at": saved_at,
+                "confirmed_at": saved_at,
+                "source_redacted": False,
+                "source_truncated": False,
+                "items": [{
+                    "item_id": f"sa-ready-{number}",
+                    "origin": "student_added",
+                    "category": "behavior_change",
+                    "draft_text": None,
+                    "ai_uncertainty": None,
+                    "uncertainty_reason": None,
+                    "source_references": [],
+                    "student_decision": "confirmed",
+                    "student_text": "The match flow is present.",
+                    "student_note": None,
+                }],
+            },
+            "review_board": {
+                "files_changed": ["app/routes/matches.py"],
+                "ai_generated": "Match flow",
+                "accepted": "Match flow",
+                "rejected": "None",
+                "edited_manually": "None",
+                "ai_assumptions": "None",
+                "least_confident": "Edge cases",
+                "out_of_scope_changes": "None",
+                "saved_at": saved_at,
+            },
+            "verification": {
+                "checks": [{"check": "app_runs_locally", "result": "pass", "note": "Ran locally"}],
+                "explanation": "The match flow ran.",
+                "saved_at": saved_at,
+            },
+            "evidence": {
+                "entries": [{"kind": "note", "content": "Observed the match flow."}],
+                "summary": "Student-provided observation.",
+                "saved_at": saved_at,
+            },
+        }
+    project = run(
+        repo.update_project(
+            user,
+            project["id"],
+            {
+                "task_progress": task_progress,
+                "workflow_artifacts": workflow_artifacts,
+            },
+        )
+    )
+    return project
 
 
 def make_repos(user=USER):
     repo = InMemoryProjectRepository()
     gates = InMemoryGateSessionRepository()
-    project = seed_active_project(repo, user)
+    project = seed_active_project(repo, user, defense_ready=True)
     return repo, gates, project
 
 

@@ -456,3 +456,78 @@ def test_completion_classifies_from_stored_answers():
     }.items():
         run(submit_answer(repo, USER, n, text))
     assert run(complete_intake(repo, USER))["archetype_id"] == 1
+
+
+@pytest.mark.parametrize(
+    "meta_language",
+    [
+        "I use ChatGPT to help write this project.",
+        "Codex changed several connected functions and I got confused.",
+        "I do not always understand the code Claude generates for me.",
+        "Cursor changed multiple files while I was coding.",
+    ],
+)
+def test_ai_tool_usage_language_is_not_an_ai_product_feature(meta_language):
+    assert classify_archetype(
+        "Help students track homework. " + meta_language,
+        "A browser-based assignment tracker using local storage. No AI features. No backend. No database.",
+        "Plain HTML, CSS, and JavaScript",
+    ) == 3
+
+
+def test_product_focused_ai_feature_language_still_selects_ai_archetype():
+    assert classify_archetype(
+        "Help students understand notes",
+        "The application calls an LLM to summarize uploaded notes and provides an AI assistant.",
+        "HTML and Python",
+    ) == 1
+
+
+def test_explicit_no_ai_feature_wins_over_meta_tool_language_deterministically():
+    assert classify_archetype(
+        "I use AI to help build a homework tracker.",
+        "No AI features. It stores assignments in browser local storage.",
+        "HTML, CSS, JavaScript; I use Claude while coding.",
+    ) == 3
+
+
+def test_explicit_exclusion_wins_when_intake_language_conflicts():
+    assert classify_archetype(
+        "Help readers organize article notes.",
+        "No AI features. An earlier idea said the app calls an LLM, but that is excluded now. "
+        "The current app saves notes in browser local storage with no backend and no database.",
+        "HTML, CSS, and JavaScript",
+    ) == 3
+
+
+def test_plain_local_browser_app_does_not_need_the_studyflow_name():
+    assert classify_archetype(
+        "Help volunteers keep a personal shift checklist.",
+        "A browser app that adds, filters, completes, and deletes shifts using local storage. "
+        "No accounts, no backend, no database, and no AI features.",
+        "Plain HTML, CSS, JavaScript",
+    ) == 3
+
+
+def test_studyflow_completion_has_an_accurate_student_visible_label():
+    repo = InMemoryProjectRepository()
+    answers = {
+        1: "Help students keep homework and due dates organized.",
+        2: (
+            "A browser-based homework tracker where students add assignments with a title, "
+            "subject, and due date; mark them complete; filter and delete them; and preserve "
+            "them through browser local storage. No accounts. No backend. No database. "
+            "No AI features. No notifications. No calendar integration."
+        ),
+        3: "Plain HTML, CSS, JavaScript",
+        4: "Honestly, not really",
+        5: "Two weeks",
+    }
+    for number, answer in answers.items():
+        run(submit_answer(repo, USER, number, answer))
+    result = run(complete_intake(repo, USER))
+    assert result == {
+        "completed": True,
+        "archetype_id": 3,
+        "archetype_name": "Browser App",
+    }

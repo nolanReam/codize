@@ -71,7 +71,7 @@ def test_full_reconnection_flow_over_http(client):
                             "unlocks", "next_action"}
     assert summary["intake_purpose"] == FIVE_ANSWERS[1]  # verbatim Q1 answer
     assert summary["current_phase"] == 1 and summary["phase_title"]
-    assert summary["incomplete_tasks"] and summary["unlocks"] == []
+    assert summary["incomplete_tasks"] == [] and summary["unlocks"] == []
 
     ack = client.post("/reconnection/acknowledge", headers=auth_headers())
     assert ack.status_code == 200 and ack.json()["acknowledged"] is True

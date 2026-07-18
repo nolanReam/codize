@@ -613,3 +613,29 @@ status, task progress, phases, gates, unlocks, and intake answers are untouched.
 The feature imports no provider and makes zero LLM calls. It adds no migration
 and does not alter classification, prompts, evaluation, PASS/FAIL, retries,
 cooldowns, or Report truth.
+
+## Product truth and lifecycle safety (M18A)
+
+`project_capability_service.py` derives classification signals from intake
+purpose/scope/stack only. Provider/tool usage and the Q4 self-assessment are
+student context, not product capability. Bounded explicit exclusions override
+conflicting positive terms deterministically. An explicitly browser-local
+project stays stored under archetype 3 but receives the accurate `Browser App`
+label and a strict seven-phase local-storage projection; provider output that
+reintroduces excluded backend/database/auth/model systems is discarded under
+the unchanged structural validator and replaced by the validated deterministic
+fallback.
+
+`defense_readiness_service.py` is the formal Defense preparation authority for
+the current phase. It requires current/compatible Change Map, Review,
+Verification, Evidence, a typed Import, and completed build tasks; import-first
+recovery remains valid without retrospective Prompt work. `GET /gate/current`
+exposes safe blockers, and `POST /gate/start` enforces the same contract before
+session creation. Existing active attempts, evaluator behavior, questions,
+scoring, thresholds, retries, and cooldowns are unchanged.
+
+`POST /workflow/{phase}/change-map/manual` is an explicit no-provider recovery
+that creates an empty provenance-bound draft only when an Import exists and no
+map exists. Confirmation requires at least one student-authored item. It never
+adds AI claims, source references, Review, Verification, Evidence, or Defense
+readiness and never overwrites a readable map.

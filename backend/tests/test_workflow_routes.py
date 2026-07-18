@@ -124,10 +124,15 @@ def test_artifact_writes_do_not_change_any_other_engine_state(client):
     client.app.dependency_overrides[get_gate_session_repository] = lambda: gates
     client.app.dependency_overrides[get_unlock_repository] = lambda: unlocks
     activate_project(client)
+    def gate_lifecycle():
+        view = client.get("/gate/current", headers=auth_headers()).json()
+        view.pop("readiness", None)
+        return view
+
     reads = {
         "roadmap": lambda: client.get("/roadmap", headers=auth_headers()).json(),
         "phase": lambda: client.get("/phases/1", headers=auth_headers()).json(),
-        "gate": lambda: client.get("/gate/current", headers=auth_headers()).json(),
+        "gate": gate_lifecycle,
         "unlocks": lambda: client.get("/unlocks", headers=auth_headers()).json(),
         "evaluation": lambda: client.get("/evaluation", headers=auth_headers()).json(),
     }

@@ -304,7 +304,11 @@ def test_verification_incomplete_state_uses_uncapped_source(monkeypatch):
 def test_linked_injection_text_is_delimited_data_in_existing_question_path():
     repo, context = linked_context()
     gates = InMemoryGateSessionRepository()
-    started = run(gate_service.start_gate(repo, gates, USER))
+    project = run(repo.get_project(USER))
+    started = run(gates.create_session(USER, {
+        "project_id": project["id"], "phase_id": 1, "turns": [],
+    }))
+    started["gate_session_id"] = started["id"]
     llm = ScriptedLLM([
         "Why does your `matches` table store a user_id for each match?"
     ])

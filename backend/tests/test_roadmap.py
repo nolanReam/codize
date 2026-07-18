@@ -73,6 +73,20 @@ class DriftingProvider:
         return json.dumps(roadmap)
 
 
+class ExclusionBreakingProvider:
+    """Keeps the shape but invents a forbidden product capability."""
+
+    name = "exclusion-breaking"
+
+    async def complete(self, prompt: str, temperature: float) -> str:
+        raw = await StubProvider().complete(prompt, temperature)
+        roadmap = json.loads(raw)
+        roadmap["phases"][0]["ai_appropriate_tasks"][0] = (
+            "Add an OpenAI model provider and API key"
+        )
+        return json.dumps(roadmap)
+
+
 # --- generation preconditions ----------------------------------------------------
 
 def test_cannot_generate_before_any_intake():
@@ -328,3 +342,56 @@ def test_validator_allows_personalized_wording():
         "Why these resources model your volleyball league, and what you left out"
     )
     assert validate_roadmap_structure(roadmap, template) == []
+
+
+def test_studyflow_gets_a_strict_browser_only_roadmap_without_invented_systems():
+    repo = InMemoryProjectRepository()
+    project = seed_project(
+        repo,
+        archetype_id=3,
+        intake_purpose="Help students keep homework and due dates organized.",
+        intake_scope=(
+            "A browser-based homework tracker where students add assignments with a title, "
+            "subject, and due date; mark them complete; filter and delete them; and preserve "
+            "them through browser local storage. No accounts. No backend. No database. "
+            "No AI features. No notifications. No calendar integration."
+        ),
+        intake_stack="Plain HTML, CSS, JavaScript",
+        intake_self_assessment=(
+            "I get confused when AI generates several connected functions or changes multiple files."
+        ),
+    )
+    result = run(generate_roadmap(repo, LLMService([FailingProvider()]), USER))
+    roadmap = result["roadmap"]
+    assert roadmap["archetype_id"] == 3
+    assert roadmap["archetype_name"] == "Browser App"
+    assert roadmap["default_stack"] == "Plain HTML + CSS + JavaScript"
+    assert len(roadmap["phases"]) == 7
+    serialized = json.dumps(roadmap).lower()
+    for invented in (
+        "llm", "model provider", "api key", "python", "fastapi", "backend",
+        "database", "authentication", "conversation history", "calendar", "notification",
+    ):
+        assert invented not in serialized
+    assert "local storage" in serialized
+    assert run(repo.get_project(USER))["roadmap"] == roadmap
+    assert project["roadmap"] is None
+
+
+def test_browser_scope_drift_is_discarded_without_weakening_structure_validation():
+    repo = InMemoryProjectRepository()
+    seed_project(
+        repo,
+        archetype_id=3,
+        intake_purpose="Help volunteers track shifts.",
+        intake_scope=(
+            "A browser app using local storage. No accounts. No backend. No database. "
+            "No AI features."
+        ),
+        intake_stack="HTML, CSS, JavaScript",
+    )
+    result = run(generate_roadmap(repo, LLMService([ExclusionBreakingProvider()]), USER))
+    serialized = json.dumps(result["roadmap"]).lower()
+    assert "openai" not in serialized
+    assert "api key" not in serialized
+    assert "local storage" in serialized

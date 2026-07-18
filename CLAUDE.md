@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-**Latest completed milestone: M16B.3B (2026-07-14).** The existing Evidence
+**Latest completed milestone: M18A (2026-07-17).** Product truth and lifecycle
+safety now separate project capability from AI-tool usage, respect bounded
+explicit exclusions, keep StudyFlow/local-browser roadmaps free of invented
+systems, enforce formal Defense preparation on both read/start paths, derive
+student-facing summaries from the canonical eight-stage Journey, and provide
+preserving Change Map retry/manual recovery. No migration or provider call was
+added; structural validation, gate questions/evaluator/scoring/retries/cooldowns
+remain unchanged. See
+`.claude/memory/project-classification-and-product-truth-conventions.md`.
+
+**M16B.3B (2026-07-14).** The existing Evidence
 page now exposes the reviewed M16B.3A Verification-to-Evidence handoff while
 preserving legacy/manual Evidence. This is a frontend-only milestone; M16S.1
 write-boundary hardening remains in force. See

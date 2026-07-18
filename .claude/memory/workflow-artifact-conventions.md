@@ -198,3 +198,17 @@ completion, and recovery emphasis. The update patches the existing JSONB
 column only and preserves phase artifacts and every lifecycle field. There is
 no migration, parallel store, or provider call. See
 [[beginner-entry-adaptive-guidance-conventions]].
+
+M18A adds no artifact type or migration. Formal Defense readiness is computed
+from the existing current-phase typed read seams: a valid Implementation Import,
+current/manual compatible Change Map, Review, Verification, and Evidence, plus
+completed phase tasks. Import-first recovery remains valid without a
+retrospective Prompt. A started attempt is stable and resumable even if an
+upstream artifact later changes.
+
+The Change Map manual-recovery route is explicit and deterministic: it binds an
+empty draft to the saved Import timestamp, preserves redaction/truncation
+metadata, refuses overwrite, and requires at least one student-authored item
+before confirmation. It creates no references or downstream artifacts and
+weakens none of the existing generation, schema, provenance, grounding, or
+confirmation validation.

@@ -75,10 +75,12 @@ the M15C.2 next action **"Create Change Map →"** plus the preserved secondary
 "Back to Build Loop" link. It navigates only—no generation or other LLM call
 happens on save. A failed save preserves form values and the local draft.
 
-**Build Loop position:** WorkflowSteps order is Plan + Prompt → Generate →
-**Bring Back** → **Change Map** → Review → Verify → Prove → Explain →
-Commit/Reflect (9 steps since M15C.2); phase next-step logic inserts Change Map
-between the saved import and Review; the
+**Build Loop position:** the canonical student Journey is defined once in
+`frontend/lib/workflowJourney.ts`: Prompt Builder → Bring Back What Changed →
+Change Map → Review → Verification → Evidence → Project Defense → Defense
+Report. Using an external AI tool happens between Prompt Builder and Bring Back
+What Changed, but is not a Codize route or a ninth stage. Phase next-step logic
+places Change Map between the saved import and Review; the
 "Workflow: N/**5** captured" counts on the phase page and cockpit were the
 easy-to-miss change (the backend returns five keys, so the old /4 display
 would have shown 5/4). Artifact saves still never tick a build task. The

@@ -98,7 +98,15 @@ def make_workspace(sections=("prompt_builder", "review_board", "evidence", "veri
 
 
 def start(repo, gates):
-    return run(start_gate(repo, gates, USER))["gate_session_id"]
+    # These grounding tests intentionally exercise sparse historical attempts.
+    # M18A blocks creating a new formal attempt from that state, while an
+    # already-created legacy attempt must remain stable and resumable.
+    project = run(repo.get_project(USER))
+    return run(gates.create_session(USER, {
+        "project_id": project["id"],
+        "phase_id": project["current_phase"],
+        "turns": [],
+    }))["id"]
 
 
 def build_pack(repo):

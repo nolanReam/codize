@@ -83,6 +83,7 @@ def client(monkeypatch, gate_llm):
     test_client = TestClient(app)
     test_client.gate_llm = gate_llm
     test_client.app_ref = app
+    test_client.project_repo = project_repo
     return test_client
 
 
@@ -102,6 +103,51 @@ def activate_project(client, user_id=USER_A):
         assert resp.status_code == 200
     assert client.post("/intake/complete", headers=auth_headers(user_id)).status_code == 200
     assert client.post("/roadmap/generate", headers=auth_headers(user_id)).status_code == 200
+    project = next(row for row in client.project_repo._rows if row["user_id"] == user_id)
+    saved_at = "2026-07-16T12:00:00+00:00"
+    task_progress = {}
+    workflow_artifacts = {}
+    for phase in project["roadmap"]["phases"]:
+        number = str(phase["phase"])
+        task_progress[number] = [
+            *(f"ai-{index}" for index, _ in enumerate(phase["ai_appropriate_tasks"], 1)),
+            *(f"human-{index}" for index, _ in enumerate(phase["human_required_tasks"], 1)),
+        ]
+        workflow_artifacts[number] = {
+        "prompt_builder": {"generated_prompt": "Add expense flow", "saved_at": saved_at},
+        "implementation_import": {
+            "source_kind": "manual_summary", "content": None,
+            "changed_files": ["app/routes/expenses.py"],
+            "student_summary": "Added expense flow.", "tool_name": None, "saved_at": saved_at,
+        },
+        "change_map": {
+            "schema_version": "1.0", "status": "confirmed",
+            "source_import_saved_at": saved_at, "generated_at": saved_at,
+            "confirmed_at": saved_at, "source_redacted": False, "source_truncated": False,
+            "items": [{
+                "item_id": f"sa-ready-{number}", "origin": "student_added", "category": "behavior_change",
+                "draft_text": None, "ai_uncertainty": None, "uncertainty_reason": None,
+                "source_references": [], "student_decision": "confirmed",
+                "student_text": "The expense flow is present.", "student_note": None,
+            }],
+        },
+        "review_board": {
+            "files_changed": ["app/routes/expenses.py"], "ai_generated": "Expense flow",
+            "accepted": "Expense flow", "rejected": "None", "edited_manually": "None",
+            "ai_assumptions": "None", "least_confident": "Edge cases",
+            "out_of_scope_changes": "None", "saved_at": saved_at,
+        },
+        "verification": {
+            "checks": [{"check": "app_runs_locally", "result": "pass", "note": "Ran locally"}],
+            "explanation": "The expense flow ran.", "saved_at": saved_at,
+        },
+        "evidence": {
+            "entries": [{"kind": "note", "content": "Observed the expense flow."}],
+            "summary": "Student-provided observation.", "saved_at": saved_at,
+        },
+        }
+    project["task_progress"] = task_progress
+    project["workflow_artifacts"] = workflow_artifacts
 
 
 def run_gate_to_evaluation(client, user_id=USER_A, verdict=PASS_VERDICT):

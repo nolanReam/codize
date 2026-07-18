@@ -318,6 +318,7 @@ def test_authenticated_deterministic_smoke_40_checks(
             f"/workflow/1/{section}", json=payload, headers=auth_headers(USER_A)
         ).status_code == 200
     defense_before = client.get("/gate/current", headers=auth_headers(USER_A)).json()
+    defense_before.pop("readiness", None)
 
     async def explode(self, prompt, temperature):
         raise AssertionError("Review initialization called a provider")
@@ -463,7 +464,9 @@ def test_authenticated_deterministic_smoke_40_checks(
           "35 Evidence remains intact")
     check(sections["verification"]["explanation"] == VERIFICATION["explanation"],
           "36 Verification remains intact")
-    check(client.get("/gate/current", headers=auth_headers(USER_A)).json() == defense_before,
+    defense_after = client.get("/gate/current", headers=auth_headers(USER_A)).json()
+    defense_after.pop("readiness", None)
+    check(defense_after == defense_before,
           "37 Project Defense remains unchanged")
     check(rebound.status_code == 200, "38 no provider call occurs during Review initialization")
     snapshots = [target["change_text"] for target in rebound.json()["artifact"]["review_targets"]]

@@ -34,6 +34,7 @@ IMPORT_PAYLOAD = {
 
 CHANGE_MAP_ROUTES = (
     ("POST", "/workflow/1/change-map/generate"),
+    ("POST", "/workflow/1/change-map/manual"),
     ("PUT", "/workflow/1/change-map"),
     ("POST", "/workflow/1/change-map/confirm"),
 )
@@ -196,6 +197,51 @@ def test_provider_failure_is_502_with_nothing_stored(client):
     assert stored["change_map"] is None
 
 
+def test_provider_failure_can_recover_to_explicit_manual_map(client):
+    activate_project(client)
+    save_import(client)
+    client.app.dependency_overrides[get_llm_service] = (
+        lambda: LLMService([ScriptedLLM([LLMError("down")])])
+    )
+    assert generate(client).status_code == 502
+
+    resp = client.post("/workflow/1/change-map/manual", headers=auth_headers())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "draft"
+    assert body["items"] == []
+    assert body["source_import_saved_at"]
+    assert body["stale"] is False
+
+    # Empty manual drafts are not confirmable. The student must record at
+    # least one change through the normal bounded update contract.
+    resp = client.post("/workflow/1/change-map/confirm", headers=auth_headers())
+    assert resp.status_code == 409
+    assert "at least one" in resp.json()["error"]["message"]
+    resp = client.put("/workflow/1/change-map", json={
+        "updates": [],
+        "student_added_items": [{
+            "category": "behavior_change",
+            "student_text": "The assignment list now persists after refresh.",
+        }],
+    }, headers=auth_headers())
+    assert resp.status_code == 200
+    assert client.post(
+        "/workflow/1/change-map/confirm", headers=auth_headers()
+    ).status_code == 200
+
+
+def test_manual_recovery_never_overwrites_an_existing_map(client):
+    activate_project(client)
+    save_import(client)
+    original = generate(client).json()
+    resp = client.post("/workflow/1/change-map/manual", headers=auth_headers())
+    assert resp.status_code == 409
+    stored = client.get("/workflow/1", headers=auth_headers()).json()["change_map"]
+    assert stored["generated_at"] == original["generated_at"]
+    assert stored["items"] == original["items"]
+
+
 def test_generic_section_put_cannot_write_the_change_map(client):
     activate_project(client)
     resp = client.put("/workflow/1/change_map",
@@ -236,10 +282,18 @@ def test_change_map_ops_do_not_change_any_other_engine_state(client):
     client.app.dependency_overrides[get_unlock_repository] = lambda: unlocks
     activate_project(client)
     save_import(client)
+    def gate_lifecycle():
+        view = client.get("/gate/current", headers=auth_headers()).json()
+        # M18A readiness is an intentional computed projection of workflow
+        # truth; Change Map work may remove that one blocker without mutating
+        # the gate lifecycle itself.
+        view.pop("readiness", None)
+        return view
+
     reads = {
         "roadmap": lambda: client.get("/roadmap", headers=auth_headers()).json(),
         "phase": lambda: client.get("/phases/1", headers=auth_headers()).json(),
-        "gate": lambda: client.get("/gate/current", headers=auth_headers()).json(),
+        "gate": gate_lifecycle,
         "unlocks": lambda: client.get("/unlocks", headers=auth_headers()).json(),
         "evaluation": lambda: client.get("/evaluation", headers=auth_headers()).json(),
         "sections": lambda: client.get("/workflow/1", headers=auth_headers()).json()["sections"],

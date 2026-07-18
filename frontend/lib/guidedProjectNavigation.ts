@@ -12,19 +12,11 @@ import type {
   WorkflowPhaseState,
   WorkflowSections,
 } from "./types";
+import { WORKFLOW_JOURNEY } from "./workflowJourney";
 
 export const GUIDED_NAVIGATION_REFRESH_EVENT = "codize:guided-navigation-refresh";
 
-export const GUIDED_JOURNEY = [
-  { id: "prompt", label: "Prompt Builder", href: "/app/phase/prompt" },
-  { id: "import", label: "Bring Back What Changed", href: "/app/phase/import" },
-  { id: "change_map", label: "Change Map", href: "/app/phase/change-map" },
-  { id: "review", label: "Review", href: "/app/phase/review" },
-  { id: "verification", label: "Verification", href: "/app/phase/verify" },
-  { id: "evidence", label: "Evidence", href: "/app/phase/evidence" },
-  { id: "defense", label: "Project Defense", href: "/app/gate" },
-  { id: "report", label: "Defense Report", href: "/app/report" },
-] as const;
+export const GUIDED_JOURNEY = WORKFLOW_JOURNEY;
 
 export type GuidedStageId = (typeof GUIDED_JOURNEY)[number]["id"];
 export type GuidedStageState =

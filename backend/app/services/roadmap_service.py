@@ -18,7 +18,7 @@ import logging
 import re
 from pathlib import Path
 
-from app.services import llm_service, template_service
+from app.services import llm_service, roadmap_scope_service, template_service
 from app.services.llm_service import LLMService
 from app.services.project_repository import ProjectRepository
 
@@ -244,7 +244,7 @@ def build_fallback_roadmap(template: dict, project: dict) -> dict:
 
 
 async def _personalized_roadmap(
-    template: dict, project: dict, llm: LLMService
+    template: dict, project: dict, llm: LLMService, capabilities
 ) -> dict | None:
     """One LLM personalization attempt. Returns a roadmap that passed strict
     structure validation, or None when the provider failed, returned
@@ -262,6 +262,7 @@ async def _personalized_roadmap(
         return None
 
     drift = validate_roadmap_structure(candidate, template)
+    drift.extend(roadmap_scope_service.validate_scope_constraints(candidate, capabilities))
     if drift:
         # Log the drift detail for observability; it never reaches the client.
         logger.warning(
@@ -298,7 +299,7 @@ async def generate_roadmap(repo: ProjectRepository, llm: LLMService, user_id: st
         raise RoadmapAlreadyGeneratedError("A roadmap has already been generated for this project.")
 
     try:
-        template = template_service.get_template(project["archetype_id"])
+        base_template = template_service.get_template(project["archetype_id"])
     except template_service.UnknownArchetypeError as e:
         # No template to personalize OR to fall back to — fail safely, store nothing.
         raise RoadmapNotReadyError("This project's archetype is not recognized.") from e
@@ -306,10 +307,16 @@ async def generate_roadmap(repo: ProjectRepository, llm: LLMService, user_id: st
     # Personalize with the LLM; fall back to the verified template on any failure
     # or drift. Either way the stored roadmap is strictly validated — an invalid
     # structure is never persisted.
-    roadmap = await _personalized_roadmap(template, project, llm)
+    template, capabilities = roadmap_scope_service.template_for_project(
+        base_template, project
+    )
+    roadmap = await _personalized_roadmap(template, project, llm, capabilities)
     if roadmap is None:
         roadmap = build_fallback_roadmap(template, project)
         residual = validate_roadmap_structure(roadmap, template)
+        residual.extend(
+            roadmap_scope_service.validate_scope_constraints(roadmap, capabilities)
+        )
         if residual:
             # Impossible by construction; never store an invalid structure.
             logger.error(
