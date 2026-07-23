@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { QuickStartPanel, StartingPathSummary } from "@/components/AdaptiveEntry";
 import Async from "@/components/Async";
@@ -38,6 +38,7 @@ function ProjectHomeContent() {
   const [roadmapError, setRoadmapError] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskBusy, setTaskBusy] = useState<string | null>(null);
+  const restoredAnchorRef = useRef<string | null>(null);
   const currentPhaseNumber = evaluation?.current_phase;
 
   const loadPhase = useCallback(async () => {
@@ -70,6 +71,23 @@ function ProjectHomeContent() {
   useEffect(() => {
     if (workflow && currentPhaseNumber != null) void loadPhase();
   }, [currentPhaseNumber, loadPhase, workflow]);
+
+  useEffect(() => {
+    const restoreHomeAnchor = () => {
+      const hash = window.location.hash;
+      if (hash !== "#current-phase" && hash !== "#current-work") {
+        restoredAnchorRef.current = null;
+        return;
+      }
+      if (phaseState !== "ready" || restoredAnchorRef.current === hash) return;
+      document.querySelector<HTMLElement>(hash)?.scrollIntoView({ block: "start" });
+      restoredAnchorRef.current = hash;
+    };
+
+    restoreHomeAnchor();
+    window.addEventListener("hashchange", restoreHomeAnchor);
+    return () => window.removeEventListener("hashchange", restoreHomeAnchor);
+  }, [phaseState]);
 
   async function toggleTask(task: TaskEntry) {
     if (!phase || taskBusy) return;

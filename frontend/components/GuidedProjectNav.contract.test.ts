@@ -28,6 +28,9 @@ describe("M18B.1 one-home guided shell contract", () => {
     expect(phase).toContain('import { redirect } from "next/navigation"');
     expect(phase).toContain('redirect("/app#current-phase")');
     expect(phase).not.toContain('"use client"');
+    expect(home).toContain('hash !== "#current-phase" && hash !== "#current-work"');
+    expect(home).toContain('scrollIntoView({ block: "start" })');
+    expect(home).toContain('window.addEventListener("hashchange", restoreHomeAnchor)');
   });
 
   it("makes Project Home own phase purpose, ordered current work, roadmap, and history access", () => {
