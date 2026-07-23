@@ -93,7 +93,26 @@ Limits:
 - unimplemented ideas in the old spec are not automatically current requirements;
 - current repository behavior must be inspected before changing existing architecture.
 
-### 5. Accepted decision records in `docs/decisions/`
+### 5. `docs/learning/codize_learning_model_v1.md`
+
+Controls active educational design, including:
+
+- the competency vocabulary;
+- the distinction between workflow completion and learning evidence;
+- student ownership and productive difficulty;
+- just-in-time teaching;
+- support and transfer principles.
+
+Limits:
+
+- it is subordinate to current repository truth, architecture, safety,
+  authentication, ownership, lifecycle, provenance, and trust boundaries;
+- it does not create product state, scores, mastery, analytics, or workflow
+  completion by itself;
+- implemented learning slices still require accepted decision records and
+  code/tests that preserve the current product contracts.
+
+### 6. Accepted decision records in `docs/decisions/`
 
 Control narrow, durable decisions that need more detail than the operating brief.
 
@@ -107,7 +126,7 @@ Examples:
 
 A decision record should include status, context, decision, consequences, and supersession rules.
 
-### 6. `CLAUDE.md`, `.claude/memory/`, and repo-scoped skills
+### 7. `CLAUDE.md`, `.claude/memory/`, and repo-scoped skills
 
 Control durable implementation conventions and operational lessons.
 
@@ -122,7 +141,7 @@ Use them for:
 
 They do not redefine product purpose unless the active product brief or an accepted decision record is updated.
 
-### 7. Strategy and planning documents
+### 8. Strategy and planning documents
 
 Examples:
 
@@ -138,7 +157,7 @@ They are not authoritative for current implementation state.
 
 Time-sensitive dates, model availability, milestone labels, and “next step” statements may become stale.
 
-### 8. Archive
+### 9. Archive
 
 Examples:
 
@@ -160,6 +179,7 @@ Archive material is non-authoritative and should not be loaded unless historical
 | Is this already implemented? | Code, tests, migrations, Git history |
 | What is Codize and who is it for? | `codize_product_operating_brief_v2.md` |
 | What is the canonical shared workflow? | `codize_product_operating_brief_v2.md` |
+| What active educational-design principle or competency name applies? | `docs/learning/codize_learning_model_v1.md`, within current architecture and trust boundaries |
 | What trust language is allowed? | Operating brief, then accepted trust decisions |
 | What security/auth/gate invariant must remain? | Current code/tests plus applicable master-spec invariant |
 | How does a subsystem currently work? | Code/tests, then `.claude/memory/` |

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPrompt, promptInputsHaveStudentWork, type PromptBuilderInputs } from "./promptBuilder";
+import {
+  buildPrompt,
+  normalizePromptBuilderInputs,
+  promptInputsHaveStudentWork,
+  type PromptBuilderInputs,
+} from "./promptBuilder";
 
 const INPUTS: PromptBuilderInputs = {
   projectGoal: "a volleyball league tracker",
@@ -20,10 +25,13 @@ describe("buildPrompt", () => {
   });
 
   it("includes every provided input in the prompt", () => {
-    const { prompt } = buildPrompt(INPUTS);
+    const { prompt } = buildPrompt(INPUTS, {
+      assignment: "Create the match endpoint",
+    });
     for (const text of [
       "volleyball league tracker",
       "match-creation endpoint",
+      "Selected assignment: Create the match endpoint",
       "POST /matches",
       "app/routes/matches.py",
       "FastAPI, async handlers",
@@ -37,11 +45,11 @@ describe("buildPrompt", () => {
   it("adds plan-first and verification lines only when asked", () => {
     const withBoth = buildPrompt(INPUTS).prompt;
     expect(withBoth).toContain("Before writing any code");
-    expect(withBoth).toContain("manually verify");
+    expect(withBoth).toContain("manually inspect");
 
     const without = buildPrompt({ ...INPUTS, planFirst: false, wantChecks: false }).prompt;
     expect(without).not.toContain("Before writing any code");
-    expect(without).not.toContain("manually verify");
+    expect(without).not.toContain("manually inspect");
   });
 
   it("always fences scope and surfaces assumptions", () => {
@@ -59,7 +67,8 @@ describe("buildPrompt", () => {
     const { badPrompt, whyStronger, prompt } = buildPrompt(INPUTS);
     expect(badPrompt).toContain("Make it work");
     expect(badPrompt.length).toBeLessThan(prompt.length);
-    expect(whyStronger).toContain("scopes the request");
+    expect(whyStronger).toContain("states one task");
+    expect(whyStronger).not.toMatch(/correct|master|prove/i);
   });
 });
 
@@ -68,5 +77,16 @@ describe("promptInputsHaveStudentWork", () => {
     const empty = { ...INPUTS, projectGoal: "", phaseGoal: "", aiTask: "", files: "", constraints: "", doNotChange: "", uncertainty: "" };
     expect(promptInputsHaveStudentWork(empty)).toBe(false);
     expect(promptInputsHaveStudentWork({ ...empty, aiTask: "one bounded task" })).toBe(true);
+  });
+});
+
+describe("normalizePromptBuilderInputs", () => {
+  it("preserves valid legacy drafts and drops malformed field types", () => {
+    expect(normalizePromptBuilderInputs({ ...INPUTS, planFirst: "yes", aiTask: 42 })).toEqual({
+      ...INPUTS,
+      aiTask: "",
+      planFirst: true,
+    });
+    expect(normalizePromptBuilderInputs("corrupt")).toBeNull();
   });
 });

@@ -31,6 +31,12 @@ PROMPT_BUILDER = {
     "why_stronger": "Scopes the request to one endpoint and forbids unrelated changes.",
 }
 
+SCOPE_PRACTICE = {
+    "finish_condition": "A match-creation endpoint exists for the selected assignment.",
+    "excluded_work": "Editing authentication and the existing league schema stays out of scope.",
+    "inspection_condition": "The new route is present and returns a validation response.",
+}
+
 REVIEW_BOARD = {
     "files_changed": ["app/routes/matches.py", "app/models.py"],
     "ai_generated": "The POST /matches handler and the Match model.",
@@ -209,7 +215,11 @@ def test_saving_one_phase_keeps_other_phases():
 def test_prompt_binding_requires_the_selected_current_ai_task_and_preserves_history():
     repo = InMemoryProjectRepository()
     seed_active_project(repo)
-    bound_a = {**PROMPT_BUILDER, "assignment_task_id": "ai-1"}
+    bound_a = {
+        **PROMPT_BUILDER,
+        "assignment_task_id": "ai-1",
+        "scope_practice": SCOPE_PRACTICE,
+    }
     with pytest.raises(InvalidArtifactError, match="Select this current-phase AI task"):
         run(save_section(repo, USER, 1, "prompt_builder", bound_a))
 
@@ -227,6 +237,7 @@ def test_prompt_binding_requires_the_selected_current_ai_task_and_preserves_hist
         "inputs": {"goal": "A different bounded task"},
         "generated_prompt": "Handle only the selected second AI task.",
         "assignment_task_id": "ai-2",
+        "scope_practice": SCOPE_PRACTICE,
     }
     saved_b = run(save_section(repo, USER, 1, "prompt_builder", bound_b))
     assert saved_b["artifact"]["assignment_task_id"] == "ai-2"
@@ -250,7 +261,11 @@ def test_legacy_prompt_remains_unassigned_and_is_archived_on_future_binding():
             USER,
             1,
             "prompt_builder",
-            {**PROMPT_BUILDER, "assignment_task_id": "ai-1"},
+            {
+                **PROMPT_BUILDER,
+                "assignment_task_id": "ai-1",
+                "scope_practice": SCOPE_PRACTICE,
+            },
         )
     )
     history = run(get_phase_artifacts(repo, USER, 1))["prompt_history"]
@@ -320,7 +335,11 @@ def test_bound_prompt_retries_a_concurrent_workflow_write_without_losing_it():
             USER,
             1,
             "prompt_builder",
-            {**PROMPT_BUILDER, "assignment_task_id": "ai-1"},
+            {
+                **PROMPT_BUILDER,
+                "assignment_task_id": "ai-1",
+                "scope_practice": SCOPE_PRACTICE,
+            },
         )
     )
     state = run(get_phase_artifacts(repo, USER, 1))["sections"]

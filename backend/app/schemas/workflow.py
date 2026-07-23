@@ -15,7 +15,14 @@ import re
 import unicodedata
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 # Prefixes of the secret formats this stack actually uses (Supabase secret
 # keys, OpenRouter keys, Google API keys, PEM private keys). Deliberately a
@@ -75,6 +82,58 @@ class _Artifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+BOUNDED_ASSIGNMENT_OBJECTIVE_ID = "bounded_assignment_v1"
+BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION = 1
+SCOPE_PRACTICE_TEXT_MAX = 800
+
+
+class ScopePracticeSubmission(_Artifact):
+    """The three student-owned M18C.1 decisions accepted on Prompt save.
+
+    Objective identity and assignment binding are deliberately absent from the
+    write shape. The service derives them after it validates the authoritative
+    selected current-phase AI assignment.
+    """
+
+    finish_condition: str = Field(max_length=SCOPE_PRACTICE_TEXT_MAX)
+    excluded_work: str = Field(max_length=SCOPE_PRACTICE_TEXT_MAX)
+    inspection_condition: str = Field(max_length=SCOPE_PRACTICE_TEXT_MAX)
+
+    @field_validator(
+        "finish_condition",
+        "excluded_work",
+        "inspection_condition",
+        mode="before",
+    )
+    @classmethod
+    def _normalize_scope_text(cls, value):
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        _reject_secret_like(value)
+        if any(
+            unicodedata.category(char) == "Cc" and char not in "\t\n\r"
+            for char in value
+        ):
+            raise ValueError("contains an unsupported control character")
+        return value
+
+    @field_validator("finish_condition", "excluded_work", "inspection_condition")
+    @classmethod
+    def _require_scope_text(cls, value: str) -> str:
+        if not value:
+            raise ValueError("cannot be empty")
+        return value
+
+
+class StoredScopePractice(ScopePracticeSubmission):
+    """Server-owned objective identity and assignment binding plus responses."""
+
+    objective_id: Literal["bounded_assignment_v1"]
+    objective_version: Literal[1]
+    assignment_task_id: Annotated[str, Field(pattern=r"^ai-[1-9][0-9]*$")]
+
+
 class PromptBuilderArtifact(_Artifact):
     """Step 2 of the Build Loop: the structured inputs and the prompt the
     student generated for their external AI tool (deterministic client-side
@@ -87,6 +146,7 @@ class PromptBuilderArtifact(_Artifact):
     assignment_task_id: Annotated[
         str, Field(pattern=r"^ai-[1-9][0-9]*$")
     ] | None = None
+    scope_practice: ScopePracticeSubmission | None = None
 
     @model_validator(mode="after")
     def _cap_inputs(self) -> "PromptBuilderArtifact":
@@ -95,10 +155,29 @@ class PromptBuilderArtifact(_Artifact):
         return self
 
 
-class StoredPromptBuilderArtifact(PromptBuilderArtifact):
-    """Read/history shape. ``saved_at`` is always server-owned."""
+class StoredPromptBuilderArtifact(_Artifact):
+    """Read/history shape. Objective identity and ``saved_at`` are server-owned."""
 
+    inputs: dict[Annotated[str, Field(max_length=64)], MedText] = Field(default_factory=dict)
+    generated_prompt: Annotated[LongText, Field(min_length=1)]
+    why_stronger: MedText | None = None
+    bad_prompt_comparison: LongText | None = None
+    assignment_task_id: Annotated[
+        str, Field(pattern=r"^ai-[1-9][0-9]*$")
+    ] | None = None
+    scope_practice: StoredScopePractice | None = None
     saved_at: str | None = None
+
+    @model_validator(mode="after")
+    def _stored_prompt_integrity(self) -> "StoredPromptBuilderArtifact":
+        if len(self.inputs) > 20:
+            raise ValueError("at most 20 prompt-builder inputs")
+        if self.scope_practice is not None:
+            if self.assignment_task_id is None:
+                raise ValueError("scope practice needs an assignment-bound Prompt")
+            if self.scope_practice.assignment_task_id != self.assignment_task_id:
+                raise ValueError("scope practice must match the Prompt assignment")
+        return self
 
 
 class ReviewBoardArtifact(_Artifact):

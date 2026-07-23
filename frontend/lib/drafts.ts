@@ -15,6 +15,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getSupabase } from "./supabase";
+import {
+  BOUNDED_ASSIGNMENT_OBJECTIVE_ID,
+  BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION,
+} from "./boundedAssignment";
 
 const PREFIX = "codize:draft:";
 const DEBOUNCE_MS = 400;
@@ -34,6 +38,19 @@ export function draftKey(userId: string, surface: string): string {
 
 export function promptAssignmentDraftSurface(phase: number, taskId: string): string {
   return `prompt_builder:${phase}:assignment:${taskId}`;
+}
+
+export function promptScopeDraftSurface(phase: number, taskId: string): string {
+  return [
+    "prompt_builder_scope",
+    "active-project",
+    phase,
+    "assignment",
+    taskId,
+    "objective",
+    BOUNDED_ASSIGNMENT_OBJECTIVE_ID,
+    BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION,
+  ].join(":");
 }
 
 export function legacyPromptDraftSurface(phase: number): string {

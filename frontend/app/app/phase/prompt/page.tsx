@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import Async from "@/components/Async";
-import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
+import { useGuidedProjectNavigation } from "@/components/GuidedProjectNavigationProvider";
 import GuideCard from "@/components/GuideCard";
 import NotReady from "@/components/NotReady";
 import SaveBar from "@/components/SaveBar";
@@ -12,10 +18,31 @@ import { ApiError, getCurrentAssignment, getIntakeStatus, selectCurrentAssignmen
 import {
   legacyPromptDraftSurface,
   promptAssignmentDraftSurface,
+  promptScopeDraftSurface,
   useDraft,
 } from "@/lib/drafts";
+import {
+  BOUNDED_ASSIGNMENT_OBJECTIVE_NAME,
+  EMPTY_SCOPE_PRACTICE,
+  SCOPE_PRACTICE_MAX_CODE_POINTS,
+  codePointLength,
+  normalizeScopePracticeDraft,
+  normalizeStoredScopePractice,
+  scopeApplication,
+  scopeApplicationConflicts,
+  scopeApplicationIsCurrent,
+  scopeFromStored,
+  scopeSubmission,
+  validateScopePractice,
+  type ScopeFieldName,
+  type ScopePracticeDraft,
+} from "@/lib/boundedAssignment";
 import { phaseGuide } from "@/lib/phaseGuide";
-import { buildPrompt, type PromptBuilderInputs } from "@/lib/promptBuilder";
+import {
+  buildPrompt,
+  normalizePromptBuilderInputs,
+  type PromptBuilderInputs,
+} from "@/lib/promptBuilder";
 import { useWorkflowSection } from "@/lib/useWorkflowSection";
 import type { PhaseAssignmentState, PromptBuilderArtifact } from "@/lib/types";
 
@@ -62,7 +89,9 @@ function builtFromArtifact(artifact: PromptBuilderArtifact) {
 // know what to ask.
 export default function PromptBuilderPage() {
   const wf = useWorkflowSection("prompt_builder");
+  const { entryProfile } = useGuidedProjectNavigation();
   const [inputs, setInputs] = useState<PromptBuilderInputs>(EMPTY);
+  const [scope, setScope] = useState<ScopePracticeDraft>(EMPTY_SCOPE_PRACTICE);
   const [built, setBuilt] = useState<ReturnType<typeof buildPrompt> | null>(null);
   const [copied, setCopied] = useState(false);
   const [intakePurpose, setIntakePurpose] = useState<string | null>(null);
@@ -72,6 +101,19 @@ export default function PromptBuilderPage() {
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [scopeDirty, setScopeDirty] = useState(false);
+  const [scopeAttempted, setScopeAttempted] = useState(false);
+  const [applyConflict, setApplyConflict] = useState<{
+    task: boolean;
+    guardrail: boolean;
+  } | null>(null);
+  const scopeFieldRefs = useRef<Record<ScopeFieldName, HTMLTextAreaElement | null>>({
+    finishCondition: null,
+    excludedWork: null,
+    inspectionCondition: null,
+  });
+  const taskFieldRef = useRef<HTMLTextAreaElement | null>(null);
+  const conflictRef = useRef<HTMLDivElement | null>(null);
 
   const loadAssignment = useCallback(async () => {
     if (!wf.phase) return;
@@ -105,24 +147,31 @@ export default function PromptBuilderPage() {
   const draftSurface = wf.phase && activeAssignment
     ? promptAssignmentDraftSurface(wf.phase.phase, activeAssignment.task_id)
     : null;
+  const scopeDraftSurface = wf.phase && activeAssignment
+    ? promptScopeDraftSurface(wf.phase.phase, activeAssignment.task_id)
+    : null;
 
   // Unsaved-draft persistence (M13E.2): the saved artifact prefills first,
   // then any local draft (typed but never saved) overlays it once.
-  const draft = useDraft<PromptBuilderInputs>(draftSurface);
+  const draft = useDraft<unknown>(draftSurface);
+  const scopeDraft = useDraft<unknown>(scopeDraftSurface);
   const legacyDraft = useDraft<PromptBuilderInputs>(
     wf.phase ? legacyPromptDraftSurface(wf.phase.phase) : null
   );
   const initializedFor = useRef<string | null>(null);
-  const pendingAssignmentFill = useRef<string | null>(null);
+  const scopeInitializedFor = useRef<string | null>(null);
   useEffect(() => {
     if (wf.loading || assignmentLoading || !activeAssignment || !draft.ready || !draftSurface) return;
     if (draft.loadedSurface !== draftSurface || initializedFor.current === draftSurface) return;
     initializedFor.current = draftSurface;
     if (draft.restored) {
-      setInputs({ ...EMPTY, ...draft.restored });
-      setBuilt(null);
-      setDirty(true);
-      return;
+      const restored = normalizePromptBuilderInputs(draft.restored);
+      if (restored) {
+        setInputs(restored);
+        setBuilt(null);
+        setDirty(true);
+        return;
+      }
     }
     if (wf.stored?.assignment_task_id === activeAssignment.task_id) {
       setInputs(inputsFromArtifact(wf.stored));
@@ -130,12 +179,65 @@ export default function PromptBuilderPage() {
       setDirty(false);
       return;
     }
-    const useTask = pendingAssignmentFill.current === activeAssignment.task_id;
-    pendingAssignmentFill.current = null;
-    setInputs({ ...EMPTY, aiTask: activeAssignment.description });
+    setInputs(EMPTY);
     setBuilt(null);
-    setDirty(useTask);
+    setDirty(false);
   }, [activeAssignment, assignmentLoading, draft.loadedSurface, draft.ready, draft.restored, draftSurface, wf.loading, wf.stored]);
+
+  useEffect(() => {
+    if (
+      wf.loading ||
+      assignmentLoading ||
+      !activeAssignment ||
+      !scopeDraft.ready ||
+      !scopeDraftSurface
+    ) return;
+    if (
+      scopeDraft.loadedSurface !== scopeDraftSurface ||
+      scopeInitializedFor.current === scopeDraftSurface
+    ) return;
+    scopeInitializedFor.current = scopeDraftSurface;
+    setScopeAttempted(false);
+    setApplyConflict(null);
+
+    const restored = normalizeScopePracticeDraft(scopeDraft.restored);
+    if (restored) {
+      setScope(restored);
+      setScopeDirty(
+        Boolean(
+          restored.finishCondition.trim() ||
+            restored.excludedWork.trim() ||
+            restored.inspectionCondition.trim() ||
+            restored.applied
+        )
+      );
+      return;
+    }
+
+    const storedScope = normalizeStoredScopePractice(wf.stored?.scope_practice);
+    if (
+      wf.stored?.assignment_task_id === activeAssignment.task_id &&
+      storedScope?.assignment_task_id === activeAssignment.task_id
+    ) {
+      const fromStored = scopeFromStored(storedScope);
+      setScope({ ...fromStored, applied: scopeApplication(fromStored) });
+      setScopeDirty(false);
+      return;
+    }
+
+    setScope(EMPTY_SCOPE_PRACTICE);
+    setScopeDirty(false);
+  }, [
+    activeAssignment,
+    assignmentLoading,
+    scopeDraft.loadedSurface,
+    scopeDraft.ready,
+    scopeDraft.restored,
+    scopeDraftSurface,
+    wf.loading,
+    wf.stored,
+  ]);
+
   // A successful save re-prefills state from the stored artifact, which would
   // immediately re-write the just-cleared draft — skip that one echo.
   const saveDraft = draft.save;
@@ -143,6 +245,22 @@ export default function PromptBuilderPage() {
     if (!dirty || !activeAssignment || draft.loadedSurface !== draftSurface) return;
     saveDraft(inputs);
   }, [activeAssignment, dirty, draft.loadedSurface, draftSurface, inputs, saveDraft]);
+  const saveScopeDraft = scopeDraft.save;
+  useEffect(() => {
+    if (
+      !scopeDirty ||
+      !activeAssignment ||
+      scopeDraft.loadedSurface !== scopeDraftSurface
+    ) return;
+    saveScopeDraft(scope);
+  }, [
+    activeAssignment,
+    saveScopeDraft,
+    scope,
+    scopeDirty,
+    scopeDraft.loadedSurface,
+    scopeDraftSurface,
+  ]);
 
   // The student's own intake answers, offered as tap-to-use starters (never
   // auto-filled — the student stays the author of every field).
@@ -161,6 +279,10 @@ export default function PromptBuilderPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (applyConflict) conflictRef.current?.focus();
+  }, [applyConflict]);
 
   if (wf.notReady) return <NotReady title="Prompt Builder" />;
 
@@ -184,46 +306,112 @@ export default function PromptBuilderPage() {
     setDirty(true);
   };
 
-  async function applyAssignmentToTaskField() {
-    const task = assignment?.assignment;
-    if (!task || task.owner !== "ai") return;
-    if (assignment.state === "recommended") {
-      setAssignmentBusy(true);
-      setAssignmentError(null);
-      pendingAssignmentFill.current = task.task_id;
-      try {
-        const selected = await selectCurrentAssignment(task.task_id);
-        initializedFor.current = null;
-        setAssignment(selected);
-      } catch (caught) {
-        pendingAssignmentFill.current = null;
-        setAssignmentError(
-          caught instanceof ApiError ? caught.message : "Couldn't select that assignment."
-        );
-      } finally {
-        setAssignmentBusy(false);
-      }
+  const setScopeField = (field: ScopeFieldName, value: string) => {
+    setScope((current) => ({ ...current, [field]: value }));
+    setScopeDirty(true);
+    setBuilt(null);
+    setApplyConflict(null);
+  };
+
+  function focusFirstScopeError() {
+    const order: ScopeFieldName[] = [
+      "finishCondition",
+      "excludedWork",
+      "inspectionCondition",
+    ];
+    const first = order.find((field) => scopeValidation.errors[field]);
+    if (first) {
+      window.setTimeout(() => scopeFieldRefs.current[first]?.focus(), 0);
+    }
+  }
+
+  function applyScopeToPrompt(replaceConflicts = false) {
+    setScopeAttempted(true);
+    if (!scopeValidation.complete) {
+      focusFirstScopeError();
       return;
     }
-    set("aiTask", task.description);
+    const proposed = scopeApplication(scope);
+    const conflicts = scopeApplicationConflicts(inputs, scope.applied, proposed);
+    if (!replaceConflicts && (conflicts.task || conflicts.guardrail)) {
+      setApplyConflict(conflicts);
+      return;
+    }
+    setInputs((current) => ({
+      ...current,
+      aiTask: proposed.taskText,
+      doNotChange: proposed.guardrailText,
+    }));
+    setScope((current) => ({ ...current, applied: proposed }));
+    setScopeDirty(true);
+    setDirty(true);
+    setBuilt(null);
+    setApplyConflict(null);
+    window.setTimeout(() => taskFieldRef.current?.focus(), 0);
+  }
+
+  function scopeReadyForFinalAction(): boolean {
+    if (!scopeValidation.complete) {
+      setScopeAttempted(true);
+      focusFirstScopeError();
+      return false;
+    }
+    if (!scopeApplicationIsCurrent(scope, scope.applied)) {
+      setScopeAttempted(true);
+      window.setTimeout(
+        () => document.getElementById("apply-scope-to-prompt")?.focus(),
+        0
+      );
+      return false;
+    }
+    return true;
+  }
+
+  async function selectPromptAssignment() {
+    const task = assignment?.assignment;
+    if (!task || task.owner !== "ai" || assignment.state !== "recommended") return;
+    setAssignmentBusy(true);
+    setAssignmentError(null);
+    try {
+      const selected = await selectCurrentAssignment(task.task_id);
+      initializedFor.current = null;
+      scopeInitializedFor.current = null;
+      setAssignment(selected);
+    } catch (caught) {
+      setAssignmentError(
+        caught instanceof ApiError ? caught.message : "Couldn't select that assignment."
+      );
+    } finally {
+      setAssignmentBusy(false);
+    }
   }
 
   function useLegacyDraft() {
     if (!legacyDraft.restored || !activeAssignment) return;
-    setInputs({ ...EMPTY, ...legacyDraft.restored, aiTask: activeAssignment.description });
+    const restored = normalizePromptBuilderInputs(legacyDraft.restored);
+    if (!restored) return;
+    setInputs({ ...restored, aiTask: activeAssignment.description });
     setBuilt(null);
     setDirty(true);
   }
 
   function generate() {
-    setBuilt(buildPrompt(inputs));
+    if (finalScopeMustBeReady && !scopeReadyForFinalAction()) return;
+    if (!inputs.aiTask.trim()) {
+      window.setTimeout(() => taskFieldRef.current?.focus(), 0);
+      return;
+    }
+    setBuilt(buildPrompt(inputs, { assignment: activeAssignment?.description }));
     setCopied(false);
   }
 
   async function save() {
     if (!activeAssignment) return;
-    const result = built ?? buildPrompt(inputs);
+    if (finalScopeMustBeReady && !scopeReadyForFinalAction()) return;
+    const result =
+      built ?? buildPrompt(inputs, { assignment: activeAssignment.description });
     setBuilt(result);
+    const persistScope = scopeValidation.complete && scopeApplicationIsCurrent(scope, scope.applied);
     const ok = await wf.save({
       inputs: {
         project_goal: inputs.projectGoal.slice(0, 2000),
@@ -240,10 +428,15 @@ export default function PromptBuilderPage() {
       why_stronger: result.whyStronger.slice(0, 2000),
       bad_prompt_comparison: result.badPrompt.slice(0, 8000),
       assignment_task_id: activeAssignment.task_id,
+      ...(persistScope ? { scope_practice: scopeSubmission(scope) } : {}),
     });
     if (ok) {
       draft.clear();
       setDirty(false);
+      if (persistScope) {
+        scopeDraft.clear();
+        setScopeDirty(false);
+      }
     }
   }
 
@@ -269,20 +462,37 @@ export default function PromptBuilderPage() {
   const savedMatchesAssignment = Boolean(
     activeAssignment && wf.stored?.assignment_task_id === activeAssignment.task_id
   );
+  const scopeValidation = validateScopePractice(scope);
+  const legacyBoundPrompt = Boolean(
+    savedMatchesAssignment &&
+      !normalizeStoredScopePractice(wf.stored?.scope_practice)
+  );
+  const finalScopeMustBeReady =
+    Boolean(activeAssignment && !legacyBoundPrompt) || scopeValidation.complete;
+  const scopeAppliedCurrent =
+    scopeValidation.complete && scopeApplicationIsCurrent(scope, scope.applied);
+  const promptChangedAfterApply = Boolean(
+    scopeAppliedCurrent &&
+      scope.applied &&
+      (inputs.aiTask !== scope.applied.taskText ||
+        inputs.doNotChange !== scope.applied.guardrailText)
+  );
+  const guidanceDepth = entryProfile?.guidance_depth ?? "standard";
 
   return (
     <>
       <h1 className="page-title">Prompt Builder</h1>
       <p className="page-sub">
-        One clear ask beats a long conversation. Tap a starter if you&rsquo;re not sure — Codize
-        turns it into a strong prompt.
+        Turn the selected phase assignment into one request you can inspect before using it with your AI tool.
       </p>
-      <AdaptiveStepGuide stage="prompt" />
 
       <Async loading={wf.loading} error={wf.error} onRetry={wf.reload}>
         <div className="workspace">
           <div>
-            <section className="card primary prompt-assignment" aria-labelledby="prompt-assignment-title">
+            <section
+              className={`card prompt-assignment${activeAssignment ? "" : " primary"}`}
+              aria-labelledby="prompt-assignment-title"
+            >
               <h2 id="prompt-assignment-title" className="entry-kicker">Current prompt assignment</h2>
               {assignmentLoading ? (
                 <p className="muted" role="status">Loading assignment…</p>
@@ -308,9 +518,13 @@ export default function PromptBuilderPage() {
                   </p>
                   {assignment.assignment.owner === "ai" ? (
                     <div className="row">
-                      <button className="btn primary" type="button" disabled={assignmentBusy} onClick={() => void applyAssignmentToTaskField()}>
-                        {assignmentBusy ? "Selecting…" : "Use this assignment"}
-                      </button>
+                      {assignment.state === "recommended" ? (
+                        <button className="btn primary" type="button" disabled={assignmentBusy} onClick={() => void selectPromptAssignment()}>
+                          {assignmentBusy ? "Selecting…" : "Use this assignment"}
+                        </button>
+                      ) : (
+                        <span className="pill ok">Selected for this Prompt</span>
+                      )}
                       <Link className="btn" href="/app#current-work">Choose another task</Link>
                     </div>
                   ) : (
@@ -332,6 +546,314 @@ export default function PromptBuilderPage() {
                 </>
               )}
             </section>
+
+            {activeAssignment && (
+              <section
+                className="card primary bounded-assignment-practice"
+                aria-labelledby="bounded-assignment-title"
+              >
+                <div className="bounded-practice-heading">
+                  <div>
+                    <p className="entry-kicker">Learning focus</p>
+                    <h2 id="bounded-assignment-title">
+                      {BOUNDED_ASSIGNMENT_OBJECTIVE_NAME}
+                    </h2>
+                  </div>
+                  <span className="pill">Required for new assigned Prompts</span>
+                </div>
+                <p className="bounded-practice-purpose">
+                  A focused request is easier to inspect, test, and understand than several features bundled into one AI change.
+                </p>
+
+                {guidanceDepth === "minimal" ? (
+                  <details className="help bounded-practice-why">
+                    <summary>Why this matters</summary>
+                    <div className="help-body">
+                      <p>
+                        One AI request should produce one result that you can inspect. Bundling several features makes it harder to understand what changed, identify the cause of a problem, or test the result.
+                      </p>
+                    </div>
+                  </details>
+                ) : (
+                  <div className="bounded-practice-why">
+                    <h3>Why this matters</h3>
+                    <p>
+                      One AI request should produce one result that you can inspect. Bundling several features makes it harder to understand what changed, identify the cause of a problem, or test the result.
+                    </p>
+                  </div>
+                )}
+
+                {legacyBoundPrompt && (
+                  <div className="notice info bounded-practice-legacy" role="status">
+                    <strong>Existing Prompt preserved</strong>
+                    <p>
+                      This saved Prompt predates scope practice. You can keep editing or saving it without retroactive blocking. Complete this organizer when you want to add the new scope record.
+                    </p>
+                  </div>
+                )}
+
+                <div className="bounded-practice-fields">
+                  <div className="field">
+                    <label htmlFor="scope-finish-condition">
+                      What will exist when this task is done?
+                    </label>
+                    <p id="scope-finish-hint" className="field-hint">
+                      Describe the specific result this AI request should produce.
+                    </p>
+                    <textarea
+                      ref={(node) => {
+                        scopeFieldRefs.current.finishCondition = node;
+                      }}
+                      id="scope-finish-condition"
+                      rows={3}
+                      value={scope.finishCondition}
+                      aria-invalid={Boolean(
+                        scopeAttempted && scopeValidation.errors.finishCondition
+                      )}
+                      aria-describedby={`scope-finish-hint scope-finish-count${
+                        scopeAttempted && scopeValidation.errors.finishCondition
+                          ? " scope-finish-error"
+                          : ""
+                      }`}
+                      onChange={(event) =>
+                        setScopeField("finishCondition", event.target.value)
+                      }
+                    />
+                    {guidanceDepth === "more" && (
+                      <p className="muted scope-direction">
+                        Keep this to the selected assignment, not the whole project.
+                      </p>
+                    )}
+                    <div className="field-meta">
+                      {scopeAttempted && scopeValidation.errors.finishCondition ? (
+                        <span id="scope-finish-error" className="field-error" role="alert">
+                          {scopeValidation.errors.finishCondition}
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                      <span
+                        id="scope-finish-count"
+                        className={
+                          codePointLength(scope.finishCondition.trim()) >
+                          SCOPE_PRACTICE_MAX_CODE_POINTS
+                            ? "field-count over"
+                            : "field-count"
+                        }
+                      >
+                        {codePointLength(scope.finishCondition.trim())}/{SCOPE_PRACTICE_MAX_CODE_POINTS}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="scope-excluded-work">
+                      What related work are you leaving out of this request?
+                    </label>
+                    <p id="scope-excluded-hint" className="field-hint">
+                      Name at least one nearby feature, decision, or task that should remain for later.
+                    </p>
+                    <textarea
+                      ref={(node) => {
+                        scopeFieldRefs.current.excludedWork = node;
+                      }}
+                      id="scope-excluded-work"
+                      rows={3}
+                      value={scope.excludedWork}
+                      aria-invalid={Boolean(
+                        scopeAttempted && scopeValidation.errors.excludedWork
+                      )}
+                      aria-describedby={`scope-excluded-hint scope-excluded-count${
+                        scopeAttempted && scopeValidation.errors.excludedWork
+                          ? " scope-excluded-error"
+                          : ""
+                      }`}
+                      onChange={(event) =>
+                        setScopeField("excludedWork", event.target.value)
+                      }
+                    />
+                    {guidanceDepth === "more" && (
+                      <p className="muted scope-direction">
+                        Pick a real boundary yourself; Codize will not select one for you.
+                      </p>
+                    )}
+                    <div className="field-meta">
+                      {scopeAttempted && scopeValidation.errors.excludedWork ? (
+                        <span id="scope-excluded-error" className="field-error" role="alert">
+                          {scopeValidation.errors.excludedWork}
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                      <span
+                        id="scope-excluded-count"
+                        className={
+                          codePointLength(scope.excludedWork.trim()) >
+                          SCOPE_PRACTICE_MAX_CODE_POINTS
+                            ? "field-count over"
+                            : "field-count"
+                        }
+                      >
+                        {codePointLength(scope.excludedWork.trim())}/{SCOPE_PRACTICE_MAX_CODE_POINTS}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="scope-inspection-condition">
+                      What observable result will tell you the response is ready to inspect?
+                    </label>
+                    <p id="scope-inspection-hint" className="field-hint">
+                      Describe something you can look for after the AI finishes. This is not the same as proving the entire feature works.
+                    </p>
+                    <textarea
+                      ref={(node) => {
+                        scopeFieldRefs.current.inspectionCondition = node;
+                      }}
+                      id="scope-inspection-condition"
+                      rows={3}
+                      value={scope.inspectionCondition}
+                      aria-invalid={Boolean(
+                        scopeAttempted && scopeValidation.errors.inspectionCondition
+                      )}
+                      aria-describedby={`scope-inspection-hint scope-inspection-count${
+                        scopeAttempted && scopeValidation.errors.inspectionCondition
+                          ? " scope-inspection-error"
+                          : ""
+                      }`}
+                      onChange={(event) =>
+                        setScopeField("inspectionCondition", event.target.value)
+                      }
+                    />
+                    {guidanceDepth === "more" && (
+                      <p className="muted scope-direction">
+                        Think about a visible structure, route, file, or targeted command result.
+                      </p>
+                    )}
+                    <div className="field-meta">
+                      {scopeAttempted && scopeValidation.errors.inspectionCondition ? (
+                        <span id="scope-inspection-error" className="field-error" role="alert">
+                          {scopeValidation.errors.inspectionCondition}
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                      <span
+                        id="scope-inspection-count"
+                        className={
+                          codePointLength(scope.inspectionCondition.trim()) >
+                          SCOPE_PRACTICE_MAX_CODE_POINTS
+                            ? "field-count over"
+                            : "field-count"
+                        }
+                      >
+                        {codePointLength(scope.inspectionCondition.trim())}/{SCOPE_PRACTICE_MAX_CODE_POINTS}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <section
+                  className="scope-checklist"
+                  aria-labelledby="scope-checklist-title"
+                >
+                  <div className="spread">
+                    <h3 id="scope-checklist-title">Scope checklist</h3>
+                    <p className="scope-checklist-status" role="status" aria-live="polite">
+                      {scopeValidation.complete
+                        ? "Scope checklist complete"
+                        : `${Object.keys(scopeValidation.errors).length} planning ${
+                            Object.keys(scopeValidation.errors).length === 1
+                              ? "piece is"
+                              : "pieces are"
+                          } still missing`}
+                    </p>
+                  </div>
+                  <ul>
+                    <ScopeChecklistItem complete>
+                      This Prompt is connected to the selected assignment
+                    </ScopeChecklistItem>
+                    <ScopeChecklistItem
+                      complete={!scopeValidation.errors.finishCondition}
+                    >
+                      You described what should exist afterward
+                    </ScopeChecklistItem>
+                    <ScopeChecklistItem
+                      complete={!scopeValidation.errors.excludedWork}
+                    >
+                      You named related work that remains outside this request
+                    </ScopeChecklistItem>
+                    <ScopeChecklistItem
+                      complete={!scopeValidation.errors.inspectionCondition}
+                    >
+                      You described what you will inspect afterward
+                    </ScopeChecklistItem>
+                  </ul>
+                  <p className="muted scope-checklist-boundary">
+                    This checks only that the required planning pieces are present. It does not score correctness or prove the request is well scoped.
+                  </p>
+                </section>
+
+                <div className="scope-apply">
+                  <div>
+                    <h3>Use these decisions in the editable Prompt</h3>
+                    <p className="muted">
+                      This adds your finish and inspection conditions to Task, and excluded work to Don&rsquo;t touch. Context stays exactly as written. Nothing is saved automatically.
+                    </p>
+                  </div>
+                  <button
+                    id="apply-scope-to-prompt"
+                    className="btn primary"
+                    type="button"
+                    onClick={() => applyScopeToPrompt(false)}
+                  >
+                    {scopeAppliedCurrent
+                      ? "Reapply this scope"
+                      : "Apply this scope to my Prompt"}
+                  </button>
+                </div>
+
+                {applyConflict && (
+                  <div
+                    ref={conflictRef}
+                    className="notice warn scope-apply-conflict"
+                    role="alertdialog"
+                    aria-labelledby="scope-conflict-title"
+                    aria-describedby="scope-conflict-description"
+                    tabIndex={-1}
+                  >
+                    <strong id="scope-conflict-title">Replace existing Prompt text?</strong>
+                    <p id="scope-conflict-description">
+                      {applyConflict.task && applyConflict.guardrail
+                        ? "Task and Don’t touch already contain text."
+                        : applyConflict.task
+                          ? "Task already contains text."
+                          : "Don’t touch already contains text."}{" "}
+                      Applying replaces only those fields with your current scope decisions. Context and other Guardrails stay unchanged.
+                    </p>
+                    <div className="row">
+                      <button className="btn" type="button" onClick={() => setApplyConflict(null)}>
+                        Keep existing text
+                      </button>
+                      <button className="btn primary" type="button" onClick={() => applyScopeToPrompt(true)}>
+                        Replace and apply scope
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {scopeAppliedCurrent && (
+                  <p className="notice ok scope-applied-status" role="status">
+                    Scope applied to the editable Prompt fields. Review the final Prompt before using it with your AI tool; nothing has been saved or marked complete.
+                  </p>
+                )}
+                {scopeValidation.complete && !scopeAppliedCurrent && !applyConflict && (
+                  <p className="notice info" role="status">
+                    Your scope checklist includes the required planning pieces. Apply them to the Prompt fields before building the final preview.
+                  </p>
+                )}
+              </section>
+            )}
 
             {wf.stored && !savedMatchesAssignment && (
               <SavedPromptRecord
@@ -355,10 +877,15 @@ export default function PromptBuilderPage() {
 
             {activeAssignment && (
               <>
-            {/* Step 1 — the ask. The only required field, starters included. */}
-            <div className="card primary" style={{ marginBottom: 16 }}>
-              <label className="prompt-task-label" htmlFor="prompt-ai-task">Step 1 — What should the AI do?</label>
+            {promptChangedAfterApply && (
+              <div className="notice info prompt-scope-mismatch" role="status">
+                You edited Task or Don&rsquo;t touch after applying scope. Your edits are preserved. Reapply only if you want those fields replaced with the current scope decisions.
+              </div>
+            )}
+            <div className="card prompt-fields-card">
+              <label className="prompt-task-label" htmlFor="prompt-ai-task">Step 1 — Task (editable)</label>
               <textarea
+                ref={taskFieldRef}
                 id="prompt-ai-task"
                 rows={3}
                 maxLength={2000}
@@ -573,11 +1100,15 @@ export default function PromptBuilderPage() {
             </div>
 
             <div className="row" style={{ margin: "16px 0" }}>
-              <button className="btn primary" onClick={generate} disabled={!inputs.aiTask.trim()}>
+              <button className="btn primary" type="button" onClick={generate}>
                 Build the prompt
               </button>
-              {!inputs.aiTask.trim() && (
-                <span className="muted">Step 1 first — a starter chip works.</span>
+              {finalScopeMustBeReady && !scopeAppliedCurrent ? (
+                <span className="muted">Complete and apply the scope organizer first.</span>
+              ) : !inputs.aiTask.trim() ? (
+                <span className="muted">Add one Task before building the preview.</span>
+              ) : (
+                <span className="muted">Review remains yours before save or handoff.</span>
               )}
             </div>
 
@@ -593,14 +1124,13 @@ export default function PromptBuilderPage() {
                   <pre className="output">{built.prompt}</pre>
                 </div>
                 <div className="card">
-                  <h3>Why this is stronger</h3>
+                  <h3>What this structure includes</h3>
                   <p>{built.whyStronger}</p>
                   <hr className="rule" />
                   <p className="muted">
                     Compare with what usually goes wrong:{" "}
-                    <span className="mono">&ldquo;{built.badPrompt}&rdquo;</span> — no scope, no
-                    fences, no verification. That prompt is how projects end up 80% done and 100%
-                    confusing.
+                    <span className="mono">&ldquo;{built.badPrompt}&rdquo;</span> — it does not state
+                    the same boundary or inspection plan. Review your final wording before using it.
                   </p>
                 </div>
                 <SaveBar
@@ -644,29 +1174,59 @@ export default function PromptBuilderPage() {
           <aside className="ws-rail" aria-label="Guidance">
             <GuideCard title="What is this page?">
               <p>
-                Before you ask your AI tool for code, you plan the request here. Codize turns your
-                answers into a scoped, fenced prompt — the difference between directing AI and
-                gambling with it.
+                Before you ask your AI tool for code, record one assignment boundary and review
+                the editable request Codize assembles from your own decisions.
               </p>
             </GuideCard>
-            <GuideCard title="A good ask is…">
+            <GuideCard title="What the organizer checks">
               <ul>
-                <li><strong>One task</strong>, not &ldquo;build my app&rdquo;.</li>
-                <li><strong>Fenced</strong> — says what must not change.</li>
-                <li><strong>Checkable</strong> — asks how you&rsquo;ll verify it.</li>
+                <li>A finish condition is present.</li>
+                <li>Excluded work is present.</li>
+                <li>An inspection condition is present.</li>
               </ul>
-              <p>You don&rsquo;t have to write it from scratch — the starters exist to be edited.</p>
+              <p>It does not judge whether the wording is correct.</p>
             </GuideCard>
-            <GuideCard title="Confused by a field?">
+            <GuideCard
+              title="Broad versus bounded example"
+              defaultOpen={guidanceDepth === "more"}
+            >
+              <p className="muted">Another project: a habit tracker</p>
+              <dl className="contrast-example">
+                <div>
+                  <dt>Broad</dt>
+                  <dd>Build the tracker, add accounts, reminders, analytics, and deploy it.</dd>
+                </div>
+                <div>
+                  <dt>Bounded</dt>
+                  <dd>Create the basic habit-entry form without accounts, reminders, analytics, or deployment.</dd>
+                </div>
+              </dl>
+            </GuideCard>
+            <GuideCard title="Prompt fields remain yours">
               <p>
-                Every field has a hint under it, and every field except the AI task is optional.
-                A prompt from just one clear task already beats most prompts.
+                Applying scope changes only Task and Don&rsquo;t touch. Context, other Guardrails,
+                final edits, and the decision to save remain yours.
               </p>
             </GuideCard>
           </aside>
         </div>
       </Async>
     </>
+  );
+}
+
+function ScopeChecklistItem({
+  complete,
+  children,
+}: {
+  complete: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <li className={complete ? "complete" : "incomplete"}>
+      <span aria-hidden="true">{complete ? "✓" : "○"}</span>
+      <span>{complete ? "Present: " : "Missing: "}{children}</span>
+    </li>
   );
 }
 

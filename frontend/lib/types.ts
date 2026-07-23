@@ -118,6 +118,14 @@ export interface PromptBuilderArtifact {
   why_stronger?: string | null;
   bad_prompt_comparison?: string | null;
   assignment_task_id?: string | null;
+  scope_practice?: {
+    objective_id: "bounded_assignment_v1";
+    objective_version: 1;
+    assignment_task_id: string;
+    finish_condition: string;
+    excluded_work: string;
+    inspection_condition: string;
+  } | null;
   saved_at?: string;
 }
 

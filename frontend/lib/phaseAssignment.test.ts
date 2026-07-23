@@ -27,6 +27,16 @@ describe("assignmentSwitchProtection", () => {
     ).toEqual({ hasDraft: true, hasSavedPrompt: false, savedPromptIsLegacy: false });
   });
 
+  it("uses the same switching warning for scope-practice work", () => {
+    expect(
+      assignmentSwitchProtection("ai-1", "ai-2", EMPTY, null, {
+        finishCondition: "A form exists",
+        excludedWork: "",
+        inspectionCondition: "",
+      })
+    ).toEqual({ hasDraft: true, hasSavedPrompt: false, savedPromptIsLegacy: false });
+  });
+
   it("warns for the current task's saved Prompt but not an unrelated saved Prompt", () => {
     const current = { inputs: {}, generated_prompt: "A", assignment_task_id: "ai-1" };
     expect(assignmentSwitchProtection("ai-1", "ai-2", EMPTY, current)?.hasSavedPrompt).toBe(true);

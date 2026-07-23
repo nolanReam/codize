@@ -6,6 +6,7 @@ import {
   draftKey,
   legacyPromptDraftSurface,
   promptAssignmentDraftSurface,
+  promptScopeDraftSurface,
   readDraft,
   writeDraft,
 } from "./drafts";
@@ -39,6 +40,12 @@ describe("draftKey", () => {
       promptAssignmentDraftSurface(2, "ai-1")
     );
     expect(legacyPromptDraftSurface(2)).toBe("prompt_builder:2");
+    expect(promptScopeDraftSurface(2, "ai-1")).toBe(
+      "prompt_builder_scope:active-project:2:assignment:ai-1:objective:bounded_assignment_v1:1"
+    );
+    expect(promptScopeDraftSurface(2, "ai-1")).not.toBe(
+      promptScopeDraftSurface(2, "ai-2")
+    );
   });
 });
 

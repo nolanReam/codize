@@ -8,6 +8,7 @@ import { GUIDED_NAVIGATION_REFRESH_EVENT } from "./guidedProjectNavigation";
 import { generationRequestBody } from "./changeMap";
 import { reviewInitializationBody } from "./review";
 import { verificationInitializationBody } from "./verification";
+import type { ScopePracticeSubmission } from "./boundedAssignment";
 import type {
   ChangeMapConfirmationResponse,
   ChangeMapMutationResult,
@@ -161,7 +162,9 @@ export const getWorkflow = (phase: number) =>
   request<WorkflowPhaseState>(`/workflow/${phase}`);
 
 type SectionPayloadMap = {
-  prompt_builder: Omit<PromptBuilderArtifact, "saved_at">;
+  prompt_builder: Omit<PromptBuilderArtifact, "saved_at" | "scope_practice"> & {
+    scope_practice?: ScopePracticeSubmission | null;
+  };
   review_board: ReviewBoardSaveRequest;
   evidence: EvidenceSaveRequest;
   verification: VerificationSaveRequest;

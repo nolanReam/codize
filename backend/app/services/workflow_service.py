@@ -32,6 +32,8 @@ from pydantic import ValidationError
 
 from app.schemas.change_map import StoredChangeMap
 from app.schemas.workflow import (
+    BOUNDED_ASSIGNMENT_OBJECTIVE_ID,
+    BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION,
     SECTION_MODELS,
     StoredImplementationImport,
     StoredPromptBuilderArtifact,
@@ -355,6 +357,59 @@ def _validate_prompt_assignment(project: dict, phase_number: int, task_id: str) 
         )
 
 
+def _prepare_prompt_scope(
+    project: dict, phase_number: int, stored_section: dict
+) -> dict:
+    """Bind submitted scope to server-owned assignment/objective truth.
+
+    A current Prompt saved before M18C.1 may continue to save without scope.
+    New assignment-bound Prompts cannot use that compatibility seam, and a
+    scoped Prompt cannot later strip its scope record.
+    """
+    prepared = copy.deepcopy(stored_section)
+    task_id = prepared.get("assignment_task_id")
+    submitted_scope = prepared.get("scope_practice")
+    if task_id is None:
+        if submitted_scope is not None:
+            raise InvalidArtifactError(
+                "Scope practice can only be saved with a current AI assignment."
+            )
+        return prepared
+
+    artifacts = project.get("workflow_artifacts")
+    phase_map = (
+        artifacts.get(str(phase_number)) if isinstance(artifacts, dict) else None
+    )
+    previous = phase_map.get("prompt_builder") if isinstance(phase_map, dict) else None
+    same_legacy_prompt = (
+        isinstance(previous, dict)
+        and previous.get("assignment_task_id") == task_id
+        and previous.get("scope_practice") is None
+    )
+
+    if submitted_scope is None:
+        if same_legacy_prompt:
+            return prepared
+        raise InvalidArtifactError(
+            "Complete the three scope-planning fields before saving this assigned Prompt."
+        )
+
+    prepared["scope_practice"] = {
+        "objective_id": BOUNDED_ASSIGNMENT_OBJECTIVE_ID,
+        "objective_version": BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION,
+        "assignment_task_id": task_id,
+        **submitted_scope,
+    }
+    # Validate the exact stored shape, including objective and assignment
+    # integrity, before it reaches the optimistic write.
+    try:
+        return StoredPromptBuilderArtifact.model_validate(prepared).model_dump(
+            mode="json"
+        )
+    except ValidationError as exc:
+        raise InvalidArtifactError(_safe_validation_message(exc))
+
+
 async def _store_prompt_builder(
     repo: ProjectRepository,
     user_id: str,
@@ -369,6 +424,9 @@ async def _store_prompt_builder(
         task_id = stored_section.get("assignment_task_id")
         if task_id is not None:
             _validate_prompt_assignment(current, phase_number, task_id)
+        prepared_section = _prepare_prompt_scope(
+            current, phase_number, stored_section
+        )
 
         existing = current.get("workflow_artifacts")
         expected = copy.deepcopy(existing) if isinstance(existing, dict) else {}
@@ -393,7 +451,7 @@ async def _store_prompt_builder(
                 ):
                     history.append(preserved)
         phase_map[PROMPT_HISTORY_KEY] = history[-MAX_PROMPT_HISTORY:]
-        phase_map["prompt_builder"] = copy.deepcopy(stored_section)
+        phase_map["prompt_builder"] = copy.deepcopy(prepared_section)
         artifacts[str(phase_number)] = phase_map
 
         updated = await repo.update_workflow_artifacts_if_current(
@@ -403,7 +461,7 @@ async def _store_prompt_builder(
             return {
                 "phase": phase_number,
                 "section": "prompt_builder",
-                "artifact": copy.deepcopy(stored_section),
+                "artifact": copy.deepcopy(prepared_section),
                 "prompt_history": prompt_history_view(updated, phase_number),
             }
     raise WorkflowConflictError(

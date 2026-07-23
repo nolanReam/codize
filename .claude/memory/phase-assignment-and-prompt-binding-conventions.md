@@ -29,8 +29,9 @@ M18B.2 adds one concrete unit of current-phase work without restoring Phase Work
 - Prompt association is optional for legacy compatibility. Absence of metadata is shown as legacy/unassigned, never fabricated or called stale.
 - When a Prompt is saved for a different assignment, the prior Prompt moves to the server-owned `prompt_history` sibling in the same phase map. The history is bounded and validated; clients cannot submit it through the generic Prompt payload.
 - Bound Prompt saves use optimistic workflow-artifact replacement so concurrent sibling writes survive.
-- Prompt Builder shows the real assignment before generic starters. `Use this assignment` changes only the editable Task field; Context and Guardrails remain student-authored.
+- Prompt Builder shows the real assignment before generic starters. `Use this assignment` selects it but does not prefill the Task field. M18C.1's explicit scope application writes the student's finish and inspection conditions into Task and the student's exclusion into Don't touch; Context and all other fields remain untouched.
 - Local Prompt drafts use `prompt_builder:<phase>:assignment:<task_id>`, still nested under the authenticated user draft key. The old `prompt_builder:<phase>` draft remains readable as an explicit legacy draft seam.
+- Local scope drafts use a separate assignment- and objective-version-scoped surface. They participate in the same existing switch warning; no second confirmation is introduced.
 - Switching assignments never merges drafts. Project Home warns when the current assignment has unsaved or saved Prompt work; cancel performs no write, and confirmation preserves the old work under its original binding.
 
 ## Product boundaries

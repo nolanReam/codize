@@ -19,11 +19,16 @@ import {
 import {
   draftKey,
   promptAssignmentDraftSurface,
+  promptScopeDraftSurface,
   readDraft,
 } from "@/lib/drafts";
+import {
+  BOUNDED_ASSIGNMENT_OBJECTIVE_NAME,
+  normalizeScopePracticeDraft,
+} from "@/lib/boundedAssignment";
 import { phaseGuide } from "@/lib/phaseGuide";
 import { assignmentSwitchProtection } from "@/lib/phaseAssignment";
-import type { PromptBuilderInputs } from "@/lib/promptBuilder";
+import { normalizePromptBuilderInputs } from "@/lib/promptBuilder";
 import type {
   PhaseAssignmentState,
   PhaseList,
@@ -453,15 +458,24 @@ function AssignmentPanel({
 
   function workToPreserve(next: CurrentWorkItem, navigate: boolean): PendingSelection | null {
     if (!active || active.task_id === next.task_id) return null;
-    const local = readDraft<PromptBuilderInputs>(
-      window.localStorage,
-      draftKey(userId, promptAssignmentDraftSurface(assignment.phase, active.task_id))
+    const local = normalizePromptBuilderInputs(
+      readDraft<unknown>(
+        window.localStorage,
+        draftKey(userId, promptAssignmentDraftSurface(assignment.phase, active.task_id))
+      )
+    );
+    const localScope = normalizeScopePracticeDraft(
+      readDraft<unknown>(
+        window.localStorage,
+        draftKey(userId, promptScopeDraftSurface(assignment.phase, active.task_id))
+      )
     );
     const protection = assignmentSwitchProtection(
       active.task_id,
       next.task_id,
       local,
-      savedPrompt
+      savedPrompt,
+      localScope
     );
     if (!protection) return null;
     return {
@@ -540,6 +554,12 @@ function AssignmentPanel({
             <span className={`tag assignment-owner ${active.owner}`}>{active.owner_label}</span>
           </div>
           <p className="phase-assignment-reason"><strong>Why now?</strong> {active.reason}</p>
+          {active.owner === "ai" && (
+            <p className="assignment-learning-focus">
+              <span className="entry-kicker">Learning focus</span>
+              {BOUNDED_ASSIGNMENT_OBJECTIVE_NAME}
+            </p>
+          )}
           {active.owner === "student" && (
             <p className="muted">
               Make or document this decision yourself before asking AI to implement dependent work.
