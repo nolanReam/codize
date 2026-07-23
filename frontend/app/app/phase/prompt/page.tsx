@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import Async from "@/components/Async";
 import AdaptiveStepGuide from "@/components/AdaptiveStepGuide";
@@ -73,28 +73,30 @@ export default function PromptBuilderPage() {
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => {
+  const loadAssignment = useCallback(async () => {
     if (!wf.phase) return;
-    let cancelled = false;
     setAssignmentLoading(true);
-    getCurrentAssignment()
-      .then((next) => {
-        if (!cancelled) setAssignment(next);
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setAssignmentError(
-            caught instanceof ApiError ? caught.message : "Couldn't load the current assignment."
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setAssignmentLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setAssignmentError(null);
+    try {
+      setAssignment(await getCurrentAssignment());
+    } catch (caught) {
+      setAssignment(null);
+      setAssignmentError(
+        caught instanceof ApiError ? caught.message : "Couldn't load the current assignment."
+      );
+    } finally {
+      setAssignmentLoading(false);
+    }
   }, [wf.phase]);
+
+  useEffect(() => {
+    void loadAssignment();
+    const refreshOnFocus = () => void loadAssignment();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, [loadAssignment]);
 
   const activeAssignment =
     assignment?.state === "selected" && assignment.assignment?.owner === "ai"
@@ -281,15 +283,20 @@ export default function PromptBuilderPage() {
         <div className="workspace">
           <div>
             <section className="card primary prompt-assignment" aria-labelledby="prompt-assignment-title">
-              <p className="entry-kicker">Current prompt assignment</p>
+              <h2 id="prompt-assignment-title" className="entry-kicker">Current prompt assignment</h2>
               {assignmentLoading ? (
                 <p className="muted" role="status">Loading assignment…</p>
               ) : assignmentError ? (
-                <div className="notice error" role="alert">{assignmentError}</div>
+                <div className="notice error" role="alert">
+                  {assignmentError}
+                  <button className="btn small" type="button" onClick={() => void loadAssignment()}>
+                    Retry assignment
+                  </button>
+                </div>
               ) : assignment?.assignment ? (
                 <>
                   <div className="phase-assignment-heading">
-                    <h2 id="prompt-assignment-title">{assignment.assignment.description}</h2>
+                    <h3>{assignment.assignment.description}</h3>
                     <span className={`tag assignment-owner ${assignment.assignment.owner}`}>
                       {assignment.assignment.owner_label}
                     </span>
@@ -315,7 +322,7 @@ export default function PromptBuilderPage() {
                 </>
               ) : (
                 <>
-                  <h2 id="prompt-assignment-title">No AI assignment is selected</h2>
+                  <h3>No AI assignment is selected</h3>
                   <p className="muted">
                     {assignment?.state === "phase_complete"
                       ? "All current-phase tasks are marked done. Revisit one deliberately from Project Home if you need another Prompt."

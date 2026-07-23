@@ -44,6 +44,7 @@ interface GuidedNavigationContextValue {
   gate: GateCurrent | null;
   entryProfile: EntryProfile | null;
   assignment: PhaseAssignmentState | null;
+  assignmentError: string | null;
   userId: string;
   refresh: () => Promise<void>;
 }
@@ -71,6 +72,7 @@ export default function GuidedProjectNavigationProvider({
   const [projectLabel, setProjectLabel] = useState<string | null>(null);
   const [entryProfile, setEntryProfile] = useState<EntryProfile | null>(null);
   const [assignment, setAssignment] = useState<PhaseAssignmentState | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const requestId = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -96,23 +98,33 @@ export default function GuidedProjectNavigationProvider({
         setWorkflow(null);
         setGate(null);
         setAssignment(null);
+        setAssignmentError(null);
         setProjectLabel(intake?.answers?.purpose ?? null);
         setEntryProfile(normalizeEntryProfile(entry.profile));
         setState("ready");
         return;
       }
 
-      const [nextWorkflow, nextGate, nextAssignment, intake, entry] = await Promise.all([
+      const [nextWorkflow, nextGate, assignmentResult, intake, entry] = await Promise.all([
         getWorkflow(nextEvaluation.current_phase),
         getCurrentGate(),
-        getCurrentAssignment(),
+        getCurrentAssignment()
+          .then((value) => ({ value, error: null }))
+          .catch((caught) => ({
+            value: null,
+            error:
+              caught instanceof ApiError
+                ? caught.message
+                : "The current assignment is temporarily unavailable.",
+          })),
         getIntakeStatus().catch(() => null),
         getEntryProfile().catch(() => ({ profile: null })),
       ]);
       if (activeRequest !== requestId.current) return;
       setWorkflow(nextWorkflow);
       setGate(nextGate);
-      setAssignment(nextAssignment);
+      setAssignment(assignmentResult.value);
+      setAssignmentError(assignmentResult.error);
       setProjectLabel(intake?.answers?.purpose ?? null);
       setEntryProfile(normalizeEntryProfile(entry.profile));
       setState("ready");
@@ -169,10 +181,23 @@ export default function GuidedProjectNavigationProvider({
       gate,
       entryProfile,
       assignment,
+      assignmentError,
       userId,
       refresh,
     }),
-    [assignment, entryProfile, error, evaluation, gate, navigation, refresh, state, userId, workflow]
+    [
+      assignment,
+      assignmentError,
+      entryProfile,
+      error,
+      evaluation,
+      gate,
+      navigation,
+      refresh,
+      state,
+      userId,
+      workflow,
+    ]
   );
 
   return (

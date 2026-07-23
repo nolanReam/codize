@@ -952,11 +952,18 @@ details.help .help-body li { margin: 4px 0; }
 .phase-assignment-actions { margin-top: 14px; }
 .assignment-previous { margin-top: 12px; }
 .assignment-switch-warning { margin-top: 14px; }
+.assignment-switch-warning:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .assignment-switch-warning p { margin: 6px 0 10px; }
 .assignment-chooser { margin-top: 14px; border-top: 1px solid var(--border); }
 .assignment-chooser > summary,
 .completed-assignment-choices > summary,
 .prompt-history > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   padding: 12px 0 2px;
   cursor: pointer;
   color: var(--ink-2);
@@ -976,6 +983,7 @@ details.help .help-body li { margin: 4px 0; }
 .assignment-chooser li > div { min-width: 0; display: grid; gap: 5px; overflow-wrap: anywhere; }
 .assignment-chooser .task-state { color: var(--ink-3); font: 10px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .completed-assignment-choices { margin-top: 8px; }
+.phase-assignment button { min-height: 44px; }
 .current-work-secondary-title {
   margin-top: 20px;
   font: 650 13px/1.4 var(--sans);
@@ -1060,6 +1068,7 @@ details.help .help-body li { margin: 4px 0; }
 /* ---- prompt output ------------------------------------------------------- */
 
 .prompt-assignment { margin-bottom: 16px; }
+.prompt-assignment .btn { min-height: 44px; }
 .prompt-task-label {
   display: block;
   margin-bottom: 10px;

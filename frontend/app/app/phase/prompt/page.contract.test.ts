@@ -23,4 +23,10 @@ describe("Prompt Builder assignment contract", () => {
     expect(source).toContain("Prior saved Prompts");
     expect(source).toContain("does not fabricate a task association");
   });
+
+  it("keeps assignment failure recoverable and refreshes stale bindings on focus", () => {
+    expect(source).toContain("Retry assignment");
+    expect(source).toContain('window.addEventListener("focus", refreshOnFocus)');
+    expect(source).toContain('<h2 id="prompt-assignment-title" className="entry-kicker">');
+  });
 });

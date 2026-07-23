@@ -71,11 +71,16 @@ def _find_phase(project: dict, phase_number: int) -> dict:
 
 
 def _valid_task_ids(phase: dict) -> set[str]:
-    return {
-        f"{prefix}-{i}"
-        for prefix, field in _TASK_LISTS.items()
-        for i in range(1, len(phase[field]) + 1)
-    }
+    valid: set[str] = set()
+    for prefix, field in _TASK_LISTS.items():
+        tasks = phase.get(field)
+        if not isinstance(tasks, list):
+            continue
+        for index in range(1, len(tasks) + 1):
+            task_id = f"{prefix}-{index}"
+            if resolve_task(phase, task_id) is not None:
+                valid.add(task_id)
+    return valid
 
 
 def _completed_ids(project: dict, phase: dict) -> set[str]:
@@ -90,14 +95,21 @@ def _completed_ids(project: dict, phase: dict) -> set[str]:
 
 
 def _task_entries(phase: dict, prefix: str, completed: set[str]) -> list[dict]:
-    return [
-        {
-            "task_id": f"{prefix}-{i}",
-            "description": task,
-            "completed": f"{prefix}-{i}" in completed,
-        }
-        for i, task in enumerate(phase[_TASK_LISTS[prefix]], start=1)
-    ]
+    tasks = phase.get(_TASK_LISTS[prefix])
+    if not isinstance(tasks, list):
+        return []
+    entries: list[dict] = []
+    for index in range(1, len(tasks) + 1):
+        resolved = resolve_task(phase, f"{prefix}-{index}", completed)
+        if resolved is not None:
+            entries.append(
+                {
+                    "task_id": resolved["task_id"],
+                    "description": resolved["description"],
+                    "completed": resolved["completed"],
+                }
+            )
+    return entries
 
 
 def resolve_task(phase: dict, task_id: str, completed: set[str] | None = None) -> dict | None:

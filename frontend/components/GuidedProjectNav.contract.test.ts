@@ -88,6 +88,8 @@ describe("M18B.1 one-home guided shell contract", () => {
     expect(provider).toContain("getEvaluation()");
     expect(provider).toContain("getWorkflow(nextEvaluation.current_phase)");
     expect(provider).toContain("getCurrentGate()");
+    expect(provider).toContain("assignmentResult");
+    expect(provider).toContain("setAssignmentError(assignmentResult.error)");
     expect(provider).not.toMatch(/localStorage|sessionStorage/);
   });
 
@@ -115,5 +117,7 @@ describe("M18B.1 one-home guided shell contract", () => {
     expect(css).toContain(".guided-stage-state");
     expect(css).toMatch(/\.mobile-menu-button \{[\s\S]*?min-height: 44px/);
     expect(css).toMatch(/\.current-work-task \{[\s\S]*?min-height: 52px/);
+    expect(css).toContain(".phase-assignment button { min-height: 44px; }");
+    expect(css).toContain(".prompt-assignment .btn { min-height: 44px; }");
   });
 });

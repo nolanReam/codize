@@ -19,10 +19,20 @@ describe("Project Home assignment contract", () => {
     expect(source).toContain("Nothing will be merged into the new task");
     expect(source).toContain("Current assignment:");
     expect(source).toContain("Next assignment:");
+    expect(source).toContain('role="alertdialog"');
+    expect(source).toContain("warningRef.current?.focus()");
+    expect(source).toContain("trigger?.focus()");
+    expect(source).toContain('role="status" aria-live="polite"');
   });
 
   it("keeps task completion separate from assignment selection", () => {
     expect(source).toContain("Phase task checklist");
     expect(source).toContain("Saved workflow records do not complete them automatically");
+  });
+
+  it("keeps Project Home usable when only assignment loading fails", () => {
+    expect(source).toContain("Assignment temporarily unavailable");
+    expect(source).toContain("Retry assignment");
+    expect(source).toContain("assignmentError");
   });
 });

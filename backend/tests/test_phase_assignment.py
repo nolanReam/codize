@@ -91,6 +91,36 @@ def test_removed_or_malformed_selection_falls_back_without_text_matching():
     assert view["invalidated_selection"] is True
 
 
+def test_malformed_task_lists_fail_closed_even_with_stored_progress():
+    repo = InMemoryProjectRepository()
+    project = seed_active_project(repo)
+    roadmap = copy.deepcopy(project["roadmap"])
+    roadmap["phases"][0]["ai_appropriate_tasks"] = None
+    roadmap["phases"][0]["human_required_tasks"] = ["", None, "Choose the required fields"]
+    run(
+        repo.update_project(
+            USER,
+            project["id"],
+            {
+                "roadmap": roadmap,
+                "task_progress": {"1": ["ai-1", "human-1", "human-2"]},
+            },
+        )
+    )
+
+    view = run(phase_service.get_current_assignment(repo, USER))
+    assert view["state"] == "recommended"
+    assert view["assignment"]["task_id"] == "human-3"
+    assert view["assignment"]["description"] == "Choose the required fields"
+    assert view["assignment"]["completed"] is False
+    phase = run(phase_service.get_current_phase(repo, USER))
+    assert phase["ai_appropriate_tasks"] == []
+    assert [task["task_id"] for task in phase["human_required_tasks"]] == ["human-3"]
+
+    with pytest.raises(TaskNotFoundError):
+        run(phase_service.select_current_assignment(repo, USER, "human-1"))
+
+
 def test_roadmap_revision_invalidates_even_when_the_phase_local_id_still_exists():
     repo = InMemoryProjectRepository()
     project = seed_active_project(repo)

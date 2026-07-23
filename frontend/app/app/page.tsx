@@ -47,7 +47,18 @@ export default function ProjectHomePage() {
 
 function ProjectHomeContent() {
   const guided = useGuidedProjectNavigation();
-  const { state, error, navigation, evaluation, workflow, entryProfile, assignment, userId, refresh } = guided;
+  const {
+    state,
+    error,
+    navigation,
+    evaluation,
+    workflow,
+    entryProfile,
+    assignment,
+    assignmentError,
+    userId,
+    refresh,
+  } = guided;
   const searchParams = useSearchParams();
   const showQuickStart = searchParams.get("quick-start") === "1";
   const [phase, setPhase] = useState<PhaseView | null>(null);
@@ -230,7 +241,7 @@ function ProjectHomeContent() {
                 <p className="muted">Current work will return when the phase reload succeeds.</p>
               ) : currentWork.length > 0 ? (
                 <>
-                  {assignment && (
+                  {assignment ? (
                     <AssignmentPanel
                       assignment={assignment}
                       tasks={currentWork}
@@ -238,6 +249,20 @@ function ProjectHomeContent() {
                       savedPrompt={workflow.sections.prompt_builder}
                       onChanged={refresh}
                     />
+                  ) : assignmentError ? (
+                    <div className="phase-assignment" aria-labelledby="phase-assignment-unavailable">
+                      <p className="entry-kicker">Current assignment</p>
+                      <h3 id="phase-assignment-unavailable">Assignment temporarily unavailable</h3>
+                      <p className="muted">{assignmentError}</p>
+                      <button className="btn" type="button" onClick={() => void refresh()}>
+                        Retry assignment
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="phase-assignment" aria-labelledby="phase-assignment-loading">
+                      <p className="entry-kicker">Current assignment</p>
+                      <h3 id="phase-assignment-loading">Loading assignment…</h3>
+                    </div>
                   )}
                   <h3 className="current-work-secondary-title">Phase task checklist</h3>
                   <ol className="current-work-list" aria-label="Ordered current phase work">
@@ -412,7 +437,19 @@ function AssignmentPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingSelection | null>(null);
+  const warningRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLButtonElement | null>(null);
   const active = assignment.assignment;
+
+  useEffect(() => {
+    if (pending) warningRef.current?.focus();
+  }, [pending]);
+
+  function focusTask(taskId: string) {
+    const row = document.getElementById(`phase-task-${taskId}`);
+    row?.scrollIntoView({ block: "center" });
+    row?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus();
+  }
 
   function workToPreserve(next: CurrentWorkItem, navigate: boolean): PendingSelection | null {
     if (!active || active.task_id === next.task_id) return null;
@@ -443,7 +480,7 @@ function AssignmentPanel({
       setPending(null);
       if (navigate) router.push("/app/phase/prompt");
       else if (task.owner === "student") {
-        document.getElementById(`phase-task-${task.task_id}`)?.scrollIntoView({ block: "center" });
+        window.setTimeout(() => focusTask(task.task_id), 0);
       }
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Couldn't select that task.");
@@ -452,7 +489,12 @@ function AssignmentPanel({
     }
   }
 
-  function choose(task: CurrentWorkItem, navigate = false) {
+  function choose(
+    task: CurrentWorkItem,
+    navigate = false,
+    trigger: HTMLButtonElement | null = null
+  ) {
+    returnFocusRef.current = trigger;
     const preservation = workToPreserve(task, navigate);
     if (preservation) {
       setPending(preservation);
@@ -461,20 +503,26 @@ function AssignmentPanel({
     void commitSelection(task, navigate);
   }
 
-  function openAssignment() {
+  function openAssignment(trigger: HTMLButtonElement) {
     if (!active) return;
     const task = tasks.find((candidate) => candidate.task_id === active.task_id);
     if (!task) return;
     if (active.owner === "ai") {
       if (assignment.state === "selected") router.push("/app/phase/prompt");
-      else choose(task, true);
+      else choose(task, true, trigger);
       return;
     }
     if (assignment.state === "selected") {
-      document.getElementById(`phase-task-${active.task_id}`)?.scrollIntoView({ block: "center" });
+      focusTask(active.task_id);
     } else {
-      choose(task);
+      choose(task, false, trigger);
     }
+  }
+
+  function cancelSwitch() {
+    const trigger = returnFocusRef.current;
+    setPending(null);
+    window.setTimeout(() => trigger?.focus(), 0);
   }
 
   const incomplete = tasks.filter((task) => !task.completed && task.task_id !== active?.task_id);
@@ -484,7 +532,7 @@ function AssignmentPanel({
     <div className="phase-assignment" aria-labelledby="phase-assignment-title">
       {active ? (
         <>
-          <p className="entry-kicker">
+          <p className="entry-kicker" role="status" aria-live="polite">
             {assignment.state === "selected" ? "Selected assignment" : "Recommended assignment"}
           </p>
           <div className="phase-assignment-heading">
@@ -499,7 +547,12 @@ function AssignmentPanel({
             </p>
           )}
           <div className="row phase-assignment-actions">
-            <button className="btn primary" type="button" disabled={busy} onClick={openAssignment}>
+            <button
+              className="btn primary"
+              type="button"
+              disabled={busy}
+              onClick={(event) => openAssignment(event.currentTarget)}
+            >
               {busy
                 ? "Selecting…"
                 : active.owner === "ai"
@@ -534,18 +587,27 @@ function AssignmentPanel({
       )}
 
       {pending && (
-        <div className="notice warn assignment-switch-warning" role="alertdialog" aria-labelledby="assignment-switch-title">
+        <div
+          ref={warningRef}
+          className="notice warn assignment-switch-warning"
+          role="alertdialog"
+          aria-labelledby="assignment-switch-title"
+          aria-describedby="assignment-switch-description"
+          tabIndex={-1}
+        >
           <strong id="assignment-switch-title">Switch to “{pending.task.description}”?</strong>
-          <p>Current assignment: “{active?.description}”. Next assignment: “{pending.task.description}”.</p>
-          <p>
-            {pending.hasDraft && "Your unsaved draft for the current assignment stays saved on this device. "}
-            {pending.hasSavedPrompt && (pending.savedPromptIsLegacy
-              ? "Your legacy saved Prompt stays unassigned. "
-              : "Your saved Prompt keeps its current assignment. ")}
-            Nothing will be merged into the new task.
-          </p>
+          <div id="assignment-switch-description">
+            <p>Current assignment: “{active?.description}”. Next assignment: “{pending.task.description}”.</p>
+            <p>
+              {pending.hasDraft && "Your unsaved draft for the current assignment stays saved on this device. "}
+              {pending.hasSavedPrompt && (pending.savedPromptIsLegacy
+                ? "Your legacy saved Prompt stays unassigned. "
+                : "Your saved Prompt keeps its current assignment. ")}
+              Nothing will be merged into the new task.
+            </p>
+          </div>
           <div className="row">
-            <button className="btn" type="button" disabled={busy} onClick={() => setPending(null)}>Cancel</button>
+            <button className="btn" type="button" disabled={busy} onClick={cancelSwitch}>Cancel</button>
             <button className="btn primary" type="button" disabled={busy} onClick={() => void commitSelection(pending.task, pending.navigate)}>
               {busy ? "Switching…" : "Switch task"}
             </button>
@@ -590,7 +652,7 @@ function AssignmentChoice({
 }: {
   task: CurrentWorkItem;
   busy: boolean;
-  onChoose: (task: CurrentWorkItem) => void;
+  onChoose: (task: CurrentWorkItem, navigate: boolean, trigger: HTMLButtonElement) => void;
 }) {
   return (
     <li>
@@ -601,7 +663,12 @@ function AssignmentChoice({
         <span>{task.description}</span>
         <span className="task-state">{task.completed ? "Completed · revisit" : "To do"}</span>
       </div>
-      <button className="btn small" type="button" disabled={busy} onClick={() => onChoose(task)}>
+      <button
+        className="btn small"
+        type="button"
+        disabled={busy}
+        onClick={(event) => onChoose(task, false, event.currentTarget)}
+      >
         {task.completed ? "Revisit" : "Select"}
       </button>
     </li>
