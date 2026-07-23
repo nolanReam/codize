@@ -9,6 +9,7 @@ import json
 import pytest
 
 from app.schemas.workflow import SECTION_MODELS
+from app.services import phase_service
 from app.services.phase_service import PhaseNotFoundError, WorkspaceNotReadyError
 from app.services.workflow_service import (
     SECTIONS,
@@ -203,6 +204,128 @@ def test_saving_one_phase_keeps_other_phases():
     assert run(get_phase_artifacts(repo, USER, 1))["sections"]["evidence"]["summary"] == EVIDENCE["summary"]
     assert run(get_phase_artifacts(repo, USER, 2))["sections"]["verification"]["explanation"]
     assert run(get_phase_artifacts(repo, USER, 2))["sections"]["evidence"] is None
+
+
+def test_prompt_binding_requires_the_selected_current_ai_task_and_preserves_history():
+    repo = InMemoryProjectRepository()
+    seed_active_project(repo)
+    bound_a = {**PROMPT_BUILDER, "assignment_task_id": "ai-1"}
+    with pytest.raises(InvalidArtifactError, match="Select this current-phase AI task"):
+        run(save_section(repo, USER, 1, "prompt_builder", bound_a))
+
+    run(phase_service.select_current_assignment(repo, USER, "ai-1"))
+    saved_a = run(save_section(repo, USER, 1, "prompt_builder", bound_a))
+    assert saved_a["artifact"]["assignment_task_id"] == "ai-1"
+    assert saved_a["prompt_history"] == []
+
+    run(phase_service.select_current_assignment(repo, USER, "ai-2"))
+    before_b = run(get_phase_artifacts(repo, USER, 1))
+    assert before_b["sections"]["prompt_builder"]["assignment_task_id"] == "ai-1"
+
+    bound_b = {
+        **PROMPT_BUILDER,
+        "inputs": {"goal": "A different bounded task"},
+        "generated_prompt": "Handle only the selected second AI task.",
+        "assignment_task_id": "ai-2",
+    }
+    saved_b = run(save_section(repo, USER, 1, "prompt_builder", bound_b))
+    assert saved_b["artifact"]["assignment_task_id"] == "ai-2"
+    state = run(get_phase_artifacts(repo, USER, 1))
+    assert state["sections"]["prompt_builder"]["assignment_task_id"] == "ai-2"
+    assert len(state["prompt_history"]) == 1
+    assert state["prompt_history"][0]["assignment_task_id"] == "ai-1"
+    assert state["prompt_history"][0]["generated_prompt"] == PROMPT_BUILDER["generated_prompt"]
+
+
+def test_legacy_prompt_remains_unassigned_and_is_archived_on_future_binding():
+    repo = InMemoryProjectRepository()
+    seed_active_project(repo)
+    legacy = run(save_section(repo, USER, 1, "prompt_builder", PROMPT_BUILDER))
+    assert legacy["artifact"]["assignment_task_id"] is None
+
+    run(phase_service.select_current_assignment(repo, USER, "ai-1"))
+    run(
+        save_section(
+            repo,
+            USER,
+            1,
+            "prompt_builder",
+            {**PROMPT_BUILDER, "assignment_task_id": "ai-1"},
+        )
+    )
+    history = run(get_phase_artifacts(repo, USER, 1))["prompt_history"]
+    assert len(history) == 1
+    assert history[0]["assignment_task_id"] is None
+
+
+def test_prompt_binding_rejects_a_selected_student_task_and_old_phase():
+    repo = InMemoryProjectRepository()
+    project = seed_active_project(repo)
+    run(phase_service.select_current_assignment(repo, USER, "human-1"))
+    with pytest.raises(InvalidArtifactError):
+        run(
+            save_section(
+                repo,
+                USER,
+                1,
+                "prompt_builder",
+                {**PROMPT_BUILDER, "assignment_task_id": "ai-1"},
+            )
+        )
+    run(repo.update_project(USER, project["id"], {"current_phase": 2}))
+    with pytest.raises(InvalidArtifactError, match="current phase"):
+        run(
+            save_section(
+                repo,
+                USER,
+                1,
+                "prompt_builder",
+                {**PROMPT_BUILDER, "assignment_task_id": "ai-1"},
+            )
+        )
+
+
+def test_bound_prompt_retries_a_concurrent_workflow_write_without_losing_it():
+    class OneConflictRepo(InMemoryProjectRepository):
+        conflict_once = True
+
+        async def update_workflow_artifacts_if_current(
+            self, user_id, project_id, expected, replacement
+        ):
+            if self.conflict_once:
+                self.conflict_once = False
+                for row in self._rows:
+                    if row["id"] == project_id and row["user_id"] == user_id:
+                        row["workflow_artifacts"] = {
+                            **row["workflow_artifacts"],
+                            "1": {
+                                **row["workflow_artifacts"].get("1", {}),
+                                "implementation_import": {
+                                    **IMPLEMENTATION_IMPORT,
+                                    "saved_at": "2026-07-22T00:00:00+00:00",
+                                },
+                            },
+                        }
+                return None
+            return await super().update_workflow_artifacts_if_current(
+                user_id, project_id, expected, replacement
+            )
+
+    repo = OneConflictRepo()
+    seed_active_project(repo)
+    run(phase_service.select_current_assignment(repo, USER, "ai-1"))
+    run(
+        save_section(
+            repo,
+            USER,
+            1,
+            "prompt_builder",
+            {**PROMPT_BUILDER, "assignment_task_id": "ai-1"},
+        )
+    )
+    state = run(get_phase_artifacts(repo, USER, 1))["sections"]
+    assert state["prompt_builder"]["assignment_task_id"] == "ai-1"
+    assert state["implementation_import"]["student_summary"] == IMPLEMENTATION_IMPORT["student_summary"]
 
 
 # --- validation --------------------------------------------------------------------

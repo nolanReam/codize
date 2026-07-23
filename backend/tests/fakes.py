@@ -66,6 +66,21 @@ class InMemoryProjectRepository:
                 return copy.deepcopy(row)
         return None
 
+    async def update_task_progress_if_current(
+        self,
+        user_id: str,
+        project_id: str,
+        expected: dict,
+        replacement: dict,
+    ) -> dict | None:
+        for row in self._rows:
+            if row["id"] == project_id and row["user_id"] == user_id:
+                if row.get("task_progress") != expected:
+                    return None
+                row["task_progress"] = copy.deepcopy(replacement)
+                return copy.deepcopy(row)
+        return None
+
 
 class InMemoryGateSessionRepository:
     def __init__(self) -> None:

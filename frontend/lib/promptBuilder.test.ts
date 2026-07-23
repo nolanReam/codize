@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPrompt, type PromptBuilderInputs } from "./promptBuilder";
+import { buildPrompt, promptInputsHaveStudentWork, type PromptBuilderInputs } from "./promptBuilder";
 
 const INPUTS: PromptBuilderInputs = {
   projectGoal: "a volleyball league tracker",
@@ -60,5 +60,13 @@ describe("buildPrompt", () => {
     expect(badPrompt).toContain("Make it work");
     expect(badPrompt.length).toBeLessThan(prompt.length);
     expect(whyStronger).toContain("scopes the request");
+  });
+});
+
+describe("promptInputsHaveStudentWork", () => {
+  it("ignores default toggles but detects authored fields", () => {
+    const empty = { ...INPUTS, projectGoal: "", phaseGoal: "", aiTask: "", files: "", constraints: "", doNotChange: "", uncertainty: "" };
+    expect(promptInputsHaveStudentWork(empty)).toBe(false);
+    expect(promptInputsHaveStudentWork({ ...empty, aiTask: "one bounded task" })).toBe(true);
   });
 });

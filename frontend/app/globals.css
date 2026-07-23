@@ -912,6 +912,75 @@ details.help .help-body li { margin: 4px 0; }
   letter-spacing: 0.08em;
 }
 .current-work-note { margin-top: 10px; font-size: 12.5px; }
+.phase-assignment {
+  margin-top: 16px;
+  padding: 18px 18px 16px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+}
+.phase-assignment-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 5px;
+}
+.phase-assignment-heading h2,
+.phase-assignment-heading h3 {
+  max-width: 720px;
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.tag.assignment-owner {
+  flex-shrink: 0;
+  margin: 1px 0 0;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.tag.assignment-owner.student {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.phase-assignment-reason,
+.prompt-assignment-reason { margin-top: 10px; line-height: 1.55; }
+.phase-assignment-actions { margin-top: 14px; }
+.assignment-previous { margin-top: 12px; }
+.assignment-switch-warning { margin-top: 14px; }
+.assignment-switch-warning p { margin: 6px 0 10px; }
+.assignment-chooser { margin-top: 14px; border-top: 1px solid var(--border); }
+.assignment-chooser > summary,
+.completed-assignment-choices > summary,
+.prompt-history > summary {
+  padding: 12px 0 2px;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 650;
+}
+.assignment-chooser-body { padding-top: 10px; }
+.assignment-chooser ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.assignment-chooser li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+}
+.assignment-chooser li > div { min-width: 0; display: grid; gap: 5px; overflow-wrap: anywhere; }
+.assignment-chooser .task-state { color: var(--ink-3); font: 10px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+.completed-assignment-choices { margin-top: 8px; }
+.current-work-secondary-title {
+  margin-top: 20px;
+  font: 650 13px/1.4 var(--sans);
+  color: var(--ink-2);
+}
 .home-workflow-position,
 .project-record-access {
   padding: 18px 2px;
@@ -980,9 +1049,50 @@ details.help .help-body li { margin: 4px 0; }
   .project-home-controls > .btn { min-height: 44px; }
   .current-work-task .tag { display: block; width: max-content; margin-bottom: 5px; }
   .current-work-task .done { display: block; }
+  .phase-assignment { padding: 16px 14px; }
+  .phase-assignment-heading { flex-direction: column; gap: 8px; }
+  .phase-assignment-actions .btn,
+  .assignment-switch-warning .btn { width: 100%; justify-content: center; }
+  .assignment-chooser li { flex-direction: column; }
+  .assignment-chooser li .btn { width: 100%; justify-content: center; }
 }
 
 /* ---- prompt output ------------------------------------------------------- */
+
+.prompt-assignment { margin-bottom: 16px; }
+.prompt-task-label {
+  display: block;
+  margin-bottom: 10px;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.prompt-assignment .row { margin-top: 14px; }
+.one-task-rule {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.saved-prompt-record { margin-bottom: 16px; }
+.saved-prompt-record .output { max-height: 260px; overflow: auto; }
+.prompt-legacy-draft { margin-bottom: 16px; }
+.prompt-legacy-draft p { margin: 6px 0 10px; }
+.prompt-generic-starters { margin-top: 12px; }
+.prompt-history { margin-top: 16px; }
+.prompt-history > summary { padding: 0; color: var(--ink); }
+.prompt-history-list { margin-top: 14px; }
+.prompt-history-list .saved-prompt-record:last-child { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .prompt-assignment .row .btn { width: 100%; justify-content: center; }
+  .saved-prompt-record .spread { align-items: flex-start; }
+}
 
 /* the generated prompt is the payoff — it gets the one entrance animation
    in the app (transform/opacity; neutralized under reduced motion) */

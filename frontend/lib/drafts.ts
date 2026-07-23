@@ -32,6 +32,14 @@ export function draftKey(userId: string, surface: string): string {
   return `${PREFIX}${userId}:${surface}`;
 }
 
+export function promptAssignmentDraftSurface(phase: number, taskId: string): string {
+  return `prompt_builder:${phase}:assignment:${taskId}`;
+}
+
+export function legacyPromptDraftSurface(phase: number): string {
+  return `prompt_builder:${phase}`;
+}
+
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export function readDraft<T>(storage: StorageLike, key: string): T | null {

@@ -12,6 +12,7 @@ import type {
   LinkedEvidenceArtifact,
   LinkedReviewBoardArtifact,
   LinkedVerificationArtifact,
+  PhaseAssignmentState,
   StoredChangeMap,
   WorkflowPhaseState,
   WorkflowSections,
@@ -169,6 +170,25 @@ const entryProfile = (patch: Partial<EntryProfile> = {}): EntryProfile => ({
   ...patch,
 });
 
+const assignment = (
+  owner: "ai" | "student",
+  state: PhaseAssignmentState["state"] = "selected"
+): PhaseAssignmentState => ({
+  phase: 1,
+  phase_title: "Foundation",
+  state,
+  assignment: {
+    task_id: owner === "ai" ? "ai-1" : "human-1",
+    description: owner === "ai" ? "Generate the project scaffold" : "Decide the data fields",
+    completed: false,
+    owner,
+    owner_label: owner === "ai" ? "Use AI" : "You decide",
+    reason: "Current phase work.",
+  },
+  previous_selection: null,
+  invalidated_selection: false,
+});
+
 const build = (
   sectionPatch: Partial<WorkflowSections> = {},
   map: StoredChangeMap | null = confirmedMap(),
@@ -317,6 +337,27 @@ describe("guided project navigation model", () => {
     expect(model.continueAction).toMatchObject({ label: "Continue Prompt Builder", stageId: "prompt" });
     expect(model.journey[0].state).toBe("continue");
     expect(model.projectRecord).toEqual([]);
+  });
+
+  it("uses assignment ownership only when Prompt Builder is genuinely next", () => {
+    const empty = workflow(
+      { prompt_builder: null, implementation_import: null, review_board: null, verification: null, evidence: null },
+      null
+    );
+    const ai = buildGuidedProjectNavigation({
+      evaluation: evaluation(), workflow: empty, gate: gate(), assignment: assignment("ai"),
+    });
+    expect(ai.continueAction).toMatchObject({ label: "Continue Prompt Builder", stageId: "prompt" });
+
+    const student = buildGuidedProjectNavigation({
+      evaluation: evaluation(), workflow: empty, gate: gate(), assignment: assignment("student"),
+    });
+    expect(student.continueAction).toMatchObject({
+      label: "Continue your decision",
+      href: "/app#current-work",
+      stageId: null,
+    });
+    expect(student.journey[0].state).toBe("later");
   });
 
   it("moves a saved Prompt to Project Record and continues Import", () => {

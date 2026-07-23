@@ -13,6 +13,7 @@ import {
 import {
   ApiError,
   getCurrentGate,
+  getCurrentAssignment,
   getEntryProfile,
   getEvaluation,
   getIntakeStatus,
@@ -24,7 +25,13 @@ import {
   GUIDED_NAVIGATION_REFRESH_EVENT,
   type GuidedProjectNavigation,
 } from "@/lib/guidedProjectNavigation";
-import type { EntryProfile, Evaluation, GateCurrent, WorkflowPhaseState } from "@/lib/types";
+import type {
+  EntryProfile,
+  Evaluation,
+  GateCurrent,
+  PhaseAssignmentState,
+  WorkflowPhaseState,
+} from "@/lib/types";
 
 type NavigationLoadState = "loading" | "ready" | "error";
 
@@ -36,6 +43,7 @@ interface GuidedNavigationContextValue {
   workflow: WorkflowPhaseState | null;
   gate: GateCurrent | null;
   entryProfile: EntryProfile | null;
+  assignment: PhaseAssignmentState | null;
   userId: string;
   refresh: () => Promise<void>;
 }
@@ -62,6 +70,7 @@ export default function GuidedProjectNavigationProvider({
   const [gate, setGate] = useState<GateCurrent | null>(null);
   const [projectLabel, setProjectLabel] = useState<string | null>(null);
   const [entryProfile, setEntryProfile] = useState<EntryProfile | null>(null);
+  const [assignment, setAssignment] = useState<PhaseAssignmentState | null>(null);
   const requestId = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -86,21 +95,24 @@ export default function GuidedProjectNavigationProvider({
         if (activeRequest !== requestId.current) return;
         setWorkflow(null);
         setGate(null);
+        setAssignment(null);
         setProjectLabel(intake?.answers?.purpose ?? null);
         setEntryProfile(normalizeEntryProfile(entry.profile));
         setState("ready");
         return;
       }
 
-      const [nextWorkflow, nextGate, intake, entry] = await Promise.all([
+      const [nextWorkflow, nextGate, nextAssignment, intake, entry] = await Promise.all([
         getWorkflow(nextEvaluation.current_phase),
         getCurrentGate(),
+        getCurrentAssignment(),
         getIntakeStatus().catch(() => null),
         getEntryProfile().catch(() => ({ profile: null })),
       ]);
       if (activeRequest !== requestId.current) return;
       setWorkflow(nextWorkflow);
       setGate(nextGate);
+      setAssignment(nextAssignment);
       setProjectLabel(intake?.answers?.purpose ?? null);
       setEntryProfile(normalizeEntryProfile(entry.profile));
       setState("ready");
@@ -134,6 +146,7 @@ export default function GuidedProjectNavigationProvider({
             evaluation,
             workflow,
             gate,
+            assignment,
             projectLabel,
             entryProfile,
           })
@@ -143,7 +156,7 @@ export default function GuidedProjectNavigationProvider({
             evaluation,
             workflow,
           },
-    [entryProfile, evaluation, gate, projectLabel, state, workflow]
+    [assignment, entryProfile, evaluation, gate, projectLabel, state, workflow]
   );
 
   const value = useMemo<GuidedNavigationContextValue>(
@@ -155,10 +168,11 @@ export default function GuidedProjectNavigationProvider({
       workflow,
       gate,
       entryProfile,
+      assignment,
       userId,
       refresh,
     }),
-    [entryProfile, error, evaluation, gate, navigation, refresh, state, userId, workflow]
+    [assignment, entryProfile, error, evaluation, gate, navigation, refresh, state, userId, workflow]
   );
 
   return (

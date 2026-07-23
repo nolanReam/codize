@@ -29,6 +29,7 @@ import type {
   IntakeQuestion,
   IntakeStatus,
   PhaseList,
+  PhaseAssignmentState,
   PhaseView,
   PromptBuilderArtifact,
   ReconnectionState,
@@ -140,6 +141,13 @@ export const generateRoadmap = () =>
   request<{ roadmap: unknown }>("/roadmap/generate", { method: "POST" });
 export const getPhases = () => request<PhaseList>("/phases");
 export const getCurrentPhase = () => request<PhaseView>("/phases/current");
+export const getCurrentAssignment = () =>
+  request<PhaseAssignmentState>("/phases/current/assignment");
+export const selectCurrentAssignment = (taskId: string) =>
+  request<PhaseAssignmentState>("/phases/current/assignment", {
+    method: "PUT",
+    body: { task_id: taskId },
+  });
 export const getPhase = (n: number) => request<PhaseView>(`/phases/${n}`);
 export const setTaskCompletion = (phase: number, taskId: string, completed: boolean) =>
   request<PhaseView>(`/phases/${phase}/tasks/${taskId}`, {
@@ -173,7 +181,12 @@ export const saveWorkflowSection = <S extends WorkflowSectionName>(
   section: S,
   payload: SectionPayloadMap[S]
 ) =>
-  request<{ phase: number; section: S; artifact: SectionArtifactMap[S] }>(
+  request<{
+    phase: number;
+    section: S;
+    artifact: SectionArtifactMap[S];
+    prompt_history?: PromptBuilderArtifact[];
+  }>(
     `/workflow/${phase}/${section}`,
     { method: "PUT", body: payload }
   );

@@ -31,7 +31,11 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from app.schemas.change_map import StoredChangeMap
-from app.schemas.workflow import SECTION_MODELS, StoredImplementationImport
+from app.schemas.workflow import (
+    SECTION_MODELS,
+    StoredImplementationImport,
+    StoredPromptBuilderArtifact,
+)
 from app.services import (
     evidence_service,
     phase_service,
@@ -51,6 +55,9 @@ SECTIONS = tuple(SECTION_MODELS)
 # every section read, which also keeps it out of the M14 defense context
 # (stored_sections is the only artifact feed into the pack builder).
 CHANGE_MAP_KEY = "change_map"
+PROMPT_HISTORY_KEY = "prompt_history"
+MAX_PROMPT_HISTORY = 20
+_MAX_PROMPT_WRITE_RETRIES = 3
 
 # Belt over the per-field caps: one section, serialized, must stay small
 # enough to render and to aggregate into a Project Defense Report. The
@@ -73,6 +80,10 @@ class SectionNotFoundError(WorkflowError):
 
 class InvalidArtifactError(WorkflowError):
     """Payload failed validation or exceeds the size cap."""
+
+
+class WorkflowConflictError(WorkflowError):
+    """A bounded optimistic write could not preserve concurrent work."""
 
 
 def _stored_sections(project: dict, phase_number: int) -> dict:
@@ -121,7 +132,26 @@ def _phase_view(project: dict, phase_number: int) -> dict:
         # section values for its "N/5 captured" progress, and the change map
         # is not a student-captured section.
         "change_map": change_map_view(project, phase_number),
+        "prompt_history": prompt_history_view(project, phase_number),
     }
+
+
+def prompt_history_view(project: dict, phase_number: int) -> list[dict]:
+    """Validated prior Prompts, newest last; corrupt entries are never exposed."""
+    artifacts = project.get("workflow_artifacts")
+    phase_map = artifacts.get(str(phase_number)) if isinstance(artifacts, dict) else None
+    raw = phase_map.get(PROMPT_HISTORY_KEY) if isinstance(phase_map, dict) else None
+    if not isinstance(raw, list):
+        return []
+    history: list[dict] = []
+    for item in raw[-MAX_PROMPT_HISTORY:]:
+        try:
+            history.append(
+                StoredPromptBuilderArtifact.model_validate(item).model_dump(mode="json")
+            )
+        except ValidationError:
+            continue
+    return history
 
 
 def stored_sections(project: dict, phase_number: int) -> dict:
@@ -306,6 +336,81 @@ def _safe_validation_message(exc: ValidationError) -> str:
     return f"Invalid workflow artifact ({loc}): {first['msg']}"
 
 
+def _validate_prompt_assignment(project: dict, phase_number: int, task_id: str) -> None:
+    """A new association may name only the server-selected current AI task."""
+    if phase_number != project.get("current_phase"):
+        raise InvalidArtifactError(
+            "A Prompt can only be associated with the selected task in the current phase."
+        )
+    selection = phase_service.current_assignment_view(project)
+    assignment = selection.get("assignment")
+    if (
+        selection.get("state") != "selected"
+        or not isinstance(assignment, dict)
+        or assignment.get("task_id") != task_id
+        or assignment.get("owner") != "ai"
+    ):
+        raise InvalidArtifactError(
+            "Select this current-phase AI task on Project Home before saving its Prompt."
+        )
+
+
+async def _store_prompt_builder(
+    repo: ProjectRepository,
+    user_id: str,
+    project: dict,
+    phase_number: int,
+    stored_section: dict,
+) -> dict:
+    """CAS merge so assignment/history and every sibling workflow key survive."""
+    for attempt in range(_MAX_PROMPT_WRITE_RETRIES):
+        current = project if attempt == 0 else await phase_service.load_active_project(repo, user_id)
+        phase_service.require_phase(current, phase_number)
+        task_id = stored_section.get("assignment_task_id")
+        if task_id is not None:
+            _validate_prompt_assignment(current, phase_number, task_id)
+
+        existing = current.get("workflow_artifacts")
+        expected = copy.deepcopy(existing) if isinstance(existing, dict) else {}
+        artifacts = copy.deepcopy(expected)
+        raw_phase_map = artifacts.get(str(phase_number))
+        phase_map = dict(raw_phase_map) if isinstance(raw_phase_map, dict) else {}
+
+        history = prompt_history_view(current, phase_number)
+        previous = phase_map.get("prompt_builder")
+        if isinstance(previous, dict) and previous.get("assignment_task_id") != task_id:
+            try:
+                preserved = StoredPromptBuilderArtifact.model_validate(previous).model_dump(
+                    mode="json"
+                )
+            except ValidationError:
+                preserved = None
+            if preserved is not None:
+                identity = (preserved.get("saved_at"), preserved.get("assignment_task_id"))
+                if not any(
+                    (item.get("saved_at"), item.get("assignment_task_id")) == identity
+                    for item in history
+                ):
+                    history.append(preserved)
+        phase_map[PROMPT_HISTORY_KEY] = history[-MAX_PROMPT_HISTORY:]
+        phase_map["prompt_builder"] = copy.deepcopy(stored_section)
+        artifacts[str(phase_number)] = phase_map
+
+        updated = await repo.update_workflow_artifacts_if_current(
+            user_id, current["id"], expected, artifacts
+        )
+        if updated is not None:
+            return {
+                "phase": phase_number,
+                "section": "prompt_builder",
+                "artifact": copy.deepcopy(stored_section),
+                "prompt_history": prompt_history_view(updated, phase_number),
+            }
+    raise WorkflowConflictError(
+        "Workflow state changed in another tab. Reload Prompt Builder and save again."
+    )
+
+
 async def save_section(
     repo: ProjectRepository, user_id: str, phase_number: int, section: str, payload: dict
 ) -> dict:
@@ -374,6 +479,11 @@ async def save_section(
 
     stored_section = artifact.model_dump(mode="json")
     stored_section["saved_at"] = datetime.now(timezone.utc).isoformat()
+
+    if section == "prompt_builder":
+        return await _store_prompt_builder(
+            repo, user_id, project, phase_number, stored_section
+        )
 
     existing = project.get("workflow_artifacts")
     artifacts = dict(existing) if isinstance(existing, dict) else {}

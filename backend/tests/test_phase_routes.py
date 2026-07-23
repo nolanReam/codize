@@ -38,6 +38,7 @@ PHASE_ROUTES = (
     ("GET", "/phases/current"),
     ("GET", "/phases/1"),
     ("PATCH", "/phases/1/tasks/ai-1"),
+    ("GET", "/phases/current/assignment"),
 )
 
 
@@ -83,6 +84,9 @@ def test_phase_routes_require_auth(client):
         resp = client.request(method, path, json={"completed": True})
         assert resp.status_code == 401
         assert resp.json()["error"]["status"] == 401
+    assert client.put(
+        "/phases/current/assignment", json={"task_id": "ai-1"}
+    ).status_code == 401
 
 
 def test_phases_before_roadmap_returns_controlled_409(client):
@@ -95,6 +99,11 @@ def test_phases_before_roadmap_returns_controlled_409(client):
                 "message": "The phase workspace needs an active project with a generated roadmap.",
             }
         }
+    assert client.put(
+        "/phases/current/assignment",
+        json={"task_id": "ai-1"},
+        headers=auth_headers(),
+    ).status_code == 409
 
 
 def test_full_phase_workspace_flow(client):
@@ -110,6 +119,18 @@ def test_full_phase_workspace_flow(client):
     assert current.status_code == 200
     assert current.json()["phase"] == 1
     assert current.json()["is_current"] is True
+
+    recommended = client.get("/phases/current/assignment", headers=auth_headers())
+    assert recommended.status_code == 200
+    assert recommended.json()["assignment"]["task_id"] == "ai-1"
+    selected = client.put(
+        "/phases/current/assignment",
+        json={"task_id": "ai-2"},
+        headers=auth_headers(),
+    )
+    assert selected.status_code == 200
+    assert selected.json()["state"] == "selected"
+    assert selected.json()["assignment"]["description"] == roadmap["phases"][0]["ai_appropriate_tasks"][1]
 
     phase3 = client.get("/phases/3", headers=auth_headers())
     assert phase3.status_code == 200
@@ -149,6 +170,16 @@ def test_invalid_phase_and_task_are_controlled_errors(client):
     assert "does not exist in phase 1" in resp.json()["error"]["message"]
     resp = client.patch("/phases/1/tasks/ai-1", json={}, headers=auth_headers())
     assert resp.status_code == 422
+    assert client.put(
+        "/phases/current/assignment",
+        json={"task_id": "human-999"},
+        headers=auth_headers(),
+    ).status_code == 404
+    assert client.put(
+        "/phases/current/assignment",
+        json={"task_id": "ai-1", "description": "client-owned"},
+        headers=auth_headers(),
+    ).status_code == 422
 
 
 def test_task_updates_do_not_mutate_the_stored_roadmap(client):

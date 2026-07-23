@@ -89,8 +89,12 @@ tracked per phase in the separate `projects.task_progress` column as
 `{"<phase>": ["ai-1", "human-2", …]}` (1-based index into the phase's task
 lists), so marking tasks complete can never mutate the fixed roadmap
 structure. `current_phase` is advanced by the Interrogation Gate (M9), never
-by ticking tasks. Routes: `GET /phases`, `GET /phases/current`,
-`GET /phases/{n}`, `PATCH /phases/{n}/tasks/{task_id}` (body
+by ticking tasks. M18B.2 stores a phase-scoped explicit assignment under the
+same JSONB (`_phase_assignments`) with a roadmap fingerprint; selection and
+completion use optimistic writes so concurrent changes preserve one another.
+Routes: `GET /phases`, `GET /phases/current`,
+`GET|PUT /phases/current/assignment`, `GET /phases/{n}`,
+`PATCH /phases/{n}/tasks/{task_id}` (body
 `{"completed": bool}`); workspace not ready → 409, unknown phase/task → 404.
 
 ## Interrogation Gate (M9)

@@ -8,13 +8,20 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiError, getCurrentPhase, getWorkflow, saveWorkflowSection } from "./api";
-import type { PhaseView, StoredChangeMap, WorkflowSectionName, WorkflowSections } from "./types";
+import type {
+  PhaseView,
+  PromptBuilderArtifact,
+  StoredChangeMap,
+  WorkflowSectionName,
+  WorkflowSections,
+} from "./types";
 
 export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
   const [phase, setPhase] = useState<PhaseView | null>(null);
   const [stored, setStored] = useState<WorkflowSections[S] | null>(null);
   const [sections, setSections] = useState<WorkflowSections | null>(null);
   const [changeMap, setChangeMap] = useState<StoredChangeMap | null>(null);
+  const [promptHistory, setPromptHistory] = useState<PromptBuilderArtifact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notReady, setNotReady] = useState(false);
@@ -33,6 +40,7 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
       setStored(workflow.sections[section]);
       setSections(workflow.sections);
       setChangeMap(workflow.change_map);
+      setPromptHistory(workflow.prompt_history ?? []);
       setSavedAt((workflow.sections[section] as { saved_at?: string } | null)?.saved_at ?? null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -59,6 +67,7 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
         setStored(result.artifact as WorkflowSections[S]);
         setSections((current) => current ? { ...current, [section]: result.artifact } : current);
         setSavedAt(result.artifact.saved_at ?? null);
+        if (result.prompt_history) setPromptHistory(result.prompt_history);
         return result.artifact as WorkflowSections[S];
       } catch (err) {
         setSaveError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
@@ -85,6 +94,7 @@ export function useWorkflowSection<S extends WorkflowSectionName>(section: S) {
     stored,
     sections,
     changeMap,
+    promptHistory,
     loading,
     error,
     notReady,

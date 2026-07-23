@@ -21,6 +21,19 @@ export interface BuiltPrompt {
   badPrompt: string;
 }
 
+export function promptInputsHaveStudentWork(inputs: PromptBuilderInputs | null): boolean {
+  if (!inputs) return false;
+  return [
+    inputs.projectGoal,
+    inputs.phaseGoal,
+    inputs.aiTask,
+    inputs.files,
+    inputs.constraints,
+    inputs.doNotChange,
+    inputs.uncertainty,
+  ].some((value) => typeof value === "string" && value.trim().length > 0);
+}
+
 // The backend caps generated_prompt at 8000 chars; stay under it.
 const MAX_PROMPT_CHARS = 7900;
 

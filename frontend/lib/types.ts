@@ -86,6 +86,23 @@ export interface PhaseList {
   phases: PhaseSummary[];
 }
 
+export type AssignmentOwner = "ai" | "student";
+
+export interface PhaseAssignmentTask extends TaskEntry {
+  owner: AssignmentOwner;
+  owner_label: "Use AI" | "You decide";
+  reason: string;
+}
+
+export interface PhaseAssignmentState {
+  phase: number;
+  phase_title: string;
+  state: "selected" | "recommended" | "phase_complete" | "no_valid_task";
+  assignment: PhaseAssignmentTask | null;
+  previous_selection: Omit<PhaseAssignmentTask, "reason"> | null;
+  invalidated_selection: boolean;
+}
+
 // --- workflow artifacts (M13B) ---------------------------------------------
 
 export type WorkflowSectionName =
@@ -100,6 +117,7 @@ export interface PromptBuilderArtifact {
   generated_prompt: string;
   why_stronger?: string | null;
   bad_prompt_comparison?: string | null;
+  assignment_task_id?: string | null;
   saved_at?: string;
 }
 
@@ -537,6 +555,7 @@ export interface WorkflowPhaseState {
   phase: number;
   sections: WorkflowSections;
   change_map: StoredChangeMap | null;
+  prompt_history?: PromptBuilderArtifact[];
 }
 
 // --- reconnection / evaluation / gate ---------------------------------------

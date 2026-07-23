@@ -38,7 +38,7 @@ describe("M18B.1 one-home guided shell contract", () => {
     expect(home).toContain("phaseGuide(phase.phase_title).meaning");
     expect(home).toContain('id="current-work"');
     expect(home).toContain('className="current-work-list"');
-    expect(home).toContain('task.owner === "ai" ? "AI-appropriate" : "Student-owned"');
+    expect(home).toContain('task.owner === "ai" ? "Use AI" : "You decide"');
     expect(home).toContain('className="card project-roadmap"');
     expect(home).toContain('id="project-record-access-title"');
     expect(home).not.toContain("explanation_gate_targets");

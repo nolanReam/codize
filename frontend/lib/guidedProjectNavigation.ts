@@ -9,6 +9,7 @@ import type {
   Evaluation,
   EntryProfile,
   GateCurrent,
+  PhaseAssignmentState,
   WorkflowPhaseState,
   WorkflowSections,
 } from "./types";
@@ -71,6 +72,7 @@ export interface GuidedNavigationInput {
   gate: GateCurrent | null;
   projectLabel?: string | null;
   entryProfile?: EntryProfile | null;
+  assignment?: PhaseAssignmentState | null;
 }
 
 const LABEL_BY_ID = new Map(GUIDED_JOURNEY.map((stage) => [stage.id, stage.label]));
@@ -378,8 +380,27 @@ export function buildGuidedProjectNavigation(
       entryStart === "quick_start");
 
   if (!sections.prompt_builder && !importFirst) {
-    set("prompt", "continue", "Save the prompt you will use for this phase.");
-    continueAction = action("prompt", "Continue Prompt Builder", "Plan one clear ask for your AI tool.");
+    const assignment = input.assignment?.assignment;
+    if (assignment?.owner === "student") {
+      set("prompt", "later", "Make the selected project decision before asking AI to implement dependent work.");
+      continueAction = action(
+        null,
+        "Continue your decision",
+        assignment.description,
+        "/app#current-work"
+      );
+    } else if (input.assignment?.state === "phase_complete" || input.assignment?.state === "no_valid_task") {
+      set("prompt", "later", "Prompt Builder needs one valid current-phase AI task.");
+      continueAction = action(
+        null,
+        "Review current phase work",
+        "There is no incomplete AI task to send to Prompt Builder.",
+        "/app#current-work"
+      );
+    } else {
+      set("prompt", "continue", "Save the prompt you will use for this phase.");
+      continueAction = action("prompt", "Continue Prompt Builder", "Plan one clear ask for your AI tool.");
+    }
   } else {
     if (sections.prompt_builder) {
       set("prompt", "complete", "A prompt is saved for this phase.");

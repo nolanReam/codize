@@ -39,6 +39,14 @@ class ProjectRepository(Protocol):
         replacement: dict,
     ) -> dict | None: ...
 
+    async def update_task_progress_if_current(
+        self,
+        user_id: str,
+        project_id: str,
+        expected: dict,
+        replacement: dict,
+    ) -> dict | None: ...
+
 
 class GateSessionRepository(Protocol):
     """What the gate service needs from storage — nothing more."""
@@ -163,6 +171,29 @@ class SupabaseProjectRepository(_SupabaseRest):
                 "workflow_artifacts": f"eq.{expected_json}",
             },
             json={"workflow_artifacts": replacement},
+        )
+        return rows[0] if rows else None
+
+    async def update_task_progress_if_current(
+        self,
+        user_id: str,
+        project_id: str,
+        expected: dict,
+        replacement: dict,
+    ) -> dict | None:
+        """Optimistic task-state replace used by completion and assignment writes."""
+        expected_json = json.dumps(
+            expected, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        rows = await self._request(
+            "PATCH",
+            "/projects",
+            params={
+                "id": f"eq.{project_id}",
+                "user_id": f"eq.{user_id}",
+                "task_progress": f"eq.{expected_json}",
+            },
+            json={"task_progress": replacement},
         )
         return rows[0] if rows else None
 

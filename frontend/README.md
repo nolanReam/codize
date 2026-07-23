@@ -314,6 +314,17 @@ titles, sans textareas — mono reserved for code-like output); and three
 subtle transform/opacity motions (disclosure reveal, generated-prompt rise,
 focus rings) live inside the existing `prefers-reduced-motion` kill switch.
 
+## Status (M18B.2)
+
+Project Home now resolves one authoritative current-phase assignment from the
+roadmap task IDs: explicit selection wins, otherwise the earliest incomplete
+`Use AI` task precedes `You decide` work. Prompt Builder displays that real
+assignment before generic starters and binds only AI-owned tasks. Local drafts
+are assignment-specific; differently bound and legacy saved Prompts remain
+readable, with prior Prompts retained in bounded server-owned history. Continue
+still prioritizes stale workflow repair and active Defense lifecycle states.
+No migration or provider call was added.
+
 ## Status (M13E.3)
 
 Cognitive-load reduction pass from the first tester's qualitative feedback

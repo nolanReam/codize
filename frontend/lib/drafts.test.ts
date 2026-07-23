@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { clearDraft, containsSecretMarker, draftKey, readDraft, writeDraft } from "./drafts";
+import {
+  clearDraft,
+  containsSecretMarker,
+  draftKey,
+  legacyPromptDraftSurface,
+  promptAssignmentDraftSurface,
+  readDraft,
+  writeDraft,
+} from "./drafts";
 
 function fakeStorage() {
   const map = new Map<string, string>();
@@ -20,6 +28,17 @@ describe("draftKey", () => {
     expect(a).not.toBe(b);
     expect(a).not.toBe(c);
     expect(a).toBe("codize:draft:user-a:review_board:2");
+  });
+
+  it("isolates Prompt drafts by phase and stable assignment id while retaining the legacy seam", () => {
+    expect(promptAssignmentDraftSurface(2, "ai-1")).toBe("prompt_builder:2:assignment:ai-1");
+    expect(promptAssignmentDraftSurface(2, "ai-2")).not.toBe(
+      promptAssignmentDraftSurface(2, "ai-1")
+    );
+    expect(promptAssignmentDraftSurface(3, "ai-1")).not.toBe(
+      promptAssignmentDraftSurface(2, "ai-1")
+    );
+    expect(legacyPromptDraftSurface(2)).toBe("prompt_builder:2");
   });
 });
 

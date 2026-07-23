@@ -84,12 +84,21 @@ class PromptBuilderArtifact(_Artifact):
     generated_prompt: Annotated[LongText, Field(min_length=1)]
     why_stronger: MedText | None = None
     bad_prompt_comparison: LongText | None = None
+    assignment_task_id: Annotated[
+        str, Field(pattern=r"^ai-[1-9][0-9]*$")
+    ] | None = None
 
     @model_validator(mode="after")
     def _cap_inputs(self) -> "PromptBuilderArtifact":
         if len(self.inputs) > 20:
             raise ValueError("at most 20 prompt-builder inputs")
         return self
+
+
+class StoredPromptBuilderArtifact(PromptBuilderArtifact):
+    """Read/history shape. ``saved_at`` is always server-owned."""
+
+    saved_at: str | None = None
 
 
 class ReviewBoardArtifact(_Artifact):

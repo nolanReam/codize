@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { QuickStartPanel, StartingPathSummary } from "@/components/AdaptiveEntry";
@@ -9,9 +9,28 @@ import Async from "@/components/Async";
 import { GuidedContinueAction } from "@/components/GuidedProjectNav";
 import { useGuidedProjectNavigation } from "@/components/GuidedProjectNavigationProvider";
 import GuideCard from "@/components/GuideCard";
-import { ApiError, getCurrentPhase, getPhases, setTaskCompletion } from "@/lib/api";
+import {
+  ApiError,
+  getCurrentPhase,
+  getPhases,
+  selectCurrentAssignment,
+  setTaskCompletion,
+} from "@/lib/api";
+import {
+  draftKey,
+  promptAssignmentDraftSurface,
+  readDraft,
+} from "@/lib/drafts";
 import { phaseGuide } from "@/lib/phaseGuide";
-import type { PhaseList, PhaseView, TaskEntry } from "@/lib/types";
+import { assignmentSwitchProtection } from "@/lib/phaseAssignment";
+import type { PromptBuilderInputs } from "@/lib/promptBuilder";
+import type {
+  PhaseAssignmentState,
+  PhaseList,
+  PhaseView,
+  PromptBuilderArtifact,
+  TaskEntry,
+} from "@/lib/types";
 
 type PhaseLoadState = "idle" | "loading" | "ready" | "error";
 type CurrentWorkItem = TaskEntry & { owner: "ai" | "student" };
@@ -28,7 +47,7 @@ export default function ProjectHomePage() {
 
 function ProjectHomeContent() {
   const guided = useGuidedProjectNavigation();
-  const { state, error, navigation, evaluation, workflow, entryProfile, refresh } = guided;
+  const { state, error, navigation, evaluation, workflow, entryProfile, assignment, userId, refresh } = guided;
   const searchParams = useSearchParams();
   const showQuickStart = searchParams.get("quick-start") === "1";
   const [phase, setPhase] = useState<PhaseView | null>(null);
@@ -95,6 +114,7 @@ function ProjectHomeContent() {
     setTaskError(null);
     try {
       setPhase(await setTaskCompletion(phase.phase, task.task_id, !task.completed));
+      await refresh();
     } catch (caught) {
       setTaskError(caught instanceof ApiError ? caught.message : "Couldn't update that task.");
     } finally {
@@ -209,11 +229,26 @@ function ProjectHomeContent() {
               ) : phaseState === "error" ? (
                 <p className="muted">Current work will return when the phase reload succeeds.</p>
               ) : currentWork.length > 0 ? (
-                <ol className="current-work-list" aria-label="Ordered current phase work">
+                <>
+                  {assignment && (
+                    <AssignmentPanel
+                      assignment={assignment}
+                      tasks={currentWork}
+                      userId={userId}
+                      savedPrompt={workflow.sections.prompt_builder}
+                      onChanged={refresh}
+                    />
+                  )}
+                  <h3 className="current-work-secondary-title">Phase task checklist</h3>
+                  <ol className="current-work-list" aria-label="Ordered current phase work">
                   {currentWork.map((task) => {
                     const statusId = `task-status-${task.task_id}`;
                     return (
-                      <li key={task.task_id} className={task.completed ? "complete" : undefined}>
+                      <li
+                        id={`phase-task-${task.task_id}`}
+                        key={task.task_id}
+                        className={task.completed ? "complete" : undefined}
+                      >
                         <label className="task current-work-task">
                           <input
                             type="checkbox"
@@ -224,7 +259,7 @@ function ProjectHomeContent() {
                           />
                           <span>
                             <span className={`tag ${task.owner}`}>
-                              {task.owner === "ai" ? "AI-appropriate" : "Student-owned"}
+                              {task.owner === "ai" ? "Use AI" : "You decide"}
                             </span>
                             <span className={task.completed ? "done" : undefined}>{task.description}</span>
                             <span id={statusId} className="task-state">
@@ -235,7 +270,8 @@ function ProjectHomeContent() {
                       </li>
                     );
                   })}
-                </ol>
+                  </ol>
+                </>
               ) : (
                 <p className="empty">No build tasks are listed for this phase.</p>
               )}
@@ -348,6 +384,227 @@ function ProjectHomeContent() {
         )}
       </Async>
     </>
+  );
+}
+
+type PendingSelection = {
+  task: CurrentWorkItem;
+  navigate: boolean;
+  hasDraft: boolean;
+  hasSavedPrompt: boolean;
+  savedPromptIsLegacy: boolean;
+};
+
+function AssignmentPanel({
+  assignment,
+  tasks,
+  userId,
+  savedPrompt,
+  onChanged,
+}: {
+  assignment: PhaseAssignmentState;
+  tasks: CurrentWorkItem[];
+  userId: string;
+  savedPrompt: PromptBuilderArtifact | null;
+  onChanged: () => Promise<void>;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingSelection | null>(null);
+  const active = assignment.assignment;
+
+  function workToPreserve(next: CurrentWorkItem, navigate: boolean): PendingSelection | null {
+    if (!active || active.task_id === next.task_id) return null;
+    const local = readDraft<PromptBuilderInputs>(
+      window.localStorage,
+      draftKey(userId, promptAssignmentDraftSurface(assignment.phase, active.task_id))
+    );
+    const protection = assignmentSwitchProtection(
+      active.task_id,
+      next.task_id,
+      local,
+      savedPrompt
+    );
+    if (!protection) return null;
+    return {
+      task: next,
+      navigate,
+      ...protection,
+    };
+  }
+
+  async function commitSelection(task: CurrentWorkItem, navigate: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      await selectCurrentAssignment(task.task_id);
+      await onChanged();
+      setPending(null);
+      if (navigate) router.push("/app/phase/prompt");
+      else if (task.owner === "student") {
+        document.getElementById(`phase-task-${task.task_id}`)?.scrollIntoView({ block: "center" });
+      }
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Couldn't select that task.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function choose(task: CurrentWorkItem, navigate = false) {
+    const preservation = workToPreserve(task, navigate);
+    if (preservation) {
+      setPending(preservation);
+      return;
+    }
+    void commitSelection(task, navigate);
+  }
+
+  function openAssignment() {
+    if (!active) return;
+    const task = tasks.find((candidate) => candidate.task_id === active.task_id);
+    if (!task) return;
+    if (active.owner === "ai") {
+      if (assignment.state === "selected") router.push("/app/phase/prompt");
+      else choose(task, true);
+      return;
+    }
+    if (assignment.state === "selected") {
+      document.getElementById(`phase-task-${active.task_id}`)?.scrollIntoView({ block: "center" });
+    } else {
+      choose(task);
+    }
+  }
+
+  const incomplete = tasks.filter((task) => !task.completed && task.task_id !== active?.task_id);
+  const completed = tasks.filter((task) => task.completed && task.task_id !== active?.task_id);
+
+  return (
+    <div className="phase-assignment" aria-labelledby="phase-assignment-title">
+      {active ? (
+        <>
+          <p className="entry-kicker">
+            {assignment.state === "selected" ? "Selected assignment" : "Recommended assignment"}
+          </p>
+          <div className="phase-assignment-heading">
+            <h3 id="phase-assignment-title">{active.description}</h3>
+            <span className={`tag assignment-owner ${active.owner}`}>{active.owner_label}</span>
+          </div>
+          <p className="phase-assignment-reason"><strong>Why now?</strong> {active.reason}</p>
+          {active.owner === "student" && (
+            <p className="muted">
+              Make or document this decision yourself before asking AI to implement dependent work.
+              Codize will not send this decision to Prompt Builder.
+            </p>
+          )}
+          <div className="row phase-assignment-actions">
+            <button className="btn primary" type="button" disabled={busy} onClick={openAssignment}>
+              {busy
+                ? "Selecting…"
+                : active.owner === "ai"
+                  ? assignment.state === "selected" ? "Continue to Prompt Builder" : "Build this prompt"
+                  : "Review this decision"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="entry-kicker">Current assignment</p>
+          <h3 id="phase-assignment-title">
+            {assignment.state === "phase_complete" ? "All phase tasks are marked done" : "No valid phase task is available"}
+          </h3>
+          <p className="muted">
+            {assignment.state === "phase_complete"
+              ? "You can revisit a completed task below. Task completion does not advance the phase."
+              : "Reload the roadmap before building another prompt; Codize will not invent a replacement task."}
+          </p>
+        </>
+      )}
+
+      {assignment.invalidated_selection && (
+        <div className="notice info" role="status">
+          The prior selection no longer resolves in this phase. Codize chose a fresh current-phase recommendation without rebinding old work.
+        </div>
+      )}
+      {assignment.previous_selection && (
+        <p className="muted assignment-previous">
+          Completed: {assignment.previous_selection.description}. Its Prompt and local draft keep their original task binding.
+        </p>
+      )}
+
+      {pending && (
+        <div className="notice warn assignment-switch-warning" role="alertdialog" aria-labelledby="assignment-switch-title">
+          <strong id="assignment-switch-title">Switch to “{pending.task.description}”?</strong>
+          <p>Current assignment: “{active?.description}”. Next assignment: “{pending.task.description}”.</p>
+          <p>
+            {pending.hasDraft && "Your unsaved draft for the current assignment stays saved on this device. "}
+            {pending.hasSavedPrompt && (pending.savedPromptIsLegacy
+              ? "Your legacy saved Prompt stays unassigned. "
+              : "Your saved Prompt keeps its current assignment. ")}
+            Nothing will be merged into the new task.
+          </p>
+          <div className="row">
+            <button className="btn" type="button" disabled={busy} onClick={() => setPending(null)}>Cancel</button>
+            <button className="btn primary" type="button" disabled={busy} onClick={() => void commitSelection(pending.task, pending.navigate)}>
+              {busy ? "Switching…" : "Switch task"}
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <div className="notice error" role="alert">{error}</div>}
+
+      {(incomplete.length > 0 || completed.length > 0) && (
+        <details className="assignment-chooser">
+          <summary>Choose another task</summary>
+          <div className="assignment-chooser-body">
+            <p className="muted">Choose one current-phase task. Opening this list never changes the assignment.</p>
+            {incomplete.length > 0 && (
+              <ul aria-label="Incomplete current-phase tasks">
+                {incomplete.map((task) => (
+                  <AssignmentChoice key={task.task_id} task={task} busy={busy} onChoose={choose} />
+                ))}
+              </ul>
+            )}
+            {completed.length > 0 && (
+              <details className="completed-assignment-choices">
+                <summary>Revisit completed tasks</summary>
+                <ul aria-label="Completed current-phase tasks">
+                  {completed.map((task) => (
+                    <AssignmentChoice key={task.task_id} task={task} busy={busy} onChoose={choose} />
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function AssignmentChoice({
+  task,
+  busy,
+  onChoose,
+}: {
+  task: CurrentWorkItem;
+  busy: boolean;
+  onChoose: (task: CurrentWorkItem) => void;
+}) {
+  return (
+    <li>
+      <div>
+        <span className={`tag assignment-owner ${task.owner}`}>
+          {task.owner === "ai" ? "Use AI" : "You decide"}
+        </span>
+        <span>{task.description}</span>
+        <span className="task-state">{task.completed ? "Completed · revisit" : "To do"}</span>
+      </div>
+      <button className="btn small" type="button" disabled={busy} onClick={() => onChoose(task)}>
+        {task.completed ? "Revisit" : "Select"}
+      </button>
+    </li>
   );
 }
 

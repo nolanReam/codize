@@ -12,7 +12,7 @@ int path parameter.
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import CurrentUser, require_user
-from app.schemas.phases import TaskUpdateRequest
+from app.schemas.phases import AssignmentSelectionRequest, TaskUpdateRequest
 from app.services import phase_service
 from app.services.project_repository import ProjectRepository, get_project_repository
 
@@ -45,6 +45,31 @@ async def get_current_phase(
 ) -> dict:
     try:
         return await phase_service.get_current_phase(repo, user.user_id)
+    except phase_service.PhaseWorkspaceError as exc:
+        raise _http_error(exc)
+
+
+@router.get("/current/assignment")
+async def get_current_assignment(
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    try:
+        return await phase_service.get_current_assignment(repo, user.user_id)
+    except phase_service.PhaseWorkspaceError as exc:
+        raise _http_error(exc)
+
+
+@router.put("/current/assignment")
+async def select_current_assignment(
+    body: AssignmentSelectionRequest,
+    user: CurrentUser = Depends(require_user),
+    repo: ProjectRepository = Depends(get_project_repository),
+) -> dict:
+    try:
+        return await phase_service.select_current_assignment(
+            repo, user.user_id, body.task_id
+        )
     except phase_service.PhaseWorkspaceError as exc:
         raise _http_error(exc)
 
