@@ -42,6 +42,16 @@ describe("buildPrompt", () => {
     }
   });
 
+  it("does not repeat the selected assignment when applied scope already names it", () => {
+    const assignment = "Create the match endpoint";
+    const scopedTask = `Selected assignment: ${assignment}\nFinish condition: the endpoint exists`;
+    const { prompt } = buildPrompt(
+      { ...INPUTS, aiTask: scopedTask },
+      { assignment }
+    );
+    expect(prompt.split(`Selected assignment: ${assignment}`)).toHaveLength(2);
+  });
+
   it("adds plan-first and verification lines only when asked", () => {
     const withBoth = buildPrompt(INPUTS).prompt;
     expect(withBoth).toContain("Before writing any code");

@@ -75,11 +75,12 @@ export function buildPrompt(
     uncertainty: clean(raw.uncertainty),
   };
   const assignment = clean(context.assignment ?? "");
+  const assignmentLine = assignment ? `Selected assignment: ${assignment}` : "";
 
   const lines: string[] = [];
   if (i.projectGoal) lines.push(`I'm building: ${i.projectGoal}`);
   if (i.phaseGoal) lines.push(`Right now I'm working on: ${i.phaseGoal}`);
-  if (assignment) lines.push(`Selected assignment: ${assignment}`);
+  if (assignment && !i.aiTask.includes(assignmentLine)) lines.push(assignmentLine);
   lines.push("");
   lines.push(`Your task: ${i.aiTask || "(describe the one thing you want the AI to do)"}`);
   if (i.files) lines.push(`Only work in these files/components: ${i.files}`);

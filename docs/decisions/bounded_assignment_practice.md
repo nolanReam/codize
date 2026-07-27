@@ -34,7 +34,8 @@ quality, correctness, mastery, or likely project success.
 
 M18C.1 uses an explicit apply action. It:
 
-- writes the finish and inspection conditions into the editable Task field;
+- writes the authoritative selected assignment plus the finish and inspection
+  conditions into the editable Task field;
 - writes excluded work into the editable `Don't touch` guardrail;
 - leaves Context and every other Prompt field unchanged;
 - warns before replacing non-empty Task or guardrail text;
@@ -42,10 +43,9 @@ M18C.1 uses an explicit apply action. It:
 - does not save, call a provider, complete a build task, or create downstream
   artifacts.
 
-The generated Prompt separately names the server-authoritative selected
-assignment. The student may edit Task and Guardrails after applying; Codize
-preserves those edits and shows only a non-blocking deterministic mismatch
-notice.
+The generated Prompt names the server-authoritative selected assignment once.
+The student may edit Task and Guardrails after applying; Codize preserves those
+edits and shows only a non-blocking deterministic mismatch notice.
 
 ## Persistence and authority
 
@@ -58,10 +58,11 @@ secret markers, and unknown fields, then performs the existing optimistic
 Prompt write.
 
 Incomplete scope stays local in a user, active-project placeholder, phase,
-assignment, Prompt-surface, and objective-version scoped draft. Existing
-Prompt drafts remain in their original assignment-scoped key. The existing
-assignment-switch warning detects either draft and preserves both without
-merging.
+assignment, server-owned assignment-revision, Prompt-surface, and
+objective-version scoped draft. Existing Prompt drafts use the same opaque
+revision binding. The existing assignment-switch warning detects either draft
+and preserves both without merging; roadmap invalidation cannot rebind old
+work to a replacement task that reuses the same phase-local id.
 
 ## Compatibility
 

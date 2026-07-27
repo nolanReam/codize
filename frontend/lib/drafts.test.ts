@@ -22,6 +22,9 @@ function fakeStorage() {
 }
 
 describe("draftKey", () => {
+  const revisionA = "a".repeat(64);
+  const revisionB = "b".repeat(64);
+
   it("scopes by user id and surface so drafts never cross accounts or phases", () => {
     const a = draftKey("user-a", "review_board:2");
     const b = draftKey("user-b", "review_board:2");
@@ -32,19 +35,27 @@ describe("draftKey", () => {
   });
 
   it("isolates Prompt drafts by phase and stable assignment id while retaining the legacy seam", () => {
-    expect(promptAssignmentDraftSurface(2, "ai-1")).toBe("prompt_builder:2:assignment:ai-1");
-    expect(promptAssignmentDraftSurface(2, "ai-2")).not.toBe(
-      promptAssignmentDraftSurface(2, "ai-1")
+    expect(promptAssignmentDraftSurface(2, "ai-1", revisionA)).toBe(
+      `prompt_builder:2:assignment:ai-1:revision:${revisionA}`
     );
-    expect(promptAssignmentDraftSurface(3, "ai-1")).not.toBe(
-      promptAssignmentDraftSurface(2, "ai-1")
+    expect(promptAssignmentDraftSurface(2, "ai-2", revisionA)).not.toBe(
+      promptAssignmentDraftSurface(2, "ai-1", revisionA)
+    );
+    expect(promptAssignmentDraftSurface(3, "ai-1", revisionA)).not.toBe(
+      promptAssignmentDraftSurface(2, "ai-1", revisionA)
+    );
+    expect(promptAssignmentDraftSurface(2, "ai-1", revisionB)).not.toBe(
+      promptAssignmentDraftSurface(2, "ai-1", revisionA)
     );
     expect(legacyPromptDraftSurface(2)).toBe("prompt_builder:2");
-    expect(promptScopeDraftSurface(2, "ai-1")).toBe(
-      "prompt_builder_scope:active-project:2:assignment:ai-1:objective:bounded_assignment_v1:1"
+    expect(promptScopeDraftSurface(2, "ai-1", revisionA)).toBe(
+      `prompt_builder_scope:active-project:2:assignment:ai-1:revision:${revisionA}:objective:bounded_assignment_v1:1`
     );
-    expect(promptScopeDraftSurface(2, "ai-1")).not.toBe(
-      promptScopeDraftSurface(2, "ai-2")
+    expect(promptScopeDraftSurface(2, "ai-1", revisionA)).not.toBe(
+      promptScopeDraftSurface(2, "ai-2", revisionA)
+    );
+    expect(promptScopeDraftSurface(2, "ai-1", revisionB)).not.toBe(
+      promptScopeDraftSurface(2, "ai-1", revisionA)
     );
   });
 });

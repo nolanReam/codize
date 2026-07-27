@@ -5,6 +5,7 @@ import {
   BOUNDED_ASSIGNMENT_OBJECTIVE_NAME,
   EMPTY_SCOPE_PRACTICE,
   normalizeScopePracticeDraft,
+  promptArtifactMatchesAssignment,
   scopeApplication,
   scopeApplicationConflicts,
   scopeApplicationIsCurrent,
@@ -32,6 +33,8 @@ const INPUTS: PromptBuilderInputs = {
   wantChecks: true,
   uncertainty: "",
 };
+const ASSIGNMENT = "Create the study-session form";
+const REVISION = "a".repeat(64);
 
 describe("bounded assignment authority", () => {
   it("uses one stable objective without a score or mastery claim", () => {
@@ -70,7 +73,8 @@ describe("bounded assignment authority", () => {
 });
 describe("apply scope to Prompt", () => {
   it("uses the student's decisions once without fabricating Context", () => {
-    const applied = scopeApplication(SCOPE);
+    const applied = scopeApplication(SCOPE, ASSIGNMENT);
+    expect(applied.taskText).toContain(`Selected assignment: ${ASSIGNMENT}`);
     expect(applied.taskText).toContain(SCOPE.finishCondition);
     expect(applied.taskText).toContain(SCOPE.inspectionCondition);
     expect(applied.guardrailText).toContain(SCOPE.excludedWork);
@@ -78,8 +82,11 @@ describe("apply scope to Prompt", () => {
   });
 
   it("is idempotent and detects only non-empty field conflicts", () => {
-    const applied = scopeApplication(SCOPE);
-    expect(scopeApplicationIsCurrent(SCOPE, applied)).toBe(true);
+    const applied = scopeApplication(SCOPE, ASSIGNMENT);
+    expect(scopeApplicationIsCurrent(SCOPE, applied, ASSIGNMENT)).toBe(true);
+    expect(scopeApplicationIsCurrent(SCOPE, applied, "Replacement assignment")).toBe(
+      false
+    );
     expect(scopeApplicationConflicts(INPUTS, null, applied)).toEqual({
       task: false,
       guardrail: false,
@@ -98,6 +105,35 @@ describe("apply scope to Prompt", () => {
         applied
       )
     ).toEqual({ task: true, guardrail: true });
+  });
+
+  it("does not treat a scoped Prompt from an old assignment revision as current", () => {
+    const artifact = {
+      assignment_task_id: "ai-1",
+      scope_practice: {
+        objective_id: BOUNDED_ASSIGNMENT_OBJECTIVE_ID,
+        objective_version: 1,
+        assignment_task_id: "ai-1",
+        assignment_revision: REVISION,
+        finish_condition: SCOPE.finishCondition,
+        excluded_work: SCOPE.excludedWork,
+        inspection_condition: SCOPE.inspectionCondition,
+      },
+    };
+    expect(
+      promptArtifactMatchesAssignment(
+        artifact,
+        { task_id: "ai-1" },
+        REVISION
+      )
+    ).toBe(true);
+    expect(
+      promptArtifactMatchesAssignment(
+        artifact,
+        { task_id: "ai-1" },
+        "b".repeat(64)
+      )
+    ).toBe(false);
   });
 });
 

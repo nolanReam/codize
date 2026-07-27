@@ -461,13 +461,27 @@ function AssignmentPanel({
     const local = normalizePromptBuilderInputs(
       readDraft<unknown>(
         window.localStorage,
-        draftKey(userId, promptAssignmentDraftSurface(assignment.phase, active.task_id))
+        draftKey(
+          userId,
+          promptAssignmentDraftSurface(
+            assignment.phase,
+            active.task_id,
+            assignment.assignment_revision
+          )
+        )
       )
     );
     const localScope = normalizeScopePracticeDraft(
       readDraft<unknown>(
         window.localStorage,
-        draftKey(userId, promptScopeDraftSurface(assignment.phase, active.task_id))
+        draftKey(
+          userId,
+          promptScopeDraftSurface(
+            assignment.phase,
+            active.task_id,
+            assignment.assignment_revision
+          )
+        )
       )
     );
     const protection = assignmentSwitchProtection(

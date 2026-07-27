@@ -36,17 +36,27 @@ export function draftKey(userId: string, surface: string): string {
   return `${PREFIX}${userId}:${surface}`;
 }
 
-export function promptAssignmentDraftSurface(phase: number, taskId: string): string {
-  return `prompt_builder:${phase}:assignment:${taskId}`;
+export function promptAssignmentDraftSurface(
+  phase: number,
+  taskId: string,
+  assignmentRevision: string
+): string {
+  return `prompt_builder:${phase}:assignment:${taskId}:revision:${assignmentRevision}`;
 }
 
-export function promptScopeDraftSurface(phase: number, taskId: string): string {
+export function promptScopeDraftSurface(
+  phase: number,
+  taskId: string,
+  assignmentRevision: string
+): string {
   return [
     "prompt_builder_scope",
     "active-project",
     phase,
     "assignment",
     taskId,
+    "revision",
+    assignmentRevision,
     "objective",
     BOUNDED_ASSIGNMENT_OBJECTIVE_ID,
     BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION,

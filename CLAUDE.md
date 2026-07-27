@@ -172,15 +172,15 @@ Prompt Builder embeds one guided practice for the explicitly selected current
 AI assignment. The student defines what will exist, what is excluded, and what
 observable result they will inspect. Feedback is deterministic presence/length/
 safe-character validation only; it never scores meaning or calls a provider.
-The student explicitly applies the three answers into the existing Task and
-Don't touch fields, so Context stays student-authored and scope decisions are
-not entered twice.
+The student explicitly applies the authoritative assignment plus the three
+answers into the existing Task and Don't touch fields, so Context stays
+student-authored and scope decisions are not entered twice.
 
 The scope record is stored inside the existing assignment-bound
 `prompt_builder` artifact. The server derives the fixed objective/version and
-authoritative assignment id. Existing assigned Prompts without the record and
+authoritative assignment id/revision. Existing assigned Prompts without the record and
 legacy unassigned Prompts retain their prior read/edit behavior; stored scope
-cannot be silently removed. Scope drafts are local, assignment- and
+cannot be silently removed. Scope drafts are local, assignment-revision- and
 objective-version-scoped, and participate in the existing single switch
 confirmation. Assignment selection, task completion, Continue, workflow
 lifecycle, and provider-call authority are unchanged. See

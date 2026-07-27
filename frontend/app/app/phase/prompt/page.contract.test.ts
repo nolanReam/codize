@@ -40,9 +40,16 @@ describe("Prompt Builder assignment contract", () => {
     expect(source).toContain("Apply this scope to my Prompt");
     expect(source).toContain("Context stays exactly as written");
     expect(source).toContain("Nothing is saved automatically");
+    expect(source).toContain("selected assignment plus your finish");
     expect(source).toContain("Replace existing Prompt text?");
     expect(source).toContain("scopeApplicationConflicts");
     expect(source).not.toContain("setTaskCompletion");
+  });
+
+  it("returns focus after canceling the apply conflict", () => {
+    expect(source).toContain("applyTriggerRef");
+    expect(source).toContain("cancelApplyConflict");
+    expect(source).toContain("applyTriggerRef.current?.focus()");
   });
 
   it("uses guidance depth only for presentation and keeps the example optional", () => {

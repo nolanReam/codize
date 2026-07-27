@@ -132,6 +132,7 @@ class StoredScopePractice(ScopePracticeSubmission):
     objective_id: Literal["bounded_assignment_v1"]
     objective_version: Literal[1]
     assignment_task_id: Annotated[str, Field(pattern=r"^ai-[1-9][0-9]*$")]
+    assignment_revision: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
 class PromptBuilderArtifact(_Artifact):

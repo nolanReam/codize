@@ -176,6 +176,7 @@ const assignment = (
 ): PhaseAssignmentState => ({
   phase: 1,
   phase_title: "Foundation",
+  assignment_revision: "a".repeat(64),
   state,
   assignment: {
     task_id: owner === "ai" ? "ai-1" : "human-1",

@@ -53,8 +53,9 @@ app/
       prompt/page.tsx   Prompt Builder (deterministic, client-side; M18C.1 embeds
                         one bounded-assignment practice for the selected AI task:
                         finish condition + excluded work + inspection condition,
-                        explicitly applied into the existing Task/Don't touch
-                        fields; after save, hands off to "bring back what changed")
+                        explicitly applied with the selected assignment into
+                        the existing Task/Don't touch fields; after save, hands
+                        off to "bring back what changed")
       import/page.tsx   Bring Back What Changed (M15B) — the implementation
                         import: source-kind radio chips, verbatim pasted
                         material (mono textarea, honest 40k counter — never

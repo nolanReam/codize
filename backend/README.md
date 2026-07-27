@@ -103,7 +103,8 @@ New assignment-bound Prompt saves carry a server-validated
 `scope_practice` record inside the existing phase-scoped `prompt_builder`
 artifact. It records the student's finish condition, excluded work, and
 observable inspection condition. The backend derives the fixed objective
-version and authoritative assignment id; it rejects missing, mismatched,
+version, authoritative assignment id, and opaque roadmap/assignment revision;
+it rejects missing, mismatched,
 oversized, secret-looking, or control-character input. Existing assigned
 Prompts saved before M18C.1 and legacy unassigned Prompts remain readable and
 editable without a retroactive requirement, while a stored scope record cannot

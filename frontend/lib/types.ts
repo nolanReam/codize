@@ -97,6 +97,7 @@ export interface PhaseAssignmentTask extends TaskEntry {
 export interface PhaseAssignmentState {
   phase: number;
   phase_title: string;
+  assignment_revision: string;
   state: "selected" | "recommended" | "phase_complete" | "no_valid_task";
   assignment: PhaseAssignmentTask | null;
   previous_selection: Omit<PhaseAssignmentTask, "reason"> | null;
@@ -122,6 +123,7 @@ export interface PromptBuilderArtifact {
     objective_id: "bounded_assignment_v1";
     objective_version: 1;
     assignment_task_id: string;
+    assignment_revision: string;
     finish_condition: string;
     excluded_work: string;
     inspection_condition: string;

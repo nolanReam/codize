@@ -31,6 +31,7 @@ export interface StoredScopePractice extends ScopePracticeSubmission {
   objective_id: typeof BOUNDED_ASSIGNMENT_OBJECTIVE_ID;
   objective_version: typeof BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION;
   assignment_task_id: string;
+  assignment_revision: string;
 }
 
 export type ScopeFieldName = keyof ScopePracticeFields;
@@ -118,6 +119,11 @@ export function normalizeStoredScopePractice(raw: unknown): StoredScopePractice 
     candidate.objective_id !== BOUNDED_ASSIGNMENT_OBJECTIVE_ID ||
     candidate.objective_version !== BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION ||
     typeof candidate.assignment_task_id !== "string" ||
+    !/^[0-9a-f]{64}$/.test(
+      typeof candidate.assignment_revision === "string"
+        ? candidate.assignment_revision
+        : ""
+    ) ||
     typeof candidate.finish_condition !== "string" ||
     typeof candidate.excluded_work !== "string" ||
     typeof candidate.inspection_condition !== "string"
@@ -156,10 +162,14 @@ export function normalizeScopePracticeDraft(raw: unknown): ScopePracticeDraft | 
   return { finishCondition, excludedWork, inspectionCondition, applied };
 }
 
-export function scopeApplication(scope: ScopePracticeFields): ScopeApplicationSnapshot {
+export function scopeApplication(
+  scope: ScopePracticeFields,
+  assignment: string
+): ScopeApplicationSnapshot {
   const submitted = scopeSubmission(scope);
   return {
     taskText: [
+      `Selected assignment: ${assignment.trim()}`,
       `Finish condition: ${submitted.finish_condition}`,
       `Ready to inspect when: ${submitted.inspection_condition}`,
     ].join("\n"),
@@ -169,14 +179,28 @@ export function scopeApplication(scope: ScopePracticeFields): ScopeApplicationSn
 
 export function scopeApplicationIsCurrent(
   scope: ScopePracticeFields,
-  applied: ScopeApplicationSnapshot | null
+  applied: ScopeApplicationSnapshot | null,
+  assignment: string
 ): boolean {
   if (!applied) return false;
-  const current = scopeApplication(scope);
+  const current = scopeApplication(scope, assignment);
   return (
     applied.taskText === current.taskText &&
     applied.guardrailText === current.guardrailText
   );
+}
+
+export function promptArtifactMatchesAssignment(
+  artifact: {
+    assignment_task_id?: string | null;
+    scope_practice?: unknown;
+  } | null,
+  assignment: { task_id: string },
+  assignmentRevision: string
+): boolean {
+  if (!artifact || artifact.assignment_task_id !== assignment.task_id) return false;
+  const storedScope = normalizeStoredScopePractice(artifact.scope_practice);
+  return !storedScope || storedScope.assignment_revision === assignmentRevision;
 }
 
 export function scopeApplicationConflicts(

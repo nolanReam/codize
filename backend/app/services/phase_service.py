@@ -178,6 +178,17 @@ def _roadmap_fingerprint(project: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def assignment_revision(project: dict) -> str:
+    """Opaque revision for binding assignment-scoped Prompt work.
+
+    Task ids are phase-local positions and may be reused after a roadmap
+    replacement. Exposing only the roadmap fingerprint lets clients keep old
+    drafts under their original binding without exposing roadmap content or
+    accepting client-authored authority.
+    """
+    return _roadmap_fingerprint(project)
+
+
 def current_assignment_view(project: dict) -> dict:
     """Authoritative current-phase selection or deterministic recommendation."""
     phase = _find_phase(project, project["current_phase"])
@@ -207,6 +218,7 @@ def current_assignment_view(project: dict) -> dict:
         return {
             "phase": phase["phase"],
             "phase_title": phase["phase_title"],
+            "assignment_revision": assignment_revision(project),
             "state": "selected",
             "assignment": selected,
             "previous_selection": None,
@@ -224,6 +236,7 @@ def current_assignment_view(project: dict) -> dict:
         return {
             "phase": phase["phase"],
             "phase_title": phase["phase_title"],
+            "assignment_revision": assignment_revision(project),
             "state": "recommended",
             "assignment": recommended,
             "previous_selection": previous_selection,
@@ -233,6 +246,7 @@ def current_assignment_view(project: dict) -> dict:
     return {
         "phase": phase["phase"],
         "phase_title": phase["phase_title"],
+        "assignment_revision": assignment_revision(project),
         "state": "phase_complete" if candidates else "no_valid_task",
         "assignment": None,
         "previous_selection": previous_selection,

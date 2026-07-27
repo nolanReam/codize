@@ -46,6 +46,7 @@ def test_valid_scope_save_derives_objective_and_assignment_authority():
         "objective_id": "bounded_assignment_v1",
         "objective_version": 1,
         "assignment_task_id": "ai-1",
+        "assignment_revision": phase_service.assignment_revision(before),
         **SCOPE_PRACTICE,
     }
     assert saved["inputs"] == PROMPT_BUILDER["inputs"]
@@ -210,6 +211,50 @@ def test_scope_save_preserves_siblings_and_never_completes_a_task():
     after_phase = run(phase_service.get_current_phase(repo, USER))
     assert state["sections"]["evidence"]["summary"] == EVIDENCE["summary"]
     assert after_phase["completed_task_count"] == before_phase["completed_task_count"] == 0
+
+
+def test_replaced_roadmap_task_id_gets_a_new_scope_binding_and_preserves_history():
+    repo = InMemoryProjectRepository()
+    project = seed_active_project(repo)
+    run(phase_service.select_current_assignment(repo, USER, "ai-1"))
+    first = run(
+        workflow_service.save_section(
+            repo, USER, 1, "prompt_builder", assigned_prompt()
+        )
+    )["artifact"]
+
+    changed = copy.deepcopy(project["roadmap"])
+    changed["phases"][0]["ai_appropriate_tasks"][0] = (
+        "Create the replacement study-session form"
+    )
+    run(repo.update_project(USER, project["id"], {"roadmap": changed}))
+    invalidated = phase_service.current_assignment_view(run(repo.get_project(USER)))
+    assert invalidated["invalidated_selection"] is True
+    assert invalidated["assignment"]["task_id"] == "ai-1"
+    assert invalidated["assignment_revision"] != first["scope_practice"]["assignment_revision"]
+
+    run(phase_service.select_current_assignment(repo, USER, "ai-1"))
+    second = run(
+        workflow_service.save_section(
+            repo,
+            USER,
+            1,
+            "prompt_builder",
+            assigned_prompt(
+                generated_prompt="Prompt for the replacement assignment."
+            ),
+        )
+    )
+
+    assert (
+        second["artifact"]["scope_practice"]["assignment_revision"]
+        == invalidated["assignment_revision"]
+    )
+    assert len(second["prompt_history"]) == 1
+    assert (
+        second["prompt_history"][0]["scope_practice"]["assignment_revision"]
+        == first["scope_practice"]["assignment_revision"]
+    )
 
 
 def test_scope_routes_require_auth_and_preserve_user_project_isolation(client):

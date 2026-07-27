@@ -338,7 +338,9 @@ def _safe_validation_message(exc: ValidationError) -> str:
     return f"Invalid workflow artifact ({loc}): {first['msg']}"
 
 
-def _validate_prompt_assignment(project: dict, phase_number: int, task_id: str) -> None:
+def _validate_prompt_assignment(
+    project: dict, phase_number: int, task_id: str
+) -> str:
     """A new association may name only the server-selected current AI task."""
     if phase_number != project.get("current_phase"):
         raise InvalidArtifactError(
@@ -355,10 +357,14 @@ def _validate_prompt_assignment(project: dict, phase_number: int, task_id: str) 
         raise InvalidArtifactError(
             "Select this current-phase AI task on Project Home before saving its Prompt."
         )
+    return phase_service.assignment_revision(project)
 
 
 def _prepare_prompt_scope(
-    project: dict, phase_number: int, stored_section: dict
+    project: dict,
+    phase_number: int,
+    stored_section: dict,
+    assignment_revision: str | None,
 ) -> dict:
     """Bind submitted scope to server-owned assignment/objective truth.
 
@@ -375,6 +381,10 @@ def _prepare_prompt_scope(
                 "Scope practice can only be saved with a current AI assignment."
             )
         return prepared
+    if assignment_revision is None:
+        raise InvalidArtifactError(
+            "The selected assignment changed. Return to Project Home and choose it again."
+        )
 
     artifacts = project.get("workflow_artifacts")
     phase_map = (
@@ -398,6 +408,7 @@ def _prepare_prompt_scope(
         "objective_id": BOUNDED_ASSIGNMENT_OBJECTIVE_ID,
         "objective_version": BOUNDED_ASSIGNMENT_OBJECTIVE_VERSION,
         "assignment_task_id": task_id,
+        "assignment_revision": assignment_revision,
         **submitted_scope,
     }
     # Validate the exact stored shape, including objective and assignment
@@ -422,10 +433,11 @@ async def _store_prompt_builder(
         current = project if attempt == 0 else await phase_service.load_active_project(repo, user_id)
         phase_service.require_phase(current, phase_number)
         task_id = stored_section.get("assignment_task_id")
+        revision = None
         if task_id is not None:
-            _validate_prompt_assignment(current, phase_number, task_id)
+            revision = _validate_prompt_assignment(current, phase_number, task_id)
         prepared_section = _prepare_prompt_scope(
-            current, phase_number, stored_section
+            current, phase_number, stored_section, revision
         )
 
         existing = current.get("workflow_artifacts")
@@ -436,7 +448,25 @@ async def _store_prompt_builder(
 
         history = prompt_history_view(current, phase_number)
         previous = phase_map.get("prompt_builder")
-        if isinstance(previous, dict) and previous.get("assignment_task_id") != task_id:
+        previous_scope = (
+            previous.get("scope_practice") if isinstance(previous, dict) else None
+        )
+        previous_revision = (
+            previous_scope.get("assignment_revision")
+            if isinstance(previous_scope, dict)
+            else None
+        )
+        binding_changed = (
+            isinstance(previous, dict)
+            and (
+                previous.get("assignment_task_id") != task_id
+                or (
+                    previous_revision is not None
+                    and previous_revision != revision
+                )
+            )
+        )
+        if binding_changed:
             try:
                 preserved = StoredPromptBuilderArtifact.model_validate(previous).model_dump(
                     mode="json"

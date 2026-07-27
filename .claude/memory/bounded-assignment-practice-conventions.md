@@ -14,9 +14,10 @@ assignment.
 - Feedback is transparent and deterministic: required presence, the documented
   800-character cap, safe characters, and secret-marker rejection. There is no
   semantic scoring, quality judgment, provider call, mastery state, or analytics.
-- Applying is explicit. It replaces only Task and Don't touch with the student's
-  own scope decisions, after confirmation if those fields contain different
-  work. Context and every other Prompt input remain unchanged.
+- Applying is explicit. It replaces only Task and Don't touch with the
+  authoritative selected assignment plus the student's own scope decisions,
+  after confirmation if those fields contain different work. Context and every
+  other Prompt input remain unchanged.
 - Applied text remains editable. If the mapped fields diverge, the UI says the
   scope must be applied again before a new scoped save; it never silently
   overwrites edits.
@@ -34,8 +35,10 @@ assignment.
   Prompt history, sibling workflow artifacts, task completion, and Continue
   authority retain their existing seams.
 - Scope drafts are local and separate from Prompt-field drafts, keyed by
-  project, phase, assignment, objective id, and objective version. Both feed the
-  existing one-dialog assignment-switch protection.
+  project, phase, assignment, server-owned assignment revision, objective id,
+  and objective version. Both feed the existing one-dialog assignment-switch
+  protection. A roadmap replacement cannot silently rebind old local or saved
+  scope to a new task that reuses a phase-local id.
 
 No migration, new route, provider call, lifecycle write, or task-completion
 write belongs to this slice.

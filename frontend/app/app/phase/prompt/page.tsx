@@ -28,6 +28,7 @@ import {
   codePointLength,
   normalizeScopePracticeDraft,
   normalizeStoredScopePractice,
+  promptArtifactMatchesAssignment,
   scopeApplication,
   scopeApplicationConflicts,
   scopeApplicationIsCurrent,
@@ -114,6 +115,7 @@ export default function PromptBuilderPage() {
   });
   const taskFieldRef = useRef<HTMLTextAreaElement | null>(null);
   const conflictRef = useRef<HTMLDivElement | null>(null);
+  const applyTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const loadAssignment = useCallback(async () => {
     if (!wf.phase) return;
@@ -144,11 +146,22 @@ export default function PromptBuilderPage() {
     assignment?.state === "selected" && assignment.assignment?.owner === "ai"
       ? assignment.assignment
       : null;
-  const draftSurface = wf.phase && activeAssignment
-    ? promptAssignmentDraftSurface(wf.phase.phase, activeAssignment.task_id)
+  const activeAssignmentRevision = activeAssignment
+    ? assignment?.assignment_revision ?? null
     : null;
-  const scopeDraftSurface = wf.phase && activeAssignment
-    ? promptScopeDraftSurface(wf.phase.phase, activeAssignment.task_id)
+  const draftSurface = wf.phase && activeAssignment && activeAssignmentRevision
+    ? promptAssignmentDraftSurface(
+        wf.phase.phase,
+        activeAssignment.task_id,
+        activeAssignmentRevision
+      )
+    : null;
+  const scopeDraftSurface = wf.phase && activeAssignment && activeAssignmentRevision
+    ? promptScopeDraftSurface(
+        wf.phase.phase,
+        activeAssignment.task_id,
+        activeAssignmentRevision
+      )
     : null;
 
   // Unsaved-draft persistence (M13E.2): the saved artifact prefills first,
@@ -173,7 +186,15 @@ export default function PromptBuilderPage() {
         return;
       }
     }
-    if (wf.stored?.assignment_task_id === activeAssignment.task_id) {
+    if (
+      wf.stored &&
+      activeAssignmentRevision &&
+      promptArtifactMatchesAssignment(
+        wf.stored,
+        activeAssignment,
+        activeAssignmentRevision
+      )
+    ) {
       setInputs(inputsFromArtifact(wf.stored));
       setBuilt(builtFromArtifact(wf.stored));
       setDirty(false);
@@ -182,13 +203,14 @@ export default function PromptBuilderPage() {
     setInputs(EMPTY);
     setBuilt(null);
     setDirty(false);
-  }, [activeAssignment, assignmentLoading, draft.loadedSurface, draft.ready, draft.restored, draftSurface, wf.loading, wf.stored]);
+  }, [activeAssignment, activeAssignmentRevision, assignmentLoading, draft.loadedSurface, draft.ready, draft.restored, draftSurface, wf.loading, wf.stored]);
 
   useEffect(() => {
     if (
       wf.loading ||
       assignmentLoading ||
       !activeAssignment ||
+      !activeAssignmentRevision ||
       !scopeDraft.ready ||
       !scopeDraftSurface
     ) return;
@@ -217,10 +239,14 @@ export default function PromptBuilderPage() {
     const storedScope = normalizeStoredScopePractice(wf.stored?.scope_practice);
     if (
       wf.stored?.assignment_task_id === activeAssignment.task_id &&
-      storedScope?.assignment_task_id === activeAssignment.task_id
+      storedScope?.assignment_task_id === activeAssignment.task_id &&
+      storedScope.assignment_revision === activeAssignmentRevision
     ) {
       const fromStored = scopeFromStored(storedScope);
-      setScope({ ...fromStored, applied: scopeApplication(fromStored) });
+      setScope({
+        ...fromStored,
+        applied: scopeApplication(fromStored, activeAssignment.description),
+      });
       setScopeDirty(false);
       return;
     }
@@ -229,6 +255,7 @@ export default function PromptBuilderPage() {
     setScopeDirty(false);
   }, [
     activeAssignment,
+    activeAssignmentRevision,
     assignmentLoading,
     scopeDraft.loadedSurface,
     scopeDraft.ready,
@@ -331,7 +358,7 @@ export default function PromptBuilderPage() {
       focusFirstScopeError();
       return;
     }
-    const proposed = scopeApplication(scope);
+    const proposed = scopeApplication(scope, activeAssignment?.description ?? "");
     const conflicts = scopeApplicationConflicts(inputs, scope.applied, proposed);
     if (!replaceConflicts && (conflicts.task || conflicts.guardrail)) {
       setApplyConflict(conflicts);
@@ -356,7 +383,14 @@ export default function PromptBuilderPage() {
       focusFirstScopeError();
       return false;
     }
-    if (!scopeApplicationIsCurrent(scope, scope.applied)) {
+    if (
+      !activeAssignment ||
+      !scopeApplicationIsCurrent(
+        scope,
+        scope.applied,
+        activeAssignment.description
+      )
+    ) {
       setScopeAttempted(true);
       window.setTimeout(
         () => document.getElementById("apply-scope-to-prompt")?.focus(),
@@ -365,6 +399,11 @@ export default function PromptBuilderPage() {
       return false;
     }
     return true;
+  }
+
+  function cancelApplyConflict() {
+    setApplyConflict(null);
+    window.setTimeout(() => applyTriggerRef.current?.focus(), 0);
   }
 
   async function selectPromptAssignment() {
@@ -411,7 +450,13 @@ export default function PromptBuilderPage() {
     const result =
       built ?? buildPrompt(inputs, { assignment: activeAssignment.description });
     setBuilt(result);
-    const persistScope = scopeValidation.complete && scopeApplicationIsCurrent(scope, scope.applied);
+    const persistScope =
+      scopeValidation.complete &&
+      scopeApplicationIsCurrent(
+        scope,
+        scope.applied,
+        activeAssignment.description
+      );
     const ok = await wf.save({
       inputs: {
         project_goal: inputs.projectGoal.slice(0, 2000),
@@ -460,7 +505,13 @@ export default function PromptBuilderPage() {
       : []
   );
   const savedMatchesAssignment = Boolean(
-    activeAssignment && wf.stored?.assignment_task_id === activeAssignment.task_id
+    activeAssignment &&
+      assignment &&
+      promptArtifactMatchesAssignment(
+        wf.stored,
+        activeAssignment,
+        assignment.assignment_revision
+      )
   );
   const scopeValidation = validateScopePractice(scope);
   const legacyBoundPrompt = Boolean(
@@ -470,7 +521,13 @@ export default function PromptBuilderPage() {
   const finalScopeMustBeReady =
     Boolean(activeAssignment && !legacyBoundPrompt) || scopeValidation.complete;
   const scopeAppliedCurrent =
-    scopeValidation.complete && scopeApplicationIsCurrent(scope, scope.applied);
+    Boolean(activeAssignment) &&
+    scopeValidation.complete &&
+    scopeApplicationIsCurrent(
+      scope,
+      scope.applied,
+      activeAssignment?.description ?? ""
+    );
   const promptChangedAfterApply = Boolean(
     scopeAppliedCurrent &&
       scope.applied &&
@@ -798,11 +855,12 @@ export default function PromptBuilderPage() {
                   <div>
                     <h3>Use these decisions in the editable Prompt</h3>
                     <p className="muted">
-                      This adds your finish and inspection conditions to Task, and excluded work to Don&rsquo;t touch. Context stays exactly as written. Nothing is saved automatically.
+                      This adds the selected assignment plus your finish and inspection conditions to Task, and excluded work to Don&rsquo;t touch. Context stays exactly as written. Nothing is saved automatically.
                     </p>
                   </div>
                   <button
                     id="apply-scope-to-prompt"
+                    ref={applyTriggerRef}
                     className="btn primary"
                     type="button"
                     onClick={() => applyScopeToPrompt(false)}
@@ -832,7 +890,7 @@ export default function PromptBuilderPage() {
                       Applying replaces only those fields with your current scope decisions. Context and other Guardrails stay unchanged.
                     </p>
                     <div className="row">
-                      <button className="btn" type="button" onClick={() => setApplyConflict(null)}>
+                      <button className="btn" type="button" onClick={cancelApplyConflict}>
                         Keep existing text
                       </button>
                       <button className="btn primary" type="button" onClick={() => applyScopeToPrompt(true)}>
