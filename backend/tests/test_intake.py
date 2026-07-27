@@ -270,7 +270,8 @@ def test_happy_path_is_sequential_and_completes():
     status = run(get_status(repo, USER))
     assert status == {
         "started": False, "completed": False, "answered_questions": [],
-        "next_question": 1, "archetype_id": None, "answers": None,
+        "next_question": 1, "archetype_id": None, "archetype_name": None,
+        "answers": None,
     }
 
     for n in (1, 2, 3, 4, 5):
@@ -404,7 +405,8 @@ def test_users_intake_states_are_independent():
     other = run(get_status(repo, OTHER_USER))
     assert other == {
         "started": False, "completed": False, "answered_questions": [],
-        "next_question": 1, "archetype_id": None, "answers": None,
+        "next_question": 1, "archetype_id": None, "archetype_name": None,
+        "answers": None,
     }
     with pytest.raises(IntakeSequenceError):  # B still starts at question 1
         run(submit_answer(repo, OTHER_USER, 5, "just the last one"))
@@ -742,3 +744,94 @@ def test_mixed_capability_precedence_is_current_version_and_behavior_based(
     )
     assert classify_archetype(purpose, scope, "HTML, CSS, JavaScript.") == expected_id
     assert capabilities.local_browser_app is expected_local
+
+
+@pytest.mark.parametrize(
+    "persistence",
+    [
+        "Keep the information on the current device.",
+        "The app works offline and keeps local state.",
+        "No account is required; each browser has its own data.",
+    ],
+)
+def test_non_tokenized_browser_persistence_semantics_are_browser_evidence(persistence):
+    capabilities = derive_project_capabilities(
+        "A homework tracker web app for students.",
+        persistence,
+        "Plain HTML, CSS, and JavaScript.",
+    )
+    assert capabilities.local_persistence is True
+    assert capabilities.server_capability is False
+    assert capabilities.local_browser_app is True
+
+
+@pytest.mark.parametrize(
+    "non_current",
+    [
+        "A future version may add localStorage.",
+        "Local storage may eventually be included.",
+        "Do not use localStorage.",
+        "Browser persistence is deferred.",
+    ],
+)
+def test_non_current_or_excluded_local_storage_is_not_affirmative_evidence(non_current):
+    capabilities = derive_project_capabilities(
+        "A homework tracker web app for students.",
+        non_current,
+        "Plain HTML, CSS, and JavaScript.",
+    )
+    assert capabilities.local_persistence is False
+    assert capabilities.local_browser_app is False
+
+
+@pytest.mark.parametrize(
+    "feature",
+    [
+        "Assignments sync between devices through a database.",
+        "User profiles are stored in Supabase.",
+        "The browser uses localStorage as a cache, but the server is authoritative.",
+        "The app works offline and syncs to the backend later.",
+        "No backend, but the browser calls my own API.",
+        "No database, but assignments sync between devices.",
+        (
+            "The current version has no server, though a backend is already "
+            "required for authentication."
+        ),
+    ],
+)
+def test_required_affirmative_server_semantics_do_not_fall_back_to_browser(feature):
+    purpose = "A browser homework tracker that stores assignments in localStorage."
+    capabilities = derive_project_capabilities(
+        purpose, feature, "HTML, CSS, JavaScript."
+    )
+    assert capabilities.server_capability is True
+    assert capabilities.local_browser_app is False
+    assert classify_archetype(purpose, feature, "HTML, CSS, JavaScript.") == 3
+
+
+@pytest.mark.parametrize(
+    "feature",
+    [
+        "Users submit text to OpenAI for analysis.",
+        "Generate summaries from notes.",
+        "No AI feature, but Gemini generates summaries.",
+    ],
+)
+def test_required_affirmative_product_ai_semantics_select_ai(feature):
+    purpose = "A browser homework tracker that stores assignments in localStorage."
+    capabilities = derive_project_capabilities(
+        purpose, feature, "HTML, CSS, JavaScript."
+    )
+    assert capabilities.ai_feature is True
+    assert capabilities.local_browser_app is False
+    assert classify_archetype(purpose, feature, "HTML, CSS, JavaScript.") == 1
+
+
+def test_gemini_coding_help_is_meta_language_not_product_ai():
+    purpose = "A browser homework tracker that stores assignments in localStorage."
+    scope = "Gemini helped me write the JavaScript."
+    capabilities = derive_project_capabilities(
+        purpose, scope, "HTML, CSS, JavaScript."
+    )
+    assert capabilities.ai_feature is False
+    assert capabilities.local_browser_app is True

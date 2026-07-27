@@ -339,6 +339,7 @@ def test_production_studyflow_semantics_round_trip_through_authenticated_routes(
     }
     persisted = client.get("/intake/status", headers=auth_headers()).json()
     assert persisted["archetype_id"] == 3
+    assert persisted["archetype_name"] == "Browser App"
     assert persisted["answers"] == before["answers"]
 
 
@@ -348,7 +349,14 @@ def test_production_studyflow_semantics_round_trip_through_authenticated_routes(
     [
         "Claude changed several files.",
         "I use ChatGPT while coding.",
+        "Codex wrote connected functions.",
+        "Cursor generated most of the application.",
         "AI generated connected functions I do not understand.",
+        "I do not understand some AI-generated code.",
+        "I want help reviewing changes created by coding AI.",
+        "AI sometimes changes files outside my request.",
+        "Gemini helped me write the JavaScript.",
+        "I want to learn how to use AI without losing control.",
         "Cursor wrote most of the code.",
         "I want help inspecting AI-generated changes.",
     ],
@@ -400,11 +408,27 @@ def test_browser_local_route_does_not_require_literal_backend_database_negations
         ("An LLM generates study questions.", "AI-Powered App"),
         ("The application calls OpenAI to analyze text.", "AI-Powered App"),
         ("The app uses localStorage now; a database may be added later.", "Browser App"),
+        ("Keep the information on the current device.", "Browser App"),
+        ("The app works offline and keeps local state.", "Browser App"),
+        ("No account is required; each browser has its own data.", "Browser App"),
         ("I use ChatGPT to build it, but the product has no AI features.", "Browser App"),
+        ("Gemini helped me write the JavaScript.", "Browser App"),
         ("The interface looks like a chatbot but uses scripted responses only.", "Browser App"),
         ("The app calls a weather API but has no backend or LLM.", "Browser App"),
         ("The app is named AI StudyFlow but contains no model behavior.", "Browser App"),
         ("No database, but the browser calls a custom backend API.", "Full-Stack Web App"),
+        ("Assignments sync between devices through a database.", "Full-Stack Web App"),
+        ("User profiles are stored in Supabase.", "Full-Stack Web App"),
+        (
+            "The browser uses localStorage as a cache, but the server is authoritative.",
+            "Full-Stack Web App",
+        ),
+        ("The app works offline and syncs to the backend later.", "Full-Stack Web App"),
+        ("No backend, but the browser calls my own API.", "Full-Stack Web App"),
+        ("No database, but assignments sync between devices.", "Full-Stack Web App"),
+        ("Users submit text to OpenAI for analysis.", "AI-Powered App"),
+        ("Generate summaries from notes.", "AI-Powered App"),
+        ("No AI feature, but Gemini generates summaries.", "AI-Powered App"),
         (
             "No backend, but Supabase authentication and database are required.",
             "Full-Stack Web App",
@@ -433,6 +457,27 @@ def test_completion_recalculates_and_replaces_a_stale_precompletion_archetype(cl
     assert repo._rows[0]["archetype_id"] == 3
 
 
+def test_completed_intake_refresh_returns_the_same_student_visible_label(client):
+    submit_answers(client, STUDYFLOW_ANSWERS)
+    completed = client.post("/intake/complete", headers=auth_headers()).json()
+    refreshed = client.get("/intake/status", headers=auth_headers()).json()
+    assert completed["archetype_name"] == "Browser App"
+    assert refreshed["archetype_name"] == completed["archetype_name"]
+
+
+def test_malformed_completed_archetype_state_does_not_return_a_false_label(client):
+    submit_answers(client, STUDYFLOW_ANSWERS)
+    repo = client.app.state.test_project_repo
+    repo._rows[0]["archetype_id"] = 1
+    repo._rows[0]["intake_completed_at"] = "2026-07-26T00:00:00+00:00"
+
+    refreshed = client.get("/intake/status", headers=auth_headers())
+
+    assert refreshed.status_code == 200
+    assert refreshed.json()["archetype_id"] == 1
+    assert refreshed.json()["archetype_name"] is None
+
+
 def test_answer_route_rejects_unknown_fields_without_persisting(client):
     response = client.post(
         "/intake/answers",
@@ -442,6 +487,31 @@ def test_answer_route_rejects_unknown_fields_without_persisting(client):
     assert response.status_code == 422
     assert response.json() == {"error": {"status": 422, "message": "Invalid request."}}
     assert client.get("/intake/status", headers=auth_headers()).json()["started"] is False
+
+
+def test_answer_route_preserves_the_existing_unicode_character_limit(client):
+    accepted = "🙂" * 4000
+    response = client.post(
+        "/intake/answers",
+        json={"question": 1, "answer": accepted},
+        headers=auth_headers(),
+    )
+    assert response.status_code == 200
+    assert response.json()["answers"]["purpose"] == accepted
+
+
+def test_answer_route_rejects_over_limit_content_without_echoing_it(client):
+    rejected = "private-student-prose-" + ("🙂" * 4001)
+    response = client.post(
+        "/intake/answers",
+        json={"question": 1, "answer": rejected},
+        headers=auth_headers(),
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["message"] == (
+        "Answer is too long (max 4000 characters)."
+    )
+    assert "private-student-prose" not in response.text
 
 
 def test_studyflow_route_state_is_isolated_from_another_user(client):

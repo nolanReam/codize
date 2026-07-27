@@ -637,7 +637,8 @@ cooldowns, or Report truth.
 `project_capability_service.py` derives classification signals from intake
 purpose/scope/stack only. Provider/tool usage and the Q4 self-assessment are
 student context, not product capability. Bounded explicit exclusions override
-conflicting positive terms deterministically.
+same-clause or explicitly discarded historical ideas deterministically, while
+separate affirmative current behavior after a contrast remains visible.
 
 M18H.1 hardens the production classification boundary: browser persistence
 (`localStorage`, `sessionStorage`, IndexedDB, browser/client-side persistence)

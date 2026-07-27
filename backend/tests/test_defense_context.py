@@ -139,6 +139,27 @@ def test_complete_pack_normalizes_all_sources():
     assert pack.truncation == {}
 
 
+def test_browser_project_context_uses_the_refined_archetype_label():
+    repo = InMemoryProjectRepository()
+    fields = {
+        "intake_purpose": "Help students track homework in a browser.",
+        "intake_scope": "Save assignments in localStorage with no server or accounts.",
+        "intake_stack": "Plain HTML, CSS, and JavaScript.",
+        "intake_self_assessment": "I use Claude while coding.",
+        "intake_timeline": "One week.",
+        "intake_completed_at": "2026-07-26T00:00:00+00:00",
+        "archetype_id": 3,
+    }
+    run(repo.create_project(USER, fields))
+    run(roadmap_service.generate_roadmap(repo, LLMService([StubProvider()]), USER))
+
+    pack = run(build_defense_context(repo, USER, 1))
+
+    assert pack.project.archetype_id == 3
+    assert pack.project.archetype_name == "Browser App"
+    assert pack.phase.title == "Browser App Scope & Data Shape"
+
+
 def test_ui_only_prompt_field_is_omitted():
     repo = full_repo()
     pack = run(build_defense_context(repo, USER, 1))

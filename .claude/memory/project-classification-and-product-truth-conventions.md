@@ -40,7 +40,9 @@ Positive AI-product evidence must describe intended behavior: calling an LLM,
 an AI assistant/chatbot, or generating/summarizing/analyzing content through a
 model. Bounded explicit exclusions cover AI features, accounts/auth, database,
 backend/API, notifications, and calendar integration. A clear exclusion wins a
-conflict deterministically; do not implement keyword stripping.
+same-clause or explicitly discarded historical idea deterministically; it does
+not erase a separate affirmative current behavior after a contrast. Do not
+implement keyword stripping.
 
 StudyFlow is the permanent regression: a plain HTML/CSS/JavaScript homework
 tracker using browser local storage, with no accounts/backend/database/AI/

@@ -319,6 +319,15 @@ async def generate_roadmap(repo: ProjectRepository, llm: LLMService, user_id: st
     template, capabilities = roadmap_scope_service.template_for_project(
         base_template, project
     )
+    classification_conflict = (
+        capabilities.ai_feature and project["archetype_id"] != 1
+    ) or (
+        capabilities.local_browser_app and project["archetype_id"] != 3
+    )
+    if classification_conflict:
+        raise RoadmapNotReadyError(
+            "This project's classification no longer matches its intake."
+        )
     # Browser-local scope is already a complete, purpose-built projection.
     # Calling a model cannot improve its architecture and can only reintroduce
     # systems the student did not request, so keep this boundary deterministic.

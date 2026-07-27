@@ -293,6 +293,17 @@ async def build_defense_context(
     )
 
     template = template_service.get_template(project["archetype_id"])
+    roadmap_name = (
+        project.get("roadmap", {}).get("archetype_name")
+        if isinstance(project.get("roadmap"), dict)
+        else None
+    )
+    allowed_names = {str(template["archetype_name"])}
+    if project["archetype_id"] == 3:
+        allowed_names.add("Browser App")
+    project_archetype_name = (
+        roadmap_name if roadmap_name in allowed_names else str(template["archetype_name"])
+    )
 
     # Normalize every source into plain dicts first (construction order of
     # each dict is its truncation priority), then redact, then budget.
@@ -301,7 +312,7 @@ async def build_defense_context(
             "project_id": str(project["id"]),
             "status": str(project.get("status") or ""),
             "archetype_id": int(project["archetype_id"]),
-            "archetype_name": str(template["archetype_name"]),
+            "archetype_name": project_archetype_name,
         },
         "phase": {
             "phase_number": view["phase"],

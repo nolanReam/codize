@@ -276,6 +276,21 @@ def _build_status(project: dict | None) -> dict:
         if project is None
         else {ANSWER_KEYS[n]: project.get(col) for n, col in ANSWER_COLUMNS.items()}
     )
+    archetype_id = project.get("archetype_id") if project else None
+    archetype_name = None
+    if project and archetype_id and project.get("intake_completed_at"):
+        capabilities = project_capability_service.derive_project_capabilities(
+            str(project.get("intake_purpose") or ""),
+            str(project.get("intake_scope") or ""),
+            str(project.get("intake_stack") or ""),
+        )
+        expected_archetype_id = template_service.resolve_archetype(
+            capabilities.ai_feature, capabilities.frontend_or_database
+        )
+        if archetype_id == expected_archetype_id and archetype_id in ARCHETYPE_NAMES:
+            archetype_name = project_capability_service.classification_name(
+                archetype_id, capabilities, ARCHETYPE_NAMES
+            )
     return {
         "started": project is not None,
         "completed": bool(project and project.get("intake_completed_at")),
@@ -283,7 +298,8 @@ def _build_status(project: dict | None) -> dict:
             n for n, col in ANSWER_COLUMNS.items() if project.get(col)
         ],
         "next_question": nxt,
-        "archetype_id": project.get("archetype_id") if project else None,
+        "archetype_id": archetype_id,
+        "archetype_name": archetype_name,
         "answers": answers,
     }
 

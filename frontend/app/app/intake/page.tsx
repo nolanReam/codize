@@ -129,6 +129,7 @@ export default function IntakePage() {
       const safeProfile = normalizeEntryProfile(entry.profile);
       setQuestions(q.questions);
       setStatus(s);
+      setArchetypeName(s.archetype_name);
       setEntryProfile(safeProfile);
       const preferenceRequest = new URLSearchParams(window.location.search).get("preferences") === "1";
       setPreferencesOnly(preferenceRequest);

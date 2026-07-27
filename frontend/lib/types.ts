@@ -14,6 +14,7 @@ export interface IntakeStatus {
   answered_questions: number[];
   next_question: number | null;
   archetype_id: number | null;
+  archetype_name: string | null;
   answers: Record<string, string | null> | null;
 }
 

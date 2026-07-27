@@ -109,6 +109,20 @@ def test_cannot_generate_without_archetype_id():
         run(generate_roadmap(repo, stub_llm(), USER))
 
 
+def test_malformed_local_browser_archetype_state_fails_before_provider_or_storage():
+    repo = InMemoryProjectRepository()
+    seed_project(
+        repo,
+        archetype_id=1,
+        intake_purpose="A browser homework tracker for students.",
+        intake_scope="Assignments stay on the current device using localStorage.",
+        intake_stack="Plain HTML, CSS, and JavaScript.",
+    )
+    with pytest.raises(RoadmapNotReadyError, match="classification"):
+        run(generate_roadmap(repo, LLMService([FailingProvider()]), USER))
+    assert run(repo.get_project(USER))["roadmap"] is None
+
+
 def test_cannot_generate_twice():
     repo = InMemoryProjectRepository()
     seed_project(repo)
