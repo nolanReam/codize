@@ -34,6 +34,17 @@ class _DriftingProvider:
         roadmap["phases"] = roadmap["phases"][:-1]
         return json.dumps(roadmap)
 
+
+class _CountingProvider:
+    name = "counting"
+
+    def __init__(self):
+        self.calls = 0
+
+    async def complete(self, prompt: str, temperature: float) -> str:
+        self.calls += 1
+        raise AssertionError("browser-local roadmap must not call a provider")
+
 _key = ec.generate_private_key(ec.SECP256R1())
 
 USER_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -175,3 +186,62 @@ def test_roadmap_responses_contain_no_secrets(client, monkeypatch):
         assert "fake-service-role-key-for-tests" not in text
         assert "fake-gemini-key-for-tests" not in text
         assert "fake-openrouter-key-for-tests" not in text
+
+
+def test_studyflow_route_generates_browser_only_roadmap_with_zero_provider_calls(client):
+    answers = {
+        1: (
+            "A browser-based homework tracker where students add assignments with a title, "
+            "subject, and due date; mark them complete; filter and delete them; and keep "
+            "the data after refreshing through browser local storage."
+        ),
+        2: (
+            "No accounts\nNo backend\nNo database\nNo AI product features\n"
+            "No notifications\nNo calendar integration"
+        ),
+        3: (
+            "Plain HTML, CSS, and JavaScript. The student understands basic variables, "
+            "functions, arrays, conditionals, loops, DOM events, and local storage."
+        ),
+        4: (
+            "The student becomes confused when coding AI changes several connected "
+            "functions or modifies several files."
+        ),
+        5: "Produce a working and understandable first version within one week.",
+    }
+    for number in range(1, 6):
+        assert client.post(
+            "/intake/answers",
+            json={"question": number, "answer": answers[number]},
+            headers=auth_headers(),
+        ).status_code == 200
+    completed = client.post("/intake/complete", headers=auth_headers())
+    assert completed.json()["archetype_name"] == "Browser App"
+
+    provider = _CountingProvider()
+    client.app.dependency_overrides[get_llm_service] = lambda: LLMService([provider])
+    try:
+        response = client.post("/roadmap/generate", headers=auth_headers())
+    finally:
+        client.app.dependency_overrides.pop(get_llm_service, None)
+
+    assert response.status_code == 200
+    assert provider.calls == 0
+    roadmap = response.json()["roadmap"]
+    assert roadmap["archetype_id"] == 3
+    assert roadmap["archetype_name"] == "Browser App"
+    assert len(roadmap["phases"]) == 7
+    serialized = json.dumps(roadmap).lower()
+    for forbidden in (
+        "backend",
+        "database",
+        "authentication",
+        "accounts",
+        "llm",
+        "model provider",
+        "api key",
+        "python",
+        "requirements.txt",
+        "conversation history",
+    ):
+        assert forbidden not in serialized

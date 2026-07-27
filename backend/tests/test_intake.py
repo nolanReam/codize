@@ -621,3 +621,124 @@ def test_studyflow_completion_has_an_accurate_student_visible_label():
         "archetype_id": 3,
         "archetype_name": "Browser App",
     }
+
+
+@pytest.mark.parametrize(
+    "persistence",
+    [
+        "Save assignments in localStorage.",
+        "Keep data after refresh using browser storage.",
+        "Use IndexedDB in the browser.",
+        "Persist settings client-side.",
+        "Store everything locally in the browser.",
+    ],
+)
+def test_browser_persistence_is_affirmative_browser_evidence_without_server_negations(
+    persistence,
+):
+    capabilities = derive_project_capabilities(
+        f"A browser-based homework tracker. {persistence}",
+        "Students add, complete, filter, and delete assignments.",
+        "Plain HTML, CSS, and JavaScript.",
+    )
+    assert capabilities.local_persistence is True
+    assert capabilities.server_capability is False
+    assert capabilities.local_browser_app is True
+    assert classify_archetype(
+        f"A browser-based homework tracker. {persistence}",
+        "Students add, complete, filter, and delete assignments.",
+        "Plain HTML, CSS, and JavaScript.",
+    ) == 3
+
+
+@pytest.mark.parametrize(
+    "wording",
+    [
+        "No backend or database.",
+        "Without accounts, authentication, or a server.",
+        "Backend, database, and AI features are out of scope.",
+        "Do not add a backend.",
+        "The current version is client-side only.",
+        "A future version may have accounts, but version one does not.",
+    ],
+)
+def test_exclusion_wording_never_becomes_positive_server_evidence(wording):
+    capabilities = derive_project_capabilities(
+        "A browser homework tracker using localStorage.",
+        f"Students add and complete assignments. {wording}",
+        "HTML, CSS, JavaScript.",
+    )
+    assert capabilities.server_capability is False
+    assert capabilities.local_browser_app is True
+
+
+@pytest.mark.parametrize(
+    "feature",
+    [
+        "Users create accounts and sign in.",
+        "Assignments sync through a database.",
+        "The browser calls my backend API.",
+        "A server stores user data.",
+        "The app has authenticated user profiles.",
+    ],
+)
+def test_affirmative_full_stack_capabilities_override_local_persistence(feature):
+    capabilities = derive_project_capabilities(
+        "A browser homework tracker using localStorage.",
+        feature,
+        "HTML, CSS, JavaScript.",
+    )
+    assert capabilities.server_capability is True
+    assert capabilities.local_browser_app is False
+    assert classify_archetype(
+        "A browser homework tracker using localStorage.",
+        feature,
+        "HTML, CSS, JavaScript.",
+    ) == 3
+
+
+@pytest.mark.parametrize(
+    "feature",
+    [
+        "Users submit notes and Gemini summarizes them.",
+        "The app includes a model-backed chatbot.",
+        "An LLM generates study questions.",
+        "The application calls OpenAI to analyze text.",
+    ],
+)
+def test_affirmative_ai_capabilities_override_local_persistence(feature):
+    capabilities = derive_project_capabilities(
+        "A browser homework tracker using localStorage.",
+        feature,
+        "HTML, CSS, JavaScript.",
+    )
+    assert capabilities.ai_feature is True
+    assert capabilities.local_browser_app is False
+    assert classify_archetype(
+        "A browser homework tracker using localStorage.",
+        feature,
+        "HTML, CSS, JavaScript.",
+    ) == 1
+
+
+@pytest.mark.parametrize(
+    ("scope", "expected_id", "expected_local"),
+    [
+        ("The app uses localStorage now; a database may be added later.", 3, True),
+        ("I use ChatGPT to build it, but the product has no AI features.", 3, True),
+        ("The interface looks like a chatbot but uses scripted responses only.", 3, True),
+        ("The app calls a weather API but has no backend or LLM.", 3, True),
+        ("The app is named AI StudyFlow but contains no model behavior.", 3, True),
+        ("No database, but the browser calls a custom backend API.", 3, False),
+        ("No backend, but Supabase authentication and database are required.", 3, False),
+    ],
+)
+def test_mixed_capability_precedence_is_current_version_and_behavior_based(
+    scope, expected_id, expected_local
+):
+    purpose = "A browser homework tracker that stores assignments in localStorage."
+    capabilities = derive_project_capabilities(
+        purpose, scope, "HTML, CSS, JavaScript."
+    )
+    assert classify_archetype(purpose, scope, "HTML, CSS, JavaScript.") == expected_id
+    assert capabilities.local_browser_app is expected_local

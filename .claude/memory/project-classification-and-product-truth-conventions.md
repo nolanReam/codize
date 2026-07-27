@@ -7,6 +7,33 @@ AI-generated-code language, multi-file confusion, and use of ChatGPT, Claude,
 Codex, Cursor, or similar tools never independently make the product AI-powered.
 No provider call performs classification.
 
+## M18H.1 production hotfix
+
+Local browser persistence is affirmative product evidence in its own right.
+`localStorage`, `sessionStorage`, IndexedDB, browser persistence, client-side
+storage, and data surviving a browser refresh do not imply a server or
+database. A browser/local-persistence app is `Browser App` when no affirmative
+current-version backend, database, account/authentication, or model-backed
+feature is requested; it does not depend on the student typing both literal
+`no backend` and `no database` phrases.
+
+Server capability is also affirmative and current-version scoped. Exclusions
+and deferred ideas are removed clause by clause, so their nouns never become
+positive evidence; a later database does not override local storage now.
+Independent contradictory clauses remain independent: a custom backend API or
+required Supabase auth/database keeps the app Full-Stack even when another
+server capability is excluded. AI coding-tool meta-language stays student
+context, while user-facing model behavior still selects AI-Powered.
+
+The permanent route-level regression is the authenticated five-answer
+StudyFlow flow through `/intake/answers` and `/intake/complete`, followed by the
+roadmap boundary. It asserts normalized field separation, persisted archetype
+3, returned `Browser App`, ownership, fail-closed request fields, a seven-phase
+browser-only roadmap, and zero provider calls. The review seam is
+`project_capability_service.derive_project_capabilities` plus the intake and
+roadmap route regressions. No migration or provider change belongs to this
+hotfix.
+
 ## Classification and exclusions
 
 Positive AI-product evidence must describe intended behavior: calling an LLM,
@@ -27,8 +54,8 @@ archetype 1.
 The roadmap prompt explicitly marks self-assessment as student context only.
 For browser-local projections, the projected template is the strict structural
 source of truth and an additive scope validator rejects excluded systems.
-Structural/provenance/schema validation is never weakened; invalid provider
-output is discarded and the existing deterministic fallback path is used.
+M18H.1 uses that deterministic projection directly without a provider call.
+Structural/provenance/schema validation is never weakened.
 
 ## Journey and Defense truth
 

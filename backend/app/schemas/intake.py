@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     question: int = Field(ge=1, le=5)
     answer: str
 

@@ -62,19 +62,81 @@ _SCRIPTED_CHATBOT_QUALIFIERS = re.compile(
 _LOCAL_BROWSER_PATTERNS = (
     r"\blocal\s*storage\b",
     r"\blocalstorage\b",
+    r"\bsession\s*storage\b",
+    r"\bsessionstorage\b",
+    r"\bindexeddb\b",
+    r"\bbrowser\s+(?:storage|persistence)\b",
+    r"\bclient[- ]side\s+(?:storage|persistence)\b",
+    r"\bdata\b[^.\n]{0,50}\b(?:remain|remains|persist|persists|survive|survives)\b"
+    r"[^.\n]{0,45}\b(?:refresh|browser)\b",
+    r"\b(?:persist|save|store|keep)\b[^.\n]{0,55}\b(?:locally|in\s+the\s+browser|client[- ]side)\b",
     r"\bbrowser[- ]based\b",
     r"\bbrowser[- ]only\b",
     r"\blocal\s+browser\s+(?:app|application)\b",
     r"\bruns?\s+(?:entirely\s+)?in\s+the\s+browser\b",
 )
 
+_DEFERRED_CLAUSE = re.compile(
+    r"\b(?:future|later|eventually|someday|not\s+now|not\s+in\s+(?:version|v)\s*1|"
+    r"after\s+(?:the\s+)?(?:first|initial)\s+(?:version|release)|"
+    r"(?:may|might|could|can)\s+be\s+(?:added|included|built|supported)\s+later)\b",
+    re.IGNORECASE,
+)
+
+_BACKEND_FEATURE_PATTERNS = (
+    r"\b(?:browser|frontend|client|app|application)\b[^.\n]{0,55}\b(?:calls?|connects?|sends?)\b"
+    r"[^.\n]{0,45}\b(?:my|our|the|custom)\s+(?:backend|server)(?:\s+api)?\b",
+    r"\b(?:has|uses|needs|requires|includes|builds?|adds?)\b[^.\n]{0,35}"
+    r"\b(?:backend|back[- ]end|server(?:-side)?|server\s+api|api\s+routes?)\b",
+    r"\b(?:backend|back[- ]end|server(?:-side)?|server\s+api|api\s+routes?)\b"
+    r"[^.\n]{0,45}\b(?:is|are|will\s+be)?\s*(?:required|needed|included|stores?|handles?|provides?|runs?)\b",
+    r"\bclient\s*/\s*server\s+architecture\b",
+)
+
+_DATABASE_FEATURE_PATTERNS = (
+    r"\b(?:has|uses|needs|requires|includes|writes?\s+to|reads?\s+from|syncs?\s+(?:to|through|with))\b"
+    r"[^.\n]{0,45}\b(?:database|postgres(?:ql)?|mysql|sqlite|mongodb|supabase)\b",
+    r"\b(?:database|postgres(?:ql)?|mysql|sqlite|mongodb|supabase)\b"
+    r"[^.\n]{0,45}\b(?:is|are|will\s+be)?\s*(?:required|needed|included|stores?|persists?|syncs?|backs?)\b",
+    r"\b(?:server|service)\b[^.\n]{0,35}\b(?:stores?|persists?|syncs?)\b[^.\n]{0,35}\b(?:data|records?|assignments?|profiles?)\b",
+)
+
+_ACCOUNT_FEATURE_PATTERNS = (
+    r"\b(?:users?|students?|members?)\b[^.\n]{0,35}\b(?:create|have|register|sign\s+up\s+for)\b"
+    r"[^.\n]{0,20}\baccounts?\b",
+    r"\b(?:users?|students?|members?)\b[^.\n]{0,35}\b(?:sign\s+in|log\s+in|authenticate)\b",
+    r"\b(?:has|uses|needs|requires|includes)\b[^.\n]{0,35}\b(?:accounts?|authentication|auth|login|sign[- ]in)\b",
+    r"\b(?:authenticated|signed[- ]in)\s+(?:users?|profiles?|accounts?)\b",
+    r"\bsupabase\s+(?:auth|authentication)\b",
+)
+
 
 @dataclass(frozen=True)
 class ProjectCapabilities:
     ai_feature: bool
-    frontend_or_database: bool
+    frontend: bool
+    database: bool
+    backend: bool
+    accounts: bool
     exclusions: frozenset[str]
-    local_browser_app: bool
+    local_persistence: bool
+
+    @property
+    def frontend_or_database(self) -> bool:
+        return self.frontend or self.database
+
+    @property
+    def server_capability(self) -> bool:
+        return self.backend or self.database or self.accounts
+
+    @property
+    def local_browser_app(self) -> bool:
+        return (
+            self.frontend
+            and self.local_persistence
+            and not self.server_capability
+            and not self.ai_feature
+        )
 
     @property
     def classification_label(self) -> str | None:
@@ -177,6 +239,10 @@ def explicit_exclusions(*project_answers: str) -> frozenset[str]:
 def _feature_evidence_text(text: str) -> str:
     """Drop coding-tool meta clauses before looking for product behavior."""
     text = _strip_quoted_examples(text)
+    # Qualifiers may sit across a contrast boundary ("chatbot, but scripted").
+    # Normalize the full sentence before clause splitting so the first half
+    # cannot become standalone model-backed evidence.
+    text = _SCRIPTED_CHATBOT_QUALIFIERS.sub("scripted interface", text)
     kept: list[str] = []
     for clause in re.split(r"[.!?;\n]+|\b(?:but|however|yet)\b", text.lower()):
         if any(re.search(pattern, clause) for pattern in _AI_TOOL_META_PATTERNS):
@@ -190,6 +256,33 @@ def _feature_evidence_text(text: str) -> str:
             clause = re.sub(r"\bchatbot(?:[- ]style)?\b", "interface", clause)
         kept.append(clause)
     return "\n".join(kept)
+
+
+def _current_capability_text(text: str, capability: str) -> str:
+    """Keep affirmative current-version clauses for one server capability.
+
+    Exclusions and deferred ideas are not positive evidence. Splitting on
+    contrast words preserves independent requirements in mixed input, such as
+    "No database, but the browser calls a custom backend API."
+    """
+    terms = _EXCLUSION_TERMS[capability]
+    kept: list[str] = []
+    for clause in re.split(
+        r"[.!?;\n]+|\b(?:but|however|except|yet)\b",
+        _strip_quoted_examples(text.lower()),
+    ):
+        clause = clause.strip()
+        if not clause or _DEFERRED_CLAUSE.search(clause):
+            continue
+        if any(_explicitly_excludes(clause, term) for term in terms):
+            continue
+        kept.append(clause)
+    return "\n".join(kept)
+
+
+def _has_capability(text: str, capability: str, patterns: tuple[str, ...]) -> bool:
+    evidence = _current_capability_text(text, capability)
+    return any(re.search(pattern, evidence) for pattern in patterns)
 
 
 def product_purpose_text(purpose: str) -> str:
@@ -227,21 +320,33 @@ def derive_project_capabilities(purpose: str, scope: str, stack: str) -> Project
         re.search(pattern, feature_text) for pattern in _AI_FEATURE_PATTERNS
     )
     frontend = any(_mentions(all_project_text, term) for term in _FRONTEND_TERMS)
-    database = "database" not in exclusions and any(
-        _mentions(all_project_text, term) for term in _DATABASE_TERMS
+    database = _has_capability(
+        all_project_text, "database", _DATABASE_FEATURE_PATTERNS
+    )
+    # Keep the legacy database vocabulary as affirmative evidence only when it
+    # is not negated/deferred and appears in a capability-bearing phrase.
+    if not database:
+        database_text = _current_capability_text(all_project_text, "database")
+        database = any(
+            _mentions(database_text, term)
+            for term in _DATABASE_TERMS
+            if term in {"full-stack", "full stack", "fullstack"}
+        )
+    backend = _has_capability(
+        all_project_text, "backend", _BACKEND_FEATURE_PATTERNS
+    )
+    accounts = _has_capability(
+        all_project_text, "accounts", _ACCOUNT_FEATURE_PATTERNS
     )
     local_signal = any(re.search(pattern, all_project_text) for pattern in _LOCAL_BROWSER_PATTERNS)
-    local_browser_app = (
-        frontend
-        and local_signal
-        and "backend" in exclusions
-        and "database" in exclusions
-    )
     return ProjectCapabilities(
         ai_feature=ai_feature,
-        frontend_or_database=frontend or database,
+        frontend=frontend,
+        database=database,
+        backend=backend,
+        accounts=accounts,
         exclusions=exclusions,
-        local_browser_app=local_browser_app,
+        local_persistence=local_signal,
     )
 
 

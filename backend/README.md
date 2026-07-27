@@ -637,12 +637,21 @@ cooldowns, or Report truth.
 `project_capability_service.py` derives classification signals from intake
 purpose/scope/stack only. Provider/tool usage and the Q4 self-assessment are
 student context, not product capability. Bounded explicit exclusions override
-conflicting positive terms deterministically. An explicitly browser-local
-project stays stored under archetype 3 but receives the accurate `Browser App`
-label and a strict seven-phase local-storage projection; provider output that
-reintroduces excluded backend/database/auth/model systems is discarded under
-the unchanged structural validator and replaced by the validated deterministic
-fallback.
+conflicting positive terms deterministically.
+
+M18H.1 hardens the production classification boundary: browser persistence
+(`localStorage`, `sessionStorage`, IndexedDB, browser/client-side persistence)
+is affirmative browser evidence, never database evidence. A browser-local
+project remains `Browser App` when there is no affirmative current-version
+backend, database, account/authentication, or model-backed product behavior;
+literal `no backend` + `no database` wording is not required. Negated and
+deferred capability language does not become positive evidence, while real
+client/server, database, account, and AI behavior still wins. The authenticated
+StudyFlow route fixture covers normalization, persistence, the returned label,
+ownership, stale pre-completion classification replacement, and the roadmap
+boundary. Browser-local roadmaps use the strict deterministic seven-phase
+projection directly, make zero provider calls, and cannot invent backend/auth/
+database/model work. No migration or provider configuration changed.
 
 `defense_readiness_service.py` is the formal Defense preparation authority for
 the current phase. It requires current/compatible Change Map, Review,

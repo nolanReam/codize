@@ -319,7 +319,12 @@ async def generate_roadmap(repo: ProjectRepository, llm: LLMService, user_id: st
     template, capabilities = roadmap_scope_service.template_for_project(
         base_template, project
     )
-    roadmap = await _personalized_roadmap(template, project, llm, capabilities)
+    # Browser-local scope is already a complete, purpose-built projection.
+    # Calling a model cannot improve its architecture and can only reintroduce
+    # systems the student did not request, so keep this boundary deterministic.
+    roadmap = None
+    if not capabilities.local_browser_app:
+        roadmap = await _personalized_roadmap(template, project, llm, capabilities)
     if roadmap is None:
         roadmap = build_fallback_roadmap(template, project)
         residual = validate_roadmap_structure(roadmap, template)

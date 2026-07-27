@@ -58,6 +58,7 @@ def client(monkeypatch):
     # One shared fake per test so state persists across requests.
     fake = InMemoryProjectRepository()
     app.dependency_overrides[get_project_repository] = lambda: fake
+    app.state.test_project_repo = fake
     return TestClient(app)
 
 
@@ -284,3 +285,171 @@ def test_intake_responses_contain_no_secrets(client, monkeypatch):
         text = client.request(method, path, headers=auth_headers()).text
         assert "fake-service-role-key-for-tests" not in text
         assert "fake-gemini-key-for-tests" not in text
+
+
+STUDYFLOW_ANSWERS = {
+    1: (
+        "A browser-based homework tracker where students add assignments with a title, "
+        "subject, and due date; mark them complete; filter and delete them; and keep "
+        "the data after refreshing through browser local storage."
+    ),
+    2: (
+        "No accounts\nNo backend\nNo database\nNo AI product features\n"
+        "No notifications\nNo calendar integration"
+    ),
+    3: (
+        "Plain HTML, CSS, and JavaScript. The student understands basic variables, "
+        "functions, arrays, conditionals, loops, DOM events, and local storage."
+    ),
+    4: (
+        "The student becomes confused when coding AI changes several connected "
+        "functions or modifies several files."
+    ),
+    5: "Produce a working and understandable first version within one week.",
+}
+
+
+def submit_answers(client, answers, user_id=USER_A):
+    for number in range(1, 6):
+        response = client.post(
+            "/intake/answers",
+            json={"question": number, "answer": answers[number]},
+            headers=auth_headers(user_id),
+        )
+        assert response.status_code == 200
+
+
+def test_production_studyflow_semantics_round_trip_through_authenticated_routes(client):
+    submit_answers(client, STUDYFLOW_ANSWERS)
+    before = client.get("/intake/status", headers=auth_headers()).json()
+    assert before["answers"] == {
+        "purpose": STUDYFLOW_ANSWERS[1],
+        "scope": STUDYFLOW_ANSWERS[2],
+        "stack": STUDYFLOW_ANSWERS[3],
+        "self_assessment": STUDYFLOW_ANSWERS[4],
+        "timeline": STUDYFLOW_ANSWERS[5],
+    }
+
+    completed = client.post("/intake/complete", headers=auth_headers())
+    assert completed.status_code == 200
+    assert completed.json() == {
+        "completed": True,
+        "archetype_id": 3,
+        "archetype_name": "Browser App",
+    }
+    persisted = client.get("/intake/status", headers=auth_headers()).json()
+    assert persisted["archetype_id"] == 3
+    assert persisted["answers"] == before["answers"]
+
+
+@pytest.mark.parametrize("field_number", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize(
+    "meta_language",
+    [
+        "Claude changed several files.",
+        "I use ChatGPT while coding.",
+        "AI generated connected functions I do not understand.",
+        "Cursor wrote most of the code.",
+        "I want help inspecting AI-generated changes.",
+    ],
+)
+def test_ai_coding_tool_meta_language_in_any_free_text_answer_does_not_change_route_result(
+    client, field_number, meta_language
+):
+    answers = dict(STUDYFLOW_ANSWERS)
+    answers[field_number] = f"{answers[field_number]} {meta_language}"
+    submit_answers(client, answers)
+    completed = client.post("/intake/complete", headers=auth_headers())
+    assert completed.status_code == 200
+    assert completed.json()["archetype_name"] == "Browser App"
+
+
+def test_browser_local_route_does_not_require_literal_backend_database_negations(client):
+    answers = dict(STUDYFLOW_ANSWERS)
+    answers[2] = (
+        "Students add, complete, filter, and delete assignments. "
+        "The current version is client-side only."
+    )
+    submit_answers(client, answers)
+    completed = client.post("/intake/complete", headers=auth_headers())
+    assert completed.status_code == 200
+    assert completed.json()["archetype_name"] == "Browser App"
+
+
+@pytest.mark.parametrize(
+    ("scope", "expected_name"),
+    [
+        ("Save assignments in localStorage.", "Browser App"),
+        ("Keep data after refresh using browser storage.", "Browser App"),
+        ("Use IndexedDB in the browser.", "Browser App"),
+        ("Persist settings client-side.", "Browser App"),
+        ("Store everything locally in the browser.", "Browser App"),
+        ("No backend or database.", "Browser App"),
+        ("Without accounts, authentication, or a server.", "Browser App"),
+        ("Backend, database, and AI features are out of scope.", "Browser App"),
+        ("Do not add a backend.", "Browser App"),
+        ("The current version is client-side only.", "Browser App"),
+        ("A future version may have accounts, but version one does not.", "Browser App"),
+        ("Users create accounts and sign in.", "Full-Stack Web App"),
+        ("Assignments sync through a database.", "Full-Stack Web App"),
+        ("The browser calls my backend API.", "Full-Stack Web App"),
+        ("A server stores user data.", "Full-Stack Web App"),
+        ("The app has authenticated user profiles.", "Full-Stack Web App"),
+        ("Users submit notes and Gemini summarizes them.", "AI-Powered App"),
+        ("The app includes a model-backed chatbot.", "AI-Powered App"),
+        ("An LLM generates study questions.", "AI-Powered App"),
+        ("The application calls OpenAI to analyze text.", "AI-Powered App"),
+        ("The app uses localStorage now; a database may be added later.", "Browser App"),
+        ("I use ChatGPT to build it, but the product has no AI features.", "Browser App"),
+        ("The interface looks like a chatbot but uses scripted responses only.", "Browser App"),
+        ("The app calls a weather API but has no backend or LLM.", "Browser App"),
+        ("The app is named AI StudyFlow but contains no model behavior.", "Browser App"),
+        ("No database, but the browser calls a custom backend API.", "Full-Stack Web App"),
+        (
+            "No backend, but Supabase authentication and database are required.",
+            "Full-Stack Web App",
+        ),
+    ],
+)
+def test_authenticated_route_capability_regression_matrix(client, scope, expected_name):
+    answers = dict(STUDYFLOW_ANSWERS)
+    answers[2] = scope
+    submit_answers(client, answers)
+    completed = client.post("/intake/complete", headers=auth_headers())
+    assert completed.status_code == 200
+    assert completed.json()["archetype_name"] == expected_name
+
+
+def test_completion_recalculates_and_replaces_a_stale_precompletion_archetype(client):
+    submit_answers(client, STUDYFLOW_ANSWERS)
+    repo = client.app.state.test_project_repo
+    project = repo._rows[0]
+    project["archetype_id"] = 1
+
+    completed = client.post("/intake/complete", headers=auth_headers())
+    assert completed.status_code == 200
+    assert completed.json()["archetype_id"] == 3
+    assert completed.json()["archetype_name"] == "Browser App"
+    assert repo._rows[0]["archetype_id"] == 3
+
+
+def test_answer_route_rejects_unknown_fields_without_persisting(client):
+    response = client.post(
+        "/intake/answers",
+        json={"question": 1, "answer": STUDYFLOW_ANSWERS[1], "archetype_id": 1},
+        headers=auth_headers(),
+    )
+    assert response.status_code == 422
+    assert response.json() == {"error": {"status": 422, "message": "Invalid request."}}
+    assert client.get("/intake/status", headers=auth_headers()).json()["started"] is False
+
+
+def test_studyflow_route_state_is_isolated_from_another_user(client):
+    submit_answers(client, STUDYFLOW_ANSWERS, USER_A)
+    assert client.post(
+        "/intake/complete", headers=auth_headers(USER_A)
+    ).json()["archetype_name"] == "Browser App"
+
+    other = client.get("/intake/status", headers=auth_headers(USER_B)).json()
+    assert other["started"] is False
+    assert other["archetype_id"] is None

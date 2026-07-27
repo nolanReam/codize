@@ -4,14 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-**Latest completed milestone: M18A (2026-07-17).** Product truth and lifecycle
-safety now separate project capability from AI-tool usage, respect bounded
-explicit exclusions, keep StudyFlow/local-browser roadmaps free of invented
-systems, enforce formal Defense preparation on both read/start paths, derive
-student-facing summaries from the canonical eight-stage Journey, and provide
-preserving Change Map retry/manual recovery. No migration or provider call was
-added; structural validation, gate questions/evaluator/scoring/retries/cooldowns
-remain unchanged. See
+**Latest completed milestone: M18H.1 (2026-07-26).** The production StudyFlow
+classification hotfix makes browser-local persistence affirmative Browser App
+evidence without requiring parser-specific backend/database negations. It
+separately requires affirmative current-version backend/database/account or
+model behavior for Full-Stack/AI capability, ignores exclusions/deferred ideas
+and coding-tool meta-language as positive evidence, and sends browser-local
+projects through the strict seven-phase deterministic roadmap projection with
+zero provider calls. The authenticated route regression covers payload
+normalization, persistence, returned label, ownership, stale pre-completion
+replacement, and roadmap scope. No frontend change, provider change, or
+migration. See
 `.claude/memory/project-classification-and-product-truth-conventions.md`.
 
 **M16B.3B (2026-07-14).** The existing Evidence
