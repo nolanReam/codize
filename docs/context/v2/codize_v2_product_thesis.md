@@ -13,8 +13,11 @@
 1. This Product Thesis is the highest-level V2 product authority.
 2. The `Codize V2 Exact UX Specification` controls interaction behavior and state transitions.
 3. The `Codize V2 Character System Blueprint` controls the character/customization subsystem only.
-4. The approved Figma file controls visual composition, styling, component appearance, and responsive layout: https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design
-5. The V2 Journey and Screen/Surface Map were design-process documents and are not implementation authority once the Exact UX Specification exists.
+4. The `Codize V2 Technical Architecture and State Model` controls V2 implementation architecture, state, persistence boundaries, concurrency, security, and compatibility under the product/UX authorities.
+5. The `Codize V2 Schema and Persistence Design` is subordinate to that architecture and fixes the physical MVP design for later implementation.
+6. Future accepted Learning / Teaching Policy documents will control exact evidence qualification, fading, reintroduction, and high-risk teaching rules without overriding this thesis.
+7. The approved Figma file controls visual composition, styling, component appearance, and responsive layout only: https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design
+8. The V2 Journey and Screen/Surface Map were design-process documents and are not implementation authority once the Exact UX Specification exists.
 
 If a later design decision changes behavior, synchronize the behavioral documents intentionally rather than allowing Figma or old V1 documentation to silently redefine the product.
 

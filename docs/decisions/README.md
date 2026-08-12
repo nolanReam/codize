@@ -1,6 +1,6 @@
 # Decision records
 
-Only a record explicitly labeled **Accepted V2 decision** may govern V2, and it remains subordinate to the canonical Product Thesis, Exact UX Specification, Character Blueprint, and approved Figma scope.
+Only a record explicitly labeled **Accepted V2 decision** may govern V2, and it remains subordinate to the canonical Product Thesis, Exact UX Specification, Character Blueprint, Technical Architecture, and approved Figma scope.
 
 Current files in this directory are historical V1 decisions:
 

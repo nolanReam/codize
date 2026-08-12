@@ -9,17 +9,20 @@ The canonical repository-local sources live in `docs/context/v2/`:
 1. [Codize V2 Product Thesis](v2/codize_v2_product_thesis.md) — highest product authority.
 2. [Codize V2 Exact UX Specification](v2/codize_v2_exact_ux_specification.md) — behavior and interaction authority, subordinate to the thesis.
 3. [Codize V2 Character System Blueprint](v2/codize_v2_character_system_blueprint.md) — character/customization authority only.
+4. [Codize V2 Technical Architecture and State Model](v2/codize_v2_technical_architecture.md) — accepted system, state, security, compatibility, and delivery architecture.
+
+The subordinate [Codize V2 Schema and Persistence Design](v2/codize_v2_schema_design.md) fixes the physical MVP design that a later migration milestone should implement.
 
 The approved V2 Figma is visual-composition authority only. See the router for the complete hierarchy.
 
-## Not yet defined
+## Not yet implemented or fully decided
 
-The repository does not yet have an accepted:
+The repository has no V2 implementation or migrations yet. It also does not yet have an accepted:
 
-- V2 Technical Architecture / State Model;
-- V2 Learning / Teaching Policy.
+- V2 Learning / Teaching Policy for exact evidence qualification, fading, reintroduction, freshness, and high-risk minimums;
+- retention-duration, V1 cutover/import, GitHub later-slice, telemetry, or character-economy policy decisions listed by the architecture.
 
-Do not use V1 implementation structures as substitutes. In particular, do not assume that phases, gates, cooldowns, workflow JSONB, assignments, Defense, or functional unlocks define V2 architecture.
+Do not use V1 implementation structures as substitutes or claim that the designed V2 schema is deployed. In particular, phases, gates, cooldowns, workflow JSONB, assignments, Defense, and functional unlocks do not define V2 architecture.
 
 ## Historical V1 context still stored here
 

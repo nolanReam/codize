@@ -18,13 +18,14 @@ Use this order when sources conflict:
 1. **[Codize V2 Product Thesis](v2/codize_v2_product_thesis.md)** — why Codize exists, who it serves, product boundaries, principles, positioning, and the highest-level V2 direction.
 2. **[Codize V2 Exact UX Specification](v2/codize_v2_exact_ux_specification.md)** — interaction behavior, state transitions, information architecture, copy intent, teaching behavior, and forbidden UX patterns. It is subordinate to the Product Thesis.
 3. **[Codize V2 Character System Blueprint](v2/codize_v2_character_system_blueprint.md)** — character visuals, animation semantics, customization, accessories, and cosmetic unlock rules only. It does not redefine teaching or product behavior.
-4. **[Approved Codize V2 Figma](https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design)** — visual composition, styling, sizing, component appearance, responsive layout, and motion intent only. Figma cannot silently change product behavior.
-5. **Future V2 Technical Architecture / State Model** — not written or accepted yet. It will govern V2 implementation architecture after an explicit decision. Do not infer it from V1 tables, routes, JSONB, or lifecycle state.
-6. **Future V2 Learning / Teaching Policy** — not written or accepted yet. The Product Thesis and Exact UX Specification provide current product constraints, but evidence schemas, fading thresholds, retention, and detailed inference policy remain unresolved.
-7. **Accepted V2 decision records** — narrow, explicit decisions in `docs/decisions/` that identify their V2 status and do not conflict with higher authority.
-8. **Current implementation truth** — code, tests, migrations, Git history, and verified deployment evidence. These control what exists today, not what V2 should become.
-9. **Durable V1 technical references** — authentication, JWT/JWKS, RLS and ownership, write boundaries, validation, secret handling, provenance, uncertainty, prompt-injection defenses, deployment boundaries, and adversarial-test lessons. These are reusable engineering evidence, not V2 product architecture.
-10. **Historical V1 product documents** — old intake, archetype, roadmap, phase, gate, Defense, workflow-navigation, pilot, release, milestone, and product-vision documents. They explain the current/legacy system or its history and never override V2.
+4. **[Codize V2 Technical Architecture and State Model](v2/codize_v2_technical_architecture.md)** — V2 system boundaries, entity cut, state ownership, lifecycle, concurrency, transactions, security, compatibility, retention capabilities, and implementation sequencing. The subordinate [V2 Schema and Persistence Design](v2/codize_v2_schema_design.md) fixes the physical MVP design without overriding the architecture.
+5. **Future accepted V2 Learning / Teaching Policy documents** — the Product Thesis and Exact UX Specification provide current teaching constraints, while exact evidence qualification, fading, reintroduction, freshness, high-risk minimums, and retention values remain unresolved until accepted explicitly.
+6. **Accepted V2 decision records** — narrow, explicit decisions in `docs/decisions/` that identify their V2 status and do not conflict with higher authority.
+7. **Current implementation truth** — code, tests, migrations, Git history, and verified deployment evidence. These control what exists today, not what V2 should become.
+8. **Durable V1 technical references** — authentication, JWT/JWKS, RLS and ownership, write boundaries, validation, secret handling, provenance, uncertainty, prompt-injection defenses, deployment boundaries, and adversarial-test lessons. These are reusable engineering evidence, not V2 product architecture.
+9. **Historical V1 product documents** — old intake, archetype, roadmap, phase, gate, Defense, workflow-navigation, pilot, release, milestone, and product-vision documents. They explain the current/legacy system or its history and never override V2.
+
+The [approved Codize V2 Figma](https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design) is a scoped visual-composition authority: styling, sizing, component appearance, responsive layout, and motion intent only. It sits alongside this hierarchy rather than outranking behavioral or technical authority, and it cannot silently change product behavior or persistence.
 
 ## Conflict routing
 
@@ -34,7 +35,7 @@ Use this order when sources conflict:
 | What should a student see or be able to do? | Product Thesis, then Exact UX Specification |
 | How do characters, accessories, animation, and cosmetic unlocks behave? | Character System Blueprint, within the Thesis and Exact UX |
 | What should the interface look like? | Approved Figma, within the three canonical documents |
-| How should V2 data, APIs, state, transactions, compatibility, or storage work? | Future accepted V2 Technical Architecture; until it exists, the question is unresolved |
+| How should V2 data, APIs, state, transactions, compatibility, or storage work? | V2 Technical Architecture, then its subordinate Schema and Persistence Design |
 | How should learner evidence, fading, help, retention, or teaching inference work? | Future accepted V2 Learning / Teaching Policy; until it exists, do not invent the contract |
 | What is implemented now? | Current code, tests, migrations, Git history, and verified deployment evidence |
 | How does the current V1 subsystem work? | Current implementation plus the labeled backend/frontend/schema/memory references |
@@ -72,7 +73,7 @@ This reset does not weaken:
 - accessibility, responsive behavior, and truthful system status;
 - evidence-backed verification and explicit reporting of what was not verified.
 
-Their future V2 implementation shape remains subject to the future Technical Architecture and Learning / Teaching Policy.
+Their V2 implementation shape is constrained by the accepted Technical Architecture and Schema Design. Exact learner qualification/fading and other policy values remain subject to a future Learning / Teaching Policy.
 
 ## Agent reading order
 
@@ -81,9 +82,10 @@ Before product, workflow, architecture, or major UX work:
 1. read this router;
 2. read the Product Thesis completely;
 3. read the relevant canonical specification(s);
-4. inspect current code/tests/migrations for implementation truth;
-5. read only the relevant labeled technical references or V2 decisions;
-6. identify unresolved architecture explicitly instead of filling gaps with V1 assumptions.
+4. read the Technical Architecture and its Schema Design for V2 implementation or persistence work;
+5. inspect current code/tests/migrations for implementation truth;
+6. read only the relevant labeled technical references or V2 decisions;
+7. identify unresolved policy or later-slice decisions explicitly instead of filling gaps with V1 assumptions.
 
 Do not read `conversations.json` unless the user explicitly requests historical research and authorizes it.
 

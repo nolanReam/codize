@@ -4,7 +4,7 @@ Guidance for Claude Code in this repository.
 
 ## Authority
 
-Read `docs/context/context_authority.md` first. Then read the repository-local V2 Product Thesis and the relevant Exact UX / Character documents under `docs/context/v2/`.
+Read `docs/context/context_authority.md` first. Then read the repository-local V2 Product Thesis, relevant Exact UX / Character documents, and the accepted Technical Architecture under `docs/context/v2/`. Read the subordinate Schema and Persistence Design for database or persistence work.
 
 The Product Thesis is the highest persistent V2 product authority. The authority file routes to sources; it does not override the thesis. Approved Figma controls visual composition only.
 
@@ -18,9 +18,11 @@ The repository still implements V1. Its five-question intake, three archetypes, 
 
 `backend/README.md` and `frontend/README.md` document the current V1 system. Code, tests, migrations, Git history, and verified deployments outrank stale milestone summaries for implementation truth.
 
-## Architecture is unresolved
+## Architecture is designed, not implemented
 
-No accepted V2 Technical Architecture / State Model or V2 Learning / Teaching Policy exists yet. Do not infer V2 storage, APIs, current-change state, chat persistence, learner evidence, GitHub integration, compatibility, privacy/retention, or character-entitlement architecture from V1 structures. Those require explicit decisions.
+The accepted V2 Technical Architecture / State Model and V2 Schema and Persistence Design define the separate eleven-table MVP domain, state machine, security boundary, atomic completion, and V1/V2 compatibility strategy. They are documentation only: no V2 migrations, routes, services, or UI are implemented yet.
+
+No accepted V2 Learning / Teaching Policy exists yet. Do not invent exact evidence thresholds, fading/reintroduction rules, high-risk minimums, retention durations, V1 cutover/import behavior, later GitHub persistence beyond the accepted boundary, telemetry, or character entitlements. Never infer those values—or V2 meaning—from V1 structures.
 
 ## Durable constraints
 

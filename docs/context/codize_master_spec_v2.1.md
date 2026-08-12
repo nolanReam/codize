@@ -3,7 +3,7 @@
 >
 > This document is not V2 product or architecture authority. Its five-question intake, three archetypes, seven phases, `current_phase`, mandatory gate, PASS/FAIL evaluation, cooldown, gate-controlled advancement, functional unlock thresholds, and phase-scoped rules describe V1 only.
 >
-> Durable lessons about server-side secrets, authentication, RLS/ownership, input validation, fail-closed parsing, and adversarial testing remain useful technical references when confirmed against current code and tests. Their future V2 shape is unresolved until a V2 Technical Architecture is accepted.
+> Durable lessons about server-side secrets, authentication, RLS/ownership, input validation, fail-closed parsing, and adversarial testing remain useful technical references when confirmed against current code and tests. The accepted V2 Technical Architecture and subordinate Schema Design now define their V2 shape; this historical document does not.
 >
 > Start with `docs/context/context_authority.md` and `docs/context/v2/codize_v2_product_thesis.md`.
 

@@ -10,6 +10,8 @@ Before product, workflow, architecture, learning, or major UX work, read:
 2. `docs/context/v2/codize_v2_product_thesis.md`
 3. `docs/context/v2/codize_v2_exact_ux_specification.md`
 4. `docs/context/v2/codize_v2_character_system_blueprint.md` when character/customization work is relevant
+5. `docs/context/v2/codize_v2_technical_architecture.md` for architecture, backend, state, security, compatibility, or implementation work
+6. `docs/context/v2/codize_v2_schema_design.md` for database or persistence work
 
 The Product Thesis is the highest persistent V2 product authority. The authority file is a router, not a competing specification. Approved Figma governs visual composition only.
 
@@ -27,20 +29,20 @@ The codebase currently implements the V1 system described by `backend/README.md`
 
 Maintain those contracts safely when a task touches V1. Do not treat them as V2 requirements. Do not repurpose V1 tables, columns, JSONB keys, routes, gate sessions, or unlock rows for V2 without an accepted architecture and migration decision.
 
-## Unresolved V2 architecture
+## V2 design boundary
 
-There is no accepted V2 Technical Architecture / State Model or V2 Learning / Teaching Policy yet. Do not invent:
+The V2 Technical Architecture / State Model and its subordinate Schema and Persistence Design are accepted documentation. They define a separate eleven-table MVP domain and compatibility boundary, but no V2 schema, migration, backend, or frontend is implemented yet.
 
-- a V2 database schema or route set;
-- a `current_change` persistence shape;
-- chat/event storage, retention, or deletion rules;
-- project-memory merge/provenance rules;
+There is no accepted V2 Learning / Teaching Policy. Do not invent or silently change:
+
 - learner-evidence thresholds or fading rules;
-- GitHub authorization/storage architecture;
-- V1/V2 migration or compatibility behavior;
+- exact high-risk teaching minimums or retention durations;
+- V1 cutover or import policy;
+- GitHub behavior beyond the accepted read-oriented later-slice boundary;
+- telemetry persistence;
 - character entitlement storage.
 
-Record such questions as unresolved until an explicit planning/decision task settles them.
+Follow the accepted architecture/schema for settled structure and record the remaining policy values as unresolved until an explicit planning/decision task settles them.
 
 ## Durable engineering constraints
 

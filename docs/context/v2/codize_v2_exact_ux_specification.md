@@ -14,9 +14,12 @@
 
 1. **Product Thesis** defines why Codize exists and the product principles that must not be violated.
 2. **Exact UX Specification** defines the expected behavior, flow, copy intent, and interaction structure.
-3. **Approved Figma** defines visual layout, sizing, hierarchy, styling, responsive behavior, motion intent, and component appearance: https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design
-4. **Character System Blueprint** governs character assets, animation, customization, accessories, and cosmetic unlock rules.
-5. **Implementation plan** will map the approved UX into routes, state, backend contracts, and incremental Codex milestones.
+3. **Character System Blueprint** governs character assets, animation, customization, accessories, and cosmetic unlock rules without redefining this behavior.
+4. **Technical Architecture and State Model** maps this behavior into deterministic state, domain boundaries, security, compatibility, and implementation sequencing.
+5. **Schema and Persistence Design** is subordinate to the architecture and fixes the physical MVP persistence design.
+6. **Future Learning / Teaching Policy** will settle exact evidence qualification, fading, reintroduction, and high-risk teaching minimums.
+
+The **approved Figma** defines visual layout, sizing, hierarchy, styling, responsive behavior, motion intent, and component appearance only: https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design
 
 The old V2 Journey and Screen/Surface Map are design-process references, not implementation authority. If a future Figma change alters behavior, synchronize this document intentionally rather than allowing visuals or old V1 docs to silently redefine the product.
 

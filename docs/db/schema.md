@@ -1,7 +1,7 @@
 # Codize Database Schema (Milestone 2)
 
 > [!NOTE]
-> **Current V1 implementation reference.** The schema below accurately records the implemented/legacy system. It is not a proposed V2 schema. Do not repurpose its phase, gate, workflow-artifact, or unlock structures as V2 architecture without an accepted Technical Architecture and migration plan.
+> **Current V1 implementation reference.** The schema below accurately records the implemented/legacy system. It is not the V2 schema. The accepted V2 [Technical Architecture](../context/v2/codize_v2_technical_architecture.md) and [Schema and Persistence Design](../context/v2/codize_v2_schema_design.md) define a separate, not-yet-implemented `public.v2_*` domain. Do not repurpose this V1 phase, gate, workflow-artifact, or unlock storage as V2 truth.
 
 Supabase project: `tadkbymxkdncqahzshml` (Postgres 17). Applied migrations live in
 `supabase/migrations/` and mirror what was applied via MCP on 2026-07-02.

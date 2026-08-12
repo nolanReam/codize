@@ -8,7 +8,7 @@
 
 **Starter character:** `Codybara` is the default starter character. Codybara should begin with a deliberately simple base appearance and little or no equipped customization so that accessories earned or selected later feel meaningful.
 
-**Related authority:** The Codize V2 Product Thesis and Exact UX Specification govern how the conversational AI behaves, teaches, scaffolds, responds, and uses the character in the interface. This document does **not** redefine those teaching rules. It defines the **visual character system that expresses them**. The approved Figma controls current layout/composition: https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design
+**Related authority:** The Codize V2 Product Thesis and Exact UX Specification govern how the conversational AI behaves, teaches, scaffolds, responds, and uses the character in the interface. This document does **not** redefine those teaching rules. It defines the **visual character system that expresses them**. The Technical Architecture and subordinate Schema Design govern character-system boundaries and the initial user-preference persistence; later entitlement/economy storage remains deferred. The approved Figma controls current layout/composition: https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design
 
 **Current navigation decision:** Character switching/customization is a dedicated secondary `Character` destination above Settings. Settings contains presentation controls such as sound/animation/reduced motion; it does not own character selection.
 
