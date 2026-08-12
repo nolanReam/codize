@@ -1,5 +1,8 @@
 # Codize frontend (M13C)
 
+> [!NOTE]
+> **Current implementation reference (V1).** This README documents the frontend that exists today. Its engineering-cockpit styling and visible Prompt → Import → Change Map → Review → Verification → Evidence → Defense → Report journey are not V2 UX authority. For future product behavior use `docs/context/context_authority.md` and the canonical V2 Exact UX Specification. V2 is not implemented yet.
+
 The Codize v3 **AI Workflow Workspace** — a Next.js (App Router) frontend that
 makes the Codize Build Loop visible and usable:
 

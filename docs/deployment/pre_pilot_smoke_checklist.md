@@ -1,5 +1,8 @@
 # Codize — Pre-Pilot Smoke Checklist
 
+> [!NOTE]
+> **Historical/current V1 pilot checklist.** Its product path is not V2 authority.
+
 The final gate before inviting testers. Run it on the exact environment (local or
 hosted) you'll use. If any **must-pass** item fails, fix it before the pilot.
 Complements the pilot-facing `docs/pilot/demo_checklist.md` (this one is the

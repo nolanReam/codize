@@ -1,6 +1,11 @@
 # Guided Workflow Navigation
 
-**Status:** Accepted product decision
+> [!WARNING]
+> **Status: Historical V1 product decision — not V2 authority.**
+>
+> The visible Prompt → Import → Change Map → Review → Verification → Evidence → Defense → Report journey is current V1 implementation only. V2 interaction behavior comes from the canonical Exact UX Specification.
+
+**Former status:** Accepted product decision
 **Decision type:** Product architecture and UX
 **Applies to:** Project Home, sidebar/navigation, workflow routing, progress, completed work, stale downstream artifacts
 **Implementation timing:** After the shared M16 core is stable, unless a smaller prerequisite change is required earlier

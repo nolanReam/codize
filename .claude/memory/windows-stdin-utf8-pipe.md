@@ -1,4 +1,7 @@
 ---
+
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
 name: windows-stdin-utf8-pipe
 description: On Windows, piping curl/UTF-8 into `python json.load(sys.stdin)` shows false mojibake — a diagnostic artifact, not a real bug
 metadata:

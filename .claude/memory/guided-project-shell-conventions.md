@@ -1,5 +1,8 @@
 # Guided Project Shell Conventions
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 M16N is frontend-only. It changes navigation hierarchy, not workflow routes,
 backend lifecycle, artifacts, providers, evaluator behavior, PASS/FAIL,
 retries, cooldowns, Report truth, or database schema.

@@ -1,5 +1,8 @@
 # Codize Pilot — Pre-Session Survey
 
+> [!WARNING]
+> **Historical V1 survey — not an approved V2 research instrument.**
+
 Fill this in **before** the tester touches Codize. It's the baseline the
 post-survey compares against. ~5 minutes. Mostly 1–5 scales.
 

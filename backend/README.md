@@ -1,5 +1,8 @@
 # Codize backend (FastAPI)
 
+> [!NOTE]
+> **Current implementation reference (V1).** This README documents the backend that exists today. Its intake, archetypes, roadmap, phases, gates, cooldowns, Defense, workflow artifacts, and unlocks are not future V2 requirements. For V2 direction, read `docs/context/context_authority.md`. No V2 Technical Architecture has been accepted yet.
+
 Async FastAPI service. Architecture rule: **Frontend → this backend → external
 services (Supabase, LLM providers)** — the frontend never calls external
 services directly except Supabase Auth. Route handlers stay thin; product logic lives in

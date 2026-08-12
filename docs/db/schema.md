@@ -1,5 +1,8 @@
 # Codize Database Schema (Milestone 2)
 
+> [!NOTE]
+> **Current V1 implementation reference.** The schema below accurately records the implemented/legacy system. It is not a proposed V2 schema. Do not repurpose its phase, gate, workflow-artifact, or unlock structures as V2 architecture without an accepted Technical Architecture and migration plan.
+
 Supabase project: `tadkbymxkdncqahzshml` (Postgres 17). Applied migrations live in
 `supabase/migrations/` and mirror what was applied via MCP on 2026-07-02.
 Audit queries: `scripts/verify_rls.sql`.

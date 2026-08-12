@@ -1,5 +1,8 @@
 # Codize Pilot — Demo & Pre-Flight Checklist
 
+> [!WARNING]
+> **Historical V1 pilot checklist.** Its workflow steps do not define V2.
+
 > For full setup/run/deploy detail see `docs/deployment/` —
 > `local_demo_runbook.md` (step-by-step local run + troubleshooting),
 > `pre_pilot_smoke_checklist.md` (the deploy/build smoke gate), and

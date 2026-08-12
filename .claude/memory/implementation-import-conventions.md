@@ -1,5 +1,8 @@
 # Implementation import conventions (Milestone 15A)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Product purpose:** "Bring Back What Changed" — after using their prompt
 in an external AI tool, the student brings the implementation material back
 into Codize (pasted AI response, git diff, code snippet, changed-file list,

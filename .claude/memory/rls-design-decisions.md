@@ -1,5 +1,8 @@
 # RLS design: read-only tables and the hidden score column
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 Two deliberate deviations from plain owner-CRUD policies (Milestone 2):
 
 1. `gate_sessions` and `unlocks` have ONLY owner-select policies. All writes go through the backend service role — students must never author their own verdicts or forge unlocks. Do not "fix" the missing insert/update policies.

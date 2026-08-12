@@ -1,5 +1,8 @@
 # Codize Authentication (Milestone 3)
 
+> [!NOTE]
+> **Current V1 technical reference.** Preserve verified JWT/JWKS, server-side auth, ownership, and write-boundary lessons. Re-verify live settings before use. This file does not define V2 product behavior or future authorization architecture.
+
 Supabase project `tadkbymxkdncqahzshml` (GoTrue v2.192.0). Environment contract
 in `.env.example`. Verification scripts: `scripts/verify_auth.sql` (test-user
 setup/cleanup, run via Supabase MCP) + `scripts/verify_auth.py` (HTTP tests

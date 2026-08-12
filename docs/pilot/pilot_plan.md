@@ -1,5 +1,8 @@
 # Codize Pilot Plan
 
+> [!WARNING]
+> **Historical V1 pilot document — not a V2 pilot plan.** Use only to understand the implemented Project Defense pilot and its privacy/consent lessons.
+
 The plan for a small, structured usability pilot of the Codize MVP. Read this
 before scheduling any sessions.
 

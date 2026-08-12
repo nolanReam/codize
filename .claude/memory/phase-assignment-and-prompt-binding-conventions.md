@@ -1,5 +1,8 @@
 # Phase Assignment and Prompt Binding Conventions
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 M18B.2 adds one concrete unit of current-phase work without restoring Phase Workspace or creating a second lifecycle.
 
 ## Authority and storage

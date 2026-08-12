@@ -1,5 +1,8 @@
 # Deployment conventions (M13F.1)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 - **Canonical hosted-deploy docs:** `docs/deployment/friend_pilot_deployment.md`
   (+ `env_var_matrix.md`, `hosted_smoke_checklist.md`).
   `hosted_deployment_plan.md` is the superseded M13D outline — don't extend it.

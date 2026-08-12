@@ -1,121 +1,22 @@
-# Security & Test Skill
+# Security and Test
 
-Purpose:
+## Purpose
 
-Provide a repeatable validation workflow for Codize.
+Provide risk-based validation for the current V1 implementation and future V2 work without turning V1 lifecycle tests into V2 product requirements.
 
-Invoke automatically whenever:
+Use for authentication, authorization, data access, schema, routes, untrusted content, runtime prompts, integrations, deployment, and other security-sensitive changes.
 
-* database schema changes
-* authentication changes
-* API routes change
-* gate logic changes
-* deployment configuration changes
+## Durable checks
 
-## Security Validation
+- Keep every server secret out of frontend code, responses, logs, fixtures, and commits.
+- Derive identity from verified authentication; enforce owner scoping and RLS.
+- Define and test grants and write boundaries for new data.
+- Validate user, external, and model input/output at trust boundaries; fail closed where integrity or claims are at risk.
+- Treat imported/repository content as untrusted; retain prompt-injection, redaction, truncation, grounding, and leak defenses.
+- Preserve provenance and uncertainty; suggestions and claims are not verification.
+- Test idempotency, concurrency/versioning, staleness, retries, cross-user access, malformed input, and safe errors.
+- Report commands, environments, results, and unverified items honestly.
 
-Verify:
+Run existing gate/cooldown/unlock/phase tests only when maintaining those current V1 subsystems. They prove legacy compatibility, not V2 requirements.
 
-1. No API keys in frontend source.
-2. No service-role keys exposed.
-3. No secrets committed to git.
-4. Backend routes enforce auth.
-5. RLS enabled on all tables.
-6. Ownership policies verified.
-
-Commands:
-
-```bash
-grep -R "service_role" .
-grep -R "sk-" .
-grep -R "ANTHROPIC_API_KEY" .
-```
-
-Review all matches.
-
-False positives allowed.
-Exposure is not.
-
----
-
-## Database Validation
-
-Use MCP database tools.
-
-For every table:
-
-* confirm RLS enabled
-* confirm ownership policy exists
-* confirm anon writes denied
-
-Record findings.
-
----
-
-## Gate Validation
-
-Run pytest suite.
-
-Required tests:
-
-* PASS case
-* FAIL generic answer
-* FAIL textbook answer
-* FAIL missing anchor reference
-* PASS implementation-specific answer
-
-All tests must pass.
-
----
-
-## API Validation
-
-Run:
-
-```bash
-pytest
-```
-
-Verify:
-
-* authentication
-* authorization
-* protected routes
-* cooldown enforcement
-* unlock logic
-
----
-
-## Frontend Validation
-
-Run Playwright.
-
-Verify:
-
-* signup flow
-* intake flow
-* roadmap generation
-* gate interaction
-* reconnection modal
-
----
-
-## Reporting
-
-Before reporting success:
-
-Confirm every claim with:
-
-* test output
-* tool output
-* MCP inspection
-
-If unverified:
-
-state "unverified".
-
-If failed:
-
-state "failed".
-
-Never infer success.
+Never modify live external services or production data without explicit authorization.

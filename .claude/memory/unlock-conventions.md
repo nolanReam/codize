@@ -1,5 +1,8 @@
 # Functional unlock conventions (Milestone 10)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 The hidden rule is pinned by the spec's resolved decisions: quality score >= 7
 (`unlock_service.QUALIFYING_SCORE`, server-only) on two consecutive phases'
 PASSED gates. Only the passing attempt's score counts (spec: "no retry

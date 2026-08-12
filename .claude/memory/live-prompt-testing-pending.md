@@ -1,5 +1,8 @@
 # Live adversarial prompt testing — COMPLETED in Milestone 9 (2026-07-02)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 The spec's required live adversarial testing of the system prompts ran at the
 start of M9 via `scripts/live_adversarial_tests.py` (re-runnable) against
 Gemini `gemini-2.5-flash-lite` through `llm_service` — all 10 required cases

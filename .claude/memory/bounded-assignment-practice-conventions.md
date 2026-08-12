@@ -1,5 +1,8 @@
 # Bounded Assignment Practice Conventions
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 M18C.1 adds exactly one guided practice inside Prompt Builder. Its fixed
 objective is `bounded_assignment_v1`, version `1`: define the finish condition,
 excluded work, and observable inspection condition for the selected AI

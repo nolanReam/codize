@@ -1,5 +1,8 @@
 # Codize — Demo Script
 
+> [!WARNING]
+> **Historical V1 demo script.** Do not present its workflow or Defense framing as Codize V2.
+
 A short, natural script for showing Codize to a mentor, a tester, or a camera.
 Target length **~4–6 minutes**. Talk like a builder, not a salesperson — show the
 product doing the thing, don't oversell.

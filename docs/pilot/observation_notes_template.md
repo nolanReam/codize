@@ -1,5 +1,8 @@
 # Codize Pilot — Facilitator Observation Notes
 
+> [!WARNING]
+> **Historical V1 pilot template — not a V2 validation instrument.**
+
 One copy per tester. Fill it **live** during the walkthrough. Capture what they
 *do* and *say*, not just whether they "passed." Verbatim quotes are gold.
 

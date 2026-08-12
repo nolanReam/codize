@@ -1,5 +1,8 @@
 # Artifact-aware defense UI conventions (Milestone 14C)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 M14C makes the M14B grounding VISIBLE without exposing it: the student learns
 what Codize can draw on, never what the pack contains.
 

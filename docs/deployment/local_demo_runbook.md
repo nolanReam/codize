@@ -1,5 +1,8 @@
 # Codize — Local Demo Runbook
 
+> [!NOTE]
+> **Current V1 runbook.** Commands and boundaries may remain useful, but its product flow is not V2 authority. Re-verify versions and environment behavior before use.
+
 Step-by-step to run Codize locally for a demo or a pilot session. This is the
 "green environment" procedure; the fast pre-flight is
 `pre_pilot_smoke_checklist.md` and the tester-facing walkthrough is

@@ -1,39 +1,11 @@
-> [!IMPORTANT]
-> ## Status: Active only for applicable architecture and safety invariants
+> [!WARNING]
+> ## Status: Historical V1 product specification and technical reference
 >
-> This document is a legacy foundation specification.
+> This document is not V2 product or architecture authority. Its five-question intake, three archetypes, seven phases, `current_phase`, mandatory gate, PASS/FAIL evaluation, cooldown, gate-controlled advancement, functional unlock thresholds, and phase-scoped rules describe V1 only.
 >
-> The following areas are superseded by:
+> Durable lessons about server-side secrets, authentication, RLS/ownership, input validation, fail-closed parsing, and adversarial testing remain useful technical references when confirmed against current code and tests. Their future V2 shape is unresolved until a V2 Technical Architecture is accepted.
 >
-> `docs/context/codize_product_operating_brief_v2.md`
->
-> - target audience;
-> - product positioning;
-> - prevention-first, recovery-capable direction;
-> - current shared workflow;
-> - beginner experience;
-> - current UX direction;
-> - Change Map-centered downstream architecture;
-> - guided workflow navigation.
->
-> This document remains authoritative only for still-applicable and
-> repository-confirmed invariants such as:
->
-> - the five intake questions;
-> - archetype/template constraints;
-> - server-side secrets;
-> - RLS and ownership;
-> - API-layer authentication;
-> - applicable gate mechanics;
-> - hidden evaluator scores and thresholds;
-> - fail-closed evaluation;
-> - cooldown and retry behavior.
->
-> Current code, tests, migrations, Git history, accepted decision records,
-> and later security architecture may supersede old implementation details.
->
-> Do not treat an unimplemented idea in this document as a current requirement
-> without inspecting the repository.
+> Start with `docs/context/context_authority.md` and `docs/context/v2/codize_v2_product_thesis.md`.
 
 ## Codize — Master Product Specification 
 
@@ -526,4 +498,3 @@ Codize is not Duolingo for coding. Shallow gamification is explicitly avoided ba
 This document represents the consensus output of a full product debate incorporating: threepanel critique (Stanford admissions, Silicon Valley staff engineer, cynical PM), Gemini crossvalidation on two drafts, behavioral research review (Schultz 2016, Yeager 2014, Vansteenkiste et al., incentive crowding-out literature), and direct product design iteration across 40+ exchanges. v1.1 incorporated three post-consensus corrections: reconnection modal changed from 5-second timer to click-to-dismiss; gate rubric expanded with Condition 3 (Implementation Specificity) - plus Turn 1 anchor statement and MVP caveat; Pre Build Artifacts Required section added. v1.2 - added Security Architecture Constraints section to Section 2: three non negotiable constraints across all archetypes (secrets server-side, RLS on all tables, server-side auth enforcement), - OWASP A01/A02/A03 encoded directly into relevant phase templates, mandatory pre 
 
 deployment security checklist as final phase of every archetype, and advanced security topics added to out-of-scope list. Any feature or decision not addressed here should be pressure-tested against the core mission before being added to scope. 
-

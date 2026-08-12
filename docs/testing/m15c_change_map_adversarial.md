@@ -1,5 +1,8 @@
 # M15C.1 Change Map — Adversarial Evaluation Matrix
 
+> [!NOTE]
+> **Durable V1 technical test record.** The visible Change Map workflow is not V2 authority. Its sanitization, provenance, uncertainty, tamper resistance, ownership, stale-state, and fail-closed lessons remain useful.
+
 Scope: the Change Map extraction foundation (`change_map_service` +
 `schemas/change_map.py` + the `/workflow/{phase}/change-map/*` routes).
 Automated coverage lives in `backend/tests/test_change_map_schema.py`,

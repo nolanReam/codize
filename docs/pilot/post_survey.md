@@ -1,5 +1,8 @@
 # Codize Pilot — Post-Session Survey
 
+> [!WARNING]
+> **Historical V1 survey — not an approved V2 research instrument.**
+
 Fill this in **immediately after** the walkthrough. Section D repeats the
 pre-survey confidence questions so you can measure the before/after change.
 ~5–10 minutes.

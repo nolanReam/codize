@@ -1,5 +1,8 @@
 # M14B — Grounded Defense Adversarial Evaluation Matrix
 
+> [!NOTE]
+> **Durable V1 technical test record.** Formal Project Defense is not required in V2. The untrusted-data, grounding, provenance, leak-prevention, bounded-retry, and fail-closed lessons remain useful.
+
 Adversarial cases for artifact-aware gate question generation. Automated
 coverage lives in `backend/tests/test_grounded_defense.py` (deterministic
 fakes — no live keys required); live coverage was run 2026-07-12 against real

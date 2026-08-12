@@ -1,5 +1,8 @@
 # Codize — Hosted Deployment Plan (first pilot)
 
+> [!NOTE]
+> **Historical V1 deployment plan.** Re-verify hosting and environment assumptions before use; this is not V2 architecture.
+
 > **Superseded (M13F.1):** the current canonical guide is
 > `friend_pilot_deployment.md` (+ `env_var_matrix.md` and
 > `hosted_smoke_checklist.md`). This file is kept as the original M13D

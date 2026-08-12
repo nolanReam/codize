@@ -1,5 +1,8 @@
 # Roadmap generation + LLM provider conventions (Milestone 7)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 Provider decision (user-directed in the M7 instructions): all LLM traffic goes
 through `backend/app/services/llm_service.py` — Gemini primary
 (`GEMINI_API_KEY`, `GEMINI_MODEL`, default `gemini-2.5-flash-lite`), OpenRouter

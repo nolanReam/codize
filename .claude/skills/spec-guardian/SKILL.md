@@ -1,69 +1,47 @@
-# Codize Spec Guardian Skill
+# Codize Spec Guardian
 
 ## Purpose
 
-Ensure every Codize implementation decision stays aligned with the active product direction, accepted decisions, and still-applicable architecture and safety invariants.
+Prevent product drift and accidental reuse of V1 mechanics as V2 requirements.
 
-Use this skill before:
+Use before product logic, workflow, architecture, runtime prompts, learning behavior, characters, or major UX changes.
 
-- creating architecture
-- changing product logic
-- writing system prompts
-- changing gate behavior
-- adding new features
-- modifying roadmap/archetype logic
+## Required authority
 
-## Required Source Files
+Read in order:
 
-Read these before making product, workflow, or major UX decisions:
+1. `docs/context/context_authority.md`
+2. `docs/context/v2/codize_v2_product_thesis.md`
+3. `docs/context/v2/codize_v2_exact_ux_specification.md`
+4. `docs/context/v2/codize_v2_character_system_blueprint.md` when relevant
 
-- `docs/context/context_authority.md`
-- `docs/context/codize_product_operating_brief_v2.md`
+Approved Figma controls visual composition only. Code, tests, migrations, Git history, and verified deployment evidence control current implementation truth.
 
-Use `docs/context/codize_master_spec_v2.1.md` only for still-applicable architecture and safety invariants. Use code, tests, migrations, Git history, and deployment evidence for implementation state. Do not load archived plans, old product visions, model guides, or chat exports unless historical context is specifically required.
+Do not read `conversations.json` unless the user explicitly authorizes historical research.
 
-## Non-Negotiables
+## First classification
 
-Codize is an educational platform that helps students understand projects they build with AI.
+Before acting, classify the task as V2 product/design work, current V1 maintenance, or V2 architecture planning. Canonical V2 documents govern the first; current code contracts govern the second; unresolved architecture must stay unresolved in the third until explicitly decided.
 
-Codize is not:
+## V2 product guardrails
 
-- a general tutorial platform
-- a code generator for students
-- a plagiarism detector
-- a generic chatbot
-- Duolingo for coding
-- a cybersecurity/offensive security tool
+- Product Thesis is highest authority.
+- One project, one current change, one useful habit at a time.
+- Chat is the Build interface; constrained system logic owns workflow and teaching decisions.
+- Codize guides use of external coding agents; it does not silently become the coder.
+- Preserve student agency, truthful uncertainty, project grounding, just-in-time teaching, progressive help, and per-competency fading.
+- Do not force a full workflow for every change.
+- Do not create global mastery scores, compliance rewards, routine Project Defense, or hidden advancement gates.
+- Character differences and unlocks are cosmetic and never pedagogical power.
 
-## Core Product Rules
+## Legacy boundary
 
-- The first intake question must be: “What problem do you want to solve, and who does solving it help?”
-- Intake has exactly five mandatory questions.
-- Codize supports exactly three archetypes:
-  1. AI-Powered App
-  2. REST API Backend
-  3. Full-Stack Web App
-- Archetype templates are hardcoded JSON.
-- LLMs may personalize language, but must never alter phase structure.
-- The Interrogation Gate is mandatory.
-- The gate uses a Turn 1 anchor, Turn 2 weakest-criterion probe, and Turn 3 hypothetical.
-- Gate evaluation is binary PASS/FAIL at temperature 0.
-- Generic textbook answers fail even if technically correct.
+Five intake questions, three archetypes, seven phases, `current_phase`, the visible eight-stage journey, mandatory Defense, PASS/FAIL, cooldowns, gate advancement, functional gate-score unlocks, and phase-scoped assignments are V1 implementation facts only. Preserve them for scoped V1 maintenance; never promote them to V2 requirements.
 
-## Scope Discipline
+## Unresolved architecture
 
-Do not add features just because they are interesting.
+No V2 Technical Architecture / State Model or Learning / Teaching Policy is accepted. Do not invent schemas, routes, persistence, compatibility, GitHub trust boundaries, learner thresholds, retention, or character entitlement storage.
 
-Before adding anything, ask:
+## Durable constraints
 
-1. Is this consistent with the active operating brief and accepted decisions?
-2. Is this required for the current milestone?
-3. Can this be done more simply?
-
-If the answer is no, do not build it.
-
-## Self-Improvement Rule
-
-If a spec interpretation is clarified, update this skill with the specific rule.
-
-Write specific corrections, not vague reminders.
+Never weaken authentication, authorization, RLS/ownership, server-only secrets, validation, provenance, uncertainty, write boundaries, staleness, prompt-injection defenses, accessibility, or verified reporting.

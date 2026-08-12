@@ -1,233 +1,100 @@
-# Codize Context Authority
+# Codize context authority
 
-**Status:** Active
-**Purpose:** Define which source wins when Codize documents disagree and prevent stale plans from steering implementation.
+**Status:** Active V2 authority router/index
+**Purpose:** Identify the source that governs each kind of decision without turning this index into a competing product specification.
 
----
+This file routes to authority. It does not override, summarize away, or reinterpret the Codize V2 Product Thesis.
 
-## Core Rule
+## First rule
 
-Different sources answer different questions.
+For persistent product decisions, the [Codize V2 Product Thesis](v2/codize_v2_product_thesis.md) is the highest authority.
 
-Do not use a roadmap to decide what is already implemented.
+A current user instruction controls the scope, permissions, deliverables, and stop conditions of the active task. It does not silently redefine Codize V2. A durable product change must be reconciled with the canonical V2 documents and recorded deliberately.
 
-Do not use Git history alone to redefine product purpose.
+## Authority hierarchy
 
-Do not let a temporary milestone prompt silently become permanent product direction.
+Use this order when sources conflict:
 
----
+1. **[Codize V2 Product Thesis](v2/codize_v2_product_thesis.md)** — why Codize exists, who it serves, product boundaries, principles, positioning, and the highest-level V2 direction.
+2. **[Codize V2 Exact UX Specification](v2/codize_v2_exact_ux_specification.md)** — interaction behavior, state transitions, information architecture, copy intent, teaching behavior, and forbidden UX patterns. It is subordinate to the Product Thesis.
+3. **[Codize V2 Character System Blueprint](v2/codize_v2_character_system_blueprint.md)** — character visuals, animation semantics, customization, accessories, and cosmetic unlock rules only. It does not redefine teaching or product behavior.
+4. **[Approved Codize V2 Figma](https://www.figma.com/design/QBGSdTLG7iQ2xEFzU7v0Li/Codize-V2-Product-Design)** — visual composition, styling, sizing, component appearance, responsive layout, and motion intent only. Figma cannot silently change product behavior.
+5. **Future V2 Technical Architecture / State Model** — not written or accepted yet. It will govern V2 implementation architecture after an explicit decision. Do not infer it from V1 tables, routes, JSONB, or lifecycle state.
+6. **Future V2 Learning / Teaching Policy** — not written or accepted yet. The Product Thesis and Exact UX Specification provide current product constraints, but evidence schemas, fading thresholds, retention, and detailed inference policy remain unresolved.
+7. **Accepted V2 decision records** — narrow, explicit decisions in `docs/decisions/` that identify their V2 status and do not conflict with higher authority.
+8. **Current implementation truth** — code, tests, migrations, Git history, and verified deployment evidence. These control what exists today, not what V2 should become.
+9. **Durable V1 technical references** — authentication, JWT/JWKS, RLS and ownership, write boundaries, validation, secret handling, provenance, uncertainty, prompt-injection defenses, deployment boundaries, and adversarial-test lessons. These are reusable engineering evidence, not V2 product architecture.
+10. **Historical V1 product documents** — old intake, archetype, roadmap, phase, gate, Defense, workflow-navigation, pilot, release, milestone, and product-vision documents. They explain the current/legacy system or its history and never override V2.
 
-## Authority Hierarchy
+## Conflict routing
 
-### 1. Current user instruction and `instructions.md`
-
-Controls:
-
-- the active task;
-- milestone scope;
-- allowed and forbidden changes;
-- required tests;
-- stop conditions;
-- temporary process instructions.
-
-Limits:
-
-- `instructions.md` does not permanently redefine Codize's product direction by itself;
-- a permanent product change must update the active product brief or create an accepted decision record;
-- an implementation prompt cannot override safety, ownership, provenance, or trust rules without an explicit approved architecture/product decision.
-
-### 2. Repository reality
-
-Controls what is actually implemented.
-
-Inspect:
-
-1. current code;
-2. tests;
-3. migrations;
-4. Git history;
-5. deployed-environment evidence when deployment state matters.
-
-Repository reality outranks stale milestone labels, old checklists, old dates, and old “next step” statements.
-
-Never duplicate a milestone because a strategy document still calls it “next.”
-
-### 3. `docs/context/codize_product_operating_brief_v2.md`
-
-Controls stable:
-
-- product thesis;
-- audience;
-- positioning;
-- workflow;
-- adaptive-support model;
-- product scope;
-- trust and claims model;
-- UX direction;
-- guided-navigation principles;
-- validation philosophy;
-- long-term sequencing.
-
-This is the primary product-direction source.
-
-### 4. `docs/context/codize_master_spec_v2.1.md`
-
-Controls only the still-applicable architecture and safety invariants explicitly preserved by current code and later decisions, including:
-
-- the five intake questions unless explicitly migrated;
-- archetype/template constraints where still implemented;
-- server-side secrets;
-- RLS and ownership requirements;
-- API-layer authentication;
-- gate turn structure and safety mechanics where still implemented;
-- hidden evaluator scores and thresholds;
-- fail-closed evaluation;
-- cooldown and retry behavior;
-- security architecture principles.
-
-Limits:
-
-- its original target-audience language is superseded by the active operating brief;
-- its older product positioning is superseded by the active operating brief;
-- its older workflow and UX assumptions are superseded by the active operating brief and accepted decision records;
-- unimplemented ideas in the old spec are not automatically current requirements;
-- current repository behavior must be inspected before changing existing architecture.
-
-### 5. `docs/learning/codize_learning_model_v1.md`
-
-Controls active educational design, including:
-
-- the competency vocabulary;
-- the distinction between workflow completion and learning evidence;
-- student ownership and productive difficulty;
-- just-in-time teaching;
-- support and transfer principles.
-
-Limits:
-
-- it is subordinate to current repository truth, architecture, safety,
-  authentication, ownership, lifecycle, provenance, and trust boundaries;
-- it does not create product state, scores, mastery, analytics, or workflow
-  completion by itself;
-- implemented learning slices still require accepted decision records and
-  code/tests that preserve the current product contracts.
-
-### 6. Accepted decision records in `docs/decisions/`
-
-Control narrow, durable decisions that need more detail than the operating brief.
-
-Examples:
-
-- guided workflow navigation;
-- artifact trust boundaries;
-- database write boundaries;
-- provider selection;
-- deployment architecture.
-
-A decision record should include status, context, decision, consequences, and supersession rules.
-
-### 7. `CLAUDE.md`, `.claude/memory/`, and repo-scoped skills
-
-Control durable implementation conventions and operational lessons.
-
-Use them for:
-
-- how an implemented subsystem works;
-- verified seams;
-- testing conventions;
-- security lessons;
-- frontend conventions;
-- reusable agent workflows.
-
-They do not redefine product purpose unless the active product brief or an accepted decision record is updated.
-
-### 8. Strategy and planning documents
-
-Examples:
-
-- the full one-stop PDF;
-- deferred feature plans;
-- pilot plans;
-- competition plans;
-- milestone implementation plans.
-
-These inform strategy and history.
-
-They are not authoritative for current implementation state.
-
-Time-sensitive dates, model availability, milestone labels, and “next step” statements may become stale.
-
-### 9. Archive
-
-Examples:
-
-- old product visions;
-- completed milestone plans;
-- old learning roadmaps;
-- chat exports;
-- superseded model guides.
-
-Archive material is non-authoritative and should not be loaded unless historical context is explicitly needed.
-
----
-
-## Conflict Resolution by Question
-
-| Question | Source to trust first |
+| Question | Source to use first |
 |---|---|
-| What should this active task do? | `instructions.md` |
-| Is this already implemented? | Code, tests, migrations, Git history |
-| What is Codize and who is it for? | `codize_product_operating_brief_v2.md` |
-| What is the canonical shared workflow? | `codize_product_operating_brief_v2.md` |
-| What active educational-design principle or competency name applies? | `docs/learning/codize_learning_model_v1.md`, within current architecture and trust boundaries |
-| What trust language is allowed? | Operating brief, then accepted trust decisions |
-| What security/auth/gate invariant must remain? | Current code/tests plus applicable master-spec invariant |
-| How does a subsystem currently work? | Code/tests, then `.claude/memory/` |
-| Why was a narrow product/architecture choice made? | `docs/decisions/` |
-| What feature should come after the current release? | Current user direction plus strategy docs, reconciled with repo state |
-| What happened in an old milestone? | Git history, archived plan, memory |
-| What are the current competition rules? | Current official source, not a cached context document |
+| What is Codize V2 and why does it exist? | V2 Product Thesis |
+| What should a student see or be able to do? | Product Thesis, then Exact UX Specification |
+| How do characters, accessories, animation, and cosmetic unlocks behave? | Character System Blueprint, within the Thesis and Exact UX |
+| What should the interface look like? | Approved Figma, within the three canonical documents |
+| How should V2 data, APIs, state, transactions, compatibility, or storage work? | Future accepted V2 Technical Architecture; until it exists, the question is unresolved |
+| How should learner evidence, fading, help, retention, or teaching inference work? | Future accepted V2 Learning / Teaching Policy; until it exists, do not invent the contract |
+| What is implemented now? | Current code, tests, migrations, Git history, and verified deployment evidence |
+| How does the current V1 subsystem work? | Current implementation plus the labeled backend/frontend/schema/memory references |
+| Which trust/security lessons survive? | Current implementation evidence plus labeled durable V1 technical references |
+| What did an old milestone intend? | Historical V1 product documents and archive, never as V2 authority |
 
----
+## V1 mechanics: implementation truth, not V2 requirements
 
-## Anti-Drift Rules for Agents
+The current repository implements several V1 mechanics. They remain real compatibility and maintenance constraints until deliberately migrated, but they are not mandatory future V2 architecture:
 
-Before a major implementation task:
+- five sequential intake questions;
+- exactly three archetypes;
+- a fixed seven-phase roadmap;
+- `current_phase` as lifecycle state;
+- the visible Prompt → Import → Change Map → Review → Verification → Evidence → Defense → Report journey;
+- mandatory Project Defense;
+- binary PASS/FAIL gates and cooldowns;
+- gate-controlled advancement;
+- hidden-score functional unlock thresholds;
+- phase-scoped assignment and workflow-artifact rules.
 
-1. run `git status`;
-2. inspect recent Git history;
-3. read the active milestone instructions;
-4. read only the relevant context documents;
-5. inspect existing code and tests before designing a replacement;
-6. reconcile milestone labels with repository reality;
-7. preserve unrelated work;
-8. do not revive superseded product assumptions;
-9. do not create duplicate architectures;
-10. update durable context only when a permanent lesson or decision is confirmed.
+Do not delete, repurpose, or weaken these implemented contracts casually. Do not preserve them as V2 requirements merely because they exist.
 
-Do not:
+## Durable technical rules that survive the authority reset
 
-- read the full chat archive by default;
-- load large legacy roadmaps for routine tasks;
-- treat old dates as current;
-- treat old model-specific prompting advice as product direction;
-- make product changes only in `instructions.md`;
-- create a new context file for every milestone.
+This reset does not weaken:
 
----
+- server-side authentication and authorization;
+- owner-scoped access and RLS;
+- backend-only secrets and external-service boundaries;
+- input/output validation and fail-closed handling;
+- provenance and honest uncertainty;
+- untrusted-content isolation and prompt-injection defenses;
+- safe writes, idempotency, staleness, and concurrency protections;
+- accessibility, responsive behavior, and truthful system status;
+- evidence-backed verification and explicit reporting of what was not verified.
 
-## When Product Direction Changes
+Their future V2 implementation shape remains subject to the future Technical Architecture and Learning / Teaching Policy.
 
-A real product-direction change should include:
+## Agent reading order
 
-1. the reason;
-2. evidence or user decision;
-3. what is superseded;
-4. what remains unchanged;
-5. impact on workflow, UX, trust, scope, and roadmap;
-6. an update to the active operating brief or a new accepted decision record;
-7. an update to this authority file when precedence changes.
+Before product, workflow, architecture, or major UX work:
 
-Do not silently edit history to make old documents appear current.
+1. read this router;
+2. read the Product Thesis completely;
+3. read the relevant canonical specification(s);
+4. inspect current code/tests/migrations for implementation truth;
+5. read only the relevant labeled technical references or V2 decisions;
+6. identify unresolved architecture explicitly instead of filling gaps with V1 assumptions.
 
-Archive superseded documents and preserve a clear status banner.
+Do not read `conversations.json` unless the user explicitly requests historical research and authorizes it.
+
+## Change control
+
+When accepting a durable V2 decision:
+
+1. identify the higher authority it implements;
+2. state what remains unresolved;
+3. state what V1 behavior is compatibility-only;
+4. record security, provenance, accessibility, and migration consequences;
+5. update this router only if the authority path itself changes.
+
+Never edit historical documents to make them appear current.

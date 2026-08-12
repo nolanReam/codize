@@ -1,5 +1,8 @@
 # Codize Tester Script
 
+> [!WARNING]
+> **Historical V1 tester script.** Do not use its mandatory Defense/workflow sequence to test V2.
+
 This is the script you hand to a tester (or read aloud). It's written for a high
 school CS student — plain language, no setup steps. The facilitator handles all
 the technical setup **before** the session using `demo_checklist.md`; the tester

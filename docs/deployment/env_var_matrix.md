@@ -1,5 +1,8 @@
 # Codize — Environment Variable Matrix (M13F.1)
 
+> [!NOTE]
+> **Current V1 environment reference.** Preserve secret/public boundaries, but verify every variable against current code and hosts. Future V2 configuration is unresolved.
+
 Every variable the system uses, where it lives, and whether it is secret.
 **No real values appear in this file — names and placement only.**
 

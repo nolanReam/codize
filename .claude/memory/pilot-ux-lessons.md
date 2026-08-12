@@ -1,5 +1,8 @@
 # Pilot UX lessons (first real tester, Ethan — 2026-07-06/07)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 Scores: landing clarity 4/5, intake 4/5, **Prompt Builder 5/5**, overall
 usefulness 3/5, would-use-again "maybe". Most useful: Prompt Builder. Most
 confusing: not knowing what he was going to do before starting. Felt

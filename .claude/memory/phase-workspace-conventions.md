@@ -1,5 +1,8 @@
 # Phase workspace conventions (Milestone 8)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 Persistence decision: task completion lives in `projects.task_progress` jsonb
 (migration `20260703015217_add_task_progress_to_projects.sql`), shape
 `{"<phase_number>": ["ai-1", "human-2", ...]}` — completed ids only. It is a

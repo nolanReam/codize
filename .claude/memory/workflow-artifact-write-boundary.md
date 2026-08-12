@@ -1,5 +1,8 @@
 # Workflow artifact write boundary (Milestone 16S.1)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 ## The discovered integrity issue
 
 Ownership RLS and write integrity are separate controls. The existing

@@ -1,5 +1,8 @@
 # Artifact-aware Defense and Report conventions (M16C.1)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 One server-derived contract owns downstream parsing:
 `workflow_context_service.build_workflow_context(owned_project, phase)` →
 `CuratedWorkflowContext`. Defense and Report never independently parse raw

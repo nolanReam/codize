@@ -1,5 +1,8 @@
 # Grounded defense conventions (Milestone 14B)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 The gate's three turn questions are now grounded in the M14A context pack.
 **Artifacts guide questions; they never decide PASS/FAIL** — the evaluator
 prompt composition carries NO artifact context (tested structurally:

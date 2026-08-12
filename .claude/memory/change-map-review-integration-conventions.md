@@ -1,5 +1,8 @@
 # Change Map → Review integration conventions (Milestone 16A.1)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Purpose:** prevention-first, recovery-capable. A reviewed Change Map reduces
 the Review Board's blank-page work, but never replaces student judgment.
 Change Map asks whether a description accurately represents what appears to

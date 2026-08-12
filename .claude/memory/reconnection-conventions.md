@@ -1,5 +1,8 @@
 # Reconnection conventions (Milestone 11)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 The load-bearing decision is the TIMESTAMP SEMANTICS: `profiles.last_login_at`
 means "last acknowledged presence in the app", NOT auth login time. It is
 initialized by the signup trigger's column `default now()` (so a brand-new

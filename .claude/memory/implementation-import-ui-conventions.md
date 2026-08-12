@@ -1,5 +1,8 @@
 # Implementation import UI conventions (Milestone 15B)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **User-facing name:** the page title is **"Bring Back What Changed"**
 (`lib/implementationImport.ts::PAGE_TITLE`); the Build Loop strip step is
 "Bring Back" and the sidebar link is "Bring Back What Changed". The internal

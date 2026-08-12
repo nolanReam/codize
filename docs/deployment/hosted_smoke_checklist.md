@@ -1,5 +1,8 @@
 # Codize — Hosted Smoke Checklist (M13F.1)
 
+> [!NOTE]
+> **Current/historical V1 deployment checklist.** Its workflow acceptance path does not define V2.
+
 Run this against the **deployed URLs** immediately after every deploy and
 before inviting any tester. Companion to `friend_pilot_deployment.md`.
 Local-run equivalent: `pre_pilot_smoke_checklist.md`.

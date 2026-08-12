@@ -1,5 +1,8 @@
 # Project classification and product-truth conventions
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 M18A separates product capability from the student's experience using AI.
 Intake Q1–Q3 (purpose, scope, stack) are project evidence. Q4 is a learning-
 context self-assessment and may calibrate explanations only; provider names,

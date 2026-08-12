@@ -1,6 +1,11 @@
 # Codize Learning Model v1
 
-**Status:** Active educational-design authority
+> [!WARNING]
+> **Status: Historical V1 learning reference — not V2 teaching-policy authority.**
+>
+> Its distinctions between workflow activity, student judgment, evidence, and learning remain useful. Its eight-competency vocabulary, phase/workflow binding, and bounded-assignment slice are not mandatory V2 design. A V2 Learning / Teaching Policy has not yet been accepted.
+
+**Former status:** Active educational-design authority
 **Scope:** Learning design only; subordinate to current architecture, safety,
 ownership, lifecycle, provenance, trust, and implementation truth.
 

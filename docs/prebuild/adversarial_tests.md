@@ -1,5 +1,8 @@
 # Pre-Build Prompt Adversarial Testing — Milestone 1 (live runs completed Milestone 9)
 
+> [!NOTE]
+> **Durable V1 technical test record.** Gate behavior here is not a V2 requirement. Preserve the prompt-injection, grounding, leak-prevention, fail-closed, and adversarial-testing lessons for future architecture.
+
 Spec requirement ("Pre-Build Artifacts Required — Artifact 2"): the six system prompts must be tested against adversarial inputs before backend code is written, naming three mandatory cases. This log records the **static verification** of each case against the prompt text (automated by `scripts/validate_prebuild_artifacts.py` where marked), and the **live model runs** executed at the start of Milestone 9.
 
 **Status legend:** STATIC PASS = the defending clause exists verbatim in the prompt and was reviewed. LIVE PASS = executed against a real model (see "Live run record" below) and the defense held.

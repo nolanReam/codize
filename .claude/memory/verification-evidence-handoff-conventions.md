@@ -1,5 +1,8 @@
 # Verification → Evidence handoff conventions (Milestone 16B.3A)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Permanent distinction:** a Codize-suggested check, a student-performed check,
 a student-recorded result, a student-selected Evidence target, student-provided
 Evidence, and a student explanation that Evidence is unavailable are separate

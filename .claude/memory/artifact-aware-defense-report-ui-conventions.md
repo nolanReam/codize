@@ -1,5 +1,8 @@
 # Artifact-Aware Defense and Report UI Conventions
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 M16C.2 is a frontend-only integration over the reviewed M16C.1 contracts. No
 backend, migration, provider, prompt, evaluator, threshold, PASS/FAIL, cooldown,
 retry, or model behavior changed.

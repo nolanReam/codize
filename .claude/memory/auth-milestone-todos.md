@@ -1,5 +1,8 @@
 # Auth carry-over items (updated after Milestone 9, 2026-07-02)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 1. **Leaked-password protection: advisor-clean as of end of M3 (2026-07-02).** The WARN was present at session start and gone on two advisor re-runs at session end — it is a Dashboard-only toggle (Authentication → Sign In / Providers → Passwords), so it was evidently enabled in the dashboard mid-session. Re-check `get_advisors` each milestone; if the WARN returns, that toggle is the fix.
 2. **Email confirmations are ON** — new signups get no session until the confirmation link is clicked. The frontend milestone (M13) must handle the "check your email" state, or confirmations must be deliberately disabled then. Also: the built-in email sender rate-limits after ~2 sends/hour and GoTrue MX-validates signup email domains (fake domains → `email_address_invalid`).
 3. The signup→profile trigger (`handle_new_user`) exists and is verified end-to-end; never recreate it.

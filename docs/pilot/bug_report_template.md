@@ -1,5 +1,8 @@
 # Codize Pilot — Bug Report
 
+> [!WARNING]
+> **Historical V1 pilot template.** Reuse only generic bug-reporting fields unless a V2 pilot explicitly adopts it.
+
 One defect per report. Copy this block into your issue tracker (or a notes file)
 for each bug. Enough detail to **reproduce** is the whole point.
 

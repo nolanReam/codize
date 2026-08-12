@@ -1,5 +1,8 @@
 # Codize Product Vision v3 — Historical Memory
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 > **Status:** Historical context only. Current stable product direction lives in
 > `docs/context/codize_product_operating_brief_v2.md`; source precedence lives in
 > `docs/context/context_authority.md`.

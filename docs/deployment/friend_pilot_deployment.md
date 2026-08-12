@@ -1,5 +1,8 @@
 # Codize — Friend Pilot Deployment Guide (M13F.1)
 
+> [!NOTE]
+> **Current/historical V1 deployment guide.** It does not define a V2 deployment or pilot flow.
+
 The canonical step-by-step for hosting Codize so friends can test it
 self-serve. Supersedes the outline in `hosted_deployment_plan.md` (kept for
 history). Companion docs: `env_var_matrix.md` (every variable, where it

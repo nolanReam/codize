@@ -1,5 +1,8 @@
 # Codize Pilot Kit
 
+> [!WARNING]
+> **Historical V1 pilot kit.** The materials in this directory evaluate the implemented Project Defense workflow. They are not a V2 pilot protocol and must be rewritten after V2 exists before being used to validate V2.
+
 Everything needed to run a small, structured pilot of **Codize** — the AI coding
 workflow trainer / Project Defense Workflow — with **3–10 testers** drawn from
 high-school CS, AP CSA, hackathon, or general AI-coding-tool users.

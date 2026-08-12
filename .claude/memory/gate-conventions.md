@@ -1,5 +1,8 @@
 # Interrogation Gate conventions (Milestone 9)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 Turn sequencing is derived, not stored: `gate_sessions.turns` is
 `[{"turn": 1|2|3, "question", "answer"}, …]` and the next expected call falls
 out of the last entry's null answer (`[]`→turn1, q1 unanswered→turn2, …,

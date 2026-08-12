@@ -1,5 +1,8 @@
 # Change Map conventions (Milestone 15C.1)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Purpose (prevention-first, recovery-capable):** convert a saved M15A
 implementation import into an AI-generated, EDITABLE DRAFT of what APPEARS to
 have changed, so the student reviews/corrects it before continuing. The map

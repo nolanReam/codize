@@ -1,5 +1,8 @@
 # Codize — Deployment Readiness Audit (M13D)
 
+> [!NOTE]
+> **Current/historical V1 deployment snapshot.** Preserve its secret and hosting-boundary lessons, but re-verify every version, provider, command, and deployed state before use. It does not define V2 product behavior or architecture.
+
 Snapshot of what it takes to run Codize for a first 3–5 tester pilot. No real
 secret values appear here — only variable **names** and where they belong.
 

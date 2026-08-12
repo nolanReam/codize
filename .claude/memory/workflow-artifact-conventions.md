@@ -1,5 +1,8 @@
 # Workflow artifact conventions (Milestone 13B)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 The store is a COLUMN, not a table: `projects.workflow_artifacts` jsonb,
 default `{}`, migration `20260703130000` — the exact `task_progress`
 precedent (see [[phase-workspace-conventions]]). Shape, backend-owned:

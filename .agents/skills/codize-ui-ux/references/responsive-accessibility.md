@@ -1,5 +1,7 @@
 # Responsive Accessibility
 
+> Accessibility principles are durable. V1 component/class examples below do not define V2 architecture or visual composition.
+
 ## Use semantic controls first
 
 - **Principle:** Start with native elements matching the interaction: button, link, fieldset/legend, radio, checkbox, label, details/summary, progressbar, status, and alert.

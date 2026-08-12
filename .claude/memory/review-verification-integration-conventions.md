@@ -1,5 +1,8 @@
 # Review → Verification integration conventions (Milestone 16B.1)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Purpose and permanent semantic boundary:** prevention-first,
 recovery-capable. A saved Review decision `needs_verification` means "I need to
 test this." Linked Verification turns it into a proposed check. It never means

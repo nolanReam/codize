@@ -1,21 +1,13 @@
-# UI/UX Engineering & Aesthetic Skill
+# Codize UI/UX
+
 ## Purpose
-Enforce the exact visual design philosophy, theme, and component structure for the Codize web application interface.
 
-## Core Design Philosophy (The Codize Aesthetic)
-- **Theme:** High-contrast, minimalist software-engineering dashboard. 
-- **Palette:** Strict Dark Mode baseline. Deep charcoal/near-black backgrounds (`#0d0d12`), cool lavender/violet accents (`#a78bfa`), crisp white/silver text, and distinct functional colors for state changes (e.g., green for passed gates, amber for active checkpoints).
-- **Typography:** Technical but readable. Use clean Monospace fonts for code execution blocks and geometric Sans-Serif for primary navigation.
-- **Tone:** Look like a premium, highly focused SaaS engineering IDE, not a casual or brightly colored e-learning app.
+Guide Codize interface work through the canonical V2 product and UX authority while preserving current V1 behavior during maintenance.
 
-## Component Architecture Constraints
-- **Simplest Implementation Rules:** - Build the simplest robust interface that satisfies the functional specifications.
-  - Rely on native HTML5 and modern layout systems (Flexbox and CSS Grid) rather than pulling in massive, unnecessary third-party utility frameworks or component libraries unless explicitly requested.
-  - Validate state and UI views rigidly at the boundaries (e.g., API payloads, authentication states), but trust internal framework guarantees.
+Read `docs/context/context_authority.md`, the V2 Product Thesis, and the V2 Exact UX Specification. Read the Character System Blueprint when relevant. Approved Figma controls visual composition only.
 
-## Multi-Turn Logic UI Requirements
-- **Intake Views:** Ensure conversational state handling is visually clear. The student must see their progress dynamically as they move through the 5 mandatory intake framing questions.
-- **The Interrogation Gate View:** Build a dedicated, clean split-screen chat interface for the 3-turn interrogation process. 
-  - **Left Side:** Displays the student's current source code/implementation details for context.
-  - **Right Side:** The interactive gate terminal where the binary Pass/Fail grading occurs.
-- **Reconnection/State Recovery:** The UI must natively accommodate the Spec's requirement for a persistent state reconnection modal to handle unexpected session drops gracefully.
+The current dark engineering-cockpit UI is V1 implementation evidence, not mandatory V2 styling.
+
+For V2: use a beginner-first character-guided conversation; show one primary cognitive task/action; keep Project/Build/Learning/History primary and Character/Settings secondary; make Something broke contextual; use progressive disclosure; preserve agency, uncertainty, provenance, accessible help, responsive behavior, keyboard access, reduced motion, and truthful state. Do not expose V1 phases, gates, archetypes, or its mandatory full workflow as V2 requirements.
+
+For scoped V1 maintenance, preserve current API/lifecycle behavior unless the task authorizes change and label V1-specific decisions as implementation-only.

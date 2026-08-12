@@ -1,5 +1,7 @@
 # Visual Hierarchy
 
+> V1-specific tokens, classes, pages, and styling examples below are current implementation references only. Approved V2 Figma controls future visual composition.
+
 ## Start hierarchy from the task
 
 - **Principle:** Make the current goal, state, and next action form the first scan path.

@@ -1,5 +1,7 @@
 # Forms, Feedback, and States
 
+> V1-specific component names and workflow examples below are current implementation references only. For V2, apply the underlying feedback/accessibility principles within the canonical Exact UX and approved Figma composition.
+
 ## Reduce blank-page work without taking authorship
 
 - **Principle:** Offer editable starters, examples, and choices while leaving the student in control.

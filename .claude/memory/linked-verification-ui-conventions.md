@@ -1,5 +1,8 @@
 # Linked Verification UI conventions (Milestone 16B.2)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Permanent semantic boundary:** Review records “I need to test this.” Codize
 then suggests a grounded check. The student performs a check outside Codize and
 records a result. Evidence is supporting material. None of those states may be

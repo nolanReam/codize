@@ -1,5 +1,8 @@
 # Linked Review UI conventions (Milestone 16A.2)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Semantic boundary:** Change Map asks whether a description accurately records
 what appears to have changed. Review asks what the student thinks should happen
 next. A confirmed source is not approved, correct, safe, tested, or verified.

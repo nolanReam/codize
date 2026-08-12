@@ -1,5 +1,8 @@
 # Codize Pilot — Results Summary (TEMPLATE)
 
+> [!WARNING]
+> **Historical V1 results template — not an approved V2 evaluation model.**
+
 Fill this **after** all sessions, from real collected data only. Every value is a
 placeholder — **do not invent numbers.** Leave a cell blank or "n/a" if you
 didn't measure it. Keep everything de-identified (P# only).

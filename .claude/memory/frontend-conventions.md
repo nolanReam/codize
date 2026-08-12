@@ -1,5 +1,8 @@
 # Frontend conventions (Milestone 13C)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 The frontend lives in `frontend/` — Next.js App Router, React 19, TypeScript
 strict, vitest. It is the v3 **AI Workflow Workspace** (see [[product-vision-v3]]),
 built as an engineering cockpit, NOT a roadmap/checklist/quiz app.

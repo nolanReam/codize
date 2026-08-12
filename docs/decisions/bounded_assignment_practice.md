@@ -1,6 +1,11 @@
 # Bounded Assignment Practice
 
-**Status:** Accepted
+> [!WARNING]
+> **Status: Historical V1 decision — not accepted V2 architecture.**
+>
+> The boundedness concepts may inform V2's contextual teaching, but this phase-scoped, mandatory bundled interaction does not govern V2. V2 teaching-policy and current-change architecture remain unresolved.
+
+**Former status:** Accepted
 **Decision type:** Educational interaction, Prompt artifact, and compatibility
 **Applies to:** New current-phase AI-assignment Prompts in Prompt Builder
 

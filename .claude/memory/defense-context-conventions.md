@@ -1,5 +1,8 @@
 # Defense context pack conventions (Milestone 14A)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 `services/defense_context_service.py` + `schemas/defense_context.py` build
 the artifact-aware defense context — the normalized evidence bundle gate
 questions are grounded in. **Consumed by the live gate since M14B** via

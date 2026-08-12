@@ -1,5 +1,8 @@
 # Core Workflow Beta Readiness
 
+> [!WARNING]
+> **Historical V1 release snapshot.** This file records readiness for the implemented V1 workflow at the time shown. It is not V2 product, architecture, or release authority.
+
 ## Release identity
 
 | Item | Result |

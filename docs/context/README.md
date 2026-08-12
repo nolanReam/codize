@@ -1,275 +1,44 @@
-# Codize Context Directory
+# Codize context directory
 
-**Purpose:** Keep a small, high-signal set of documents that agents can read to understand Codize without loading old plans, chat history, or stale milestone details.
+This directory contains the repository's product-authority router and canonical context. Start with [context_authority.md](context_authority.md).
 
-The context directory is for durable product direction and authority—not every useful project document.
+## Canonical V2 product documents
 
----
+The canonical repository-local sources live in `docs/context/v2/`:
 
-## Active Files
+1. [Codize V2 Product Thesis](v2/codize_v2_product_thesis.md) — highest product authority.
+2. [Codize V2 Exact UX Specification](v2/codize_v2_exact_ux_specification.md) — behavior and interaction authority, subordinate to the thesis.
+3. [Codize V2 Character System Blueprint](v2/codize_v2_character_system_blueprint.md) — character/customization authority only.
 
-### `context_authority.md`
+The approved V2 Figma is visual-composition authority only. See the router for the complete hierarchy.
 
-Read first when sources may disagree.
+## Not yet defined
 
-Defines:
+The repository does not yet have an accepted:
 
-- what controls the active task;
-- what controls implementation state;
-- what controls product direction;
-- what remains authoritative from the legacy master spec;
-- how decisions, memory, strategy, and archives fit together.
+- V2 Technical Architecture / State Model;
+- V2 Learning / Teaching Policy.
 
-### `codize_product_operating_brief_v2.md`
+Do not use V1 implementation structures as substitutes. In particular, do not assume that phases, gates, cooldowns, workflow JSONB, assignments, Defense, or functional unlocks define V2 architecture.
 
-Primary product-direction source.
+## Historical V1 context still stored here
 
-Defines:
+- `codize_product_operating_brief_v2.md` is a superseded V1 product-direction record.
+- `codize_master_spec_v2.1.md` is a historical V1 product specification with reusable technical/security lessons.
 
-- north-star thesis;
-- prevention-first, recovery-capable positioning;
-- primary and secondary audiences;
-- one shared workflow;
-- adaptive support;
-- Change Map reuse;
-- trust and claims rules;
-- guided workflow navigation;
-- UX principles;
-- validation and scope rules;
-- institutional and competition direction.
+Their headers classify their current role. Neither governs V2 product behavior.
 
-This file intentionally avoids live commit hashes, test counts, and milestone status.
+## Where other material belongs
 
-### `codize_master_spec_v2.1.md`
+- `docs/decisions/` — accepted V2 decisions or explicitly labeled historical V1 decisions.
+- `docs/learning/` — future accepted V2 teaching policy or labeled historical learning references.
+- `docs/auth.md`, `docs/db/`, `docs/testing/`, `docs/prebuild/`, and `docs/deployment/` — current implementation evidence or durable technical references; not V2 product authority.
+- `docs/releases/`, `docs/pilot/`, and completed/deferred plans — historical snapshots until replaced for V2.
+- `docs/archive/` — non-authoritative history.
+- `.claude/memory/` — implementation records and durable lessons, classified by its README; never product authority.
 
-Legacy foundation with still-active architecture and safety invariants.
+## Context-file rule
 
-The filename remains stable for references, and the document carries a status banner explaining that:
+Add a new active context file only when its authority and conflict behavior are explicit. Avoid duplicate summaries, milestone logs, transcripts, and speculative architecture in this directory.
 
-- audience and product positioning are superseded;
-- current workflow/UX direction comes from the operating brief;
-- only still-applicable intake, archetype, security, auth/RLS, and gate invariants remain authoritative;
-- repository reality must be inspected before changing implemented behavior.
-
----
-
-## Files That Do Not Belong Here
-
-Keep these outside `docs/context/`.
-
-### Completed milestone plans
-
-Store in:
-
-```text
-docs/archive/plans/completed/
-```
-
-Examples:
-
-- `m13_ai_workflow_workspace_plan.md`
-
-Reason:
-
-- useful historical implementation rationale;
-- stale as active context;
-- current implementation is already captured by code, tests, Git, and memory.
-
-### Deferred feature plans
-
-Store in:
-
-```text
-docs/plans/deferred/
-```
-
-Examples:
-
-- `multi_project_dashboard_plan.md`
-
-Add a banner:
-
-> Re-audit against the current repository before implementation. This plan records the architecture at the date shown and is not current implementation authority.
-
-### Old product visions
-
-Store in:
-
-```text
-docs/archive/product/
-```
-
-Examples:
-
-- `codize_product_vision_v3.md`
-
-Reason:
-
-- historically important;
-- superseded by the prevention-first, recovery-capable operating brief;
-- conflicts with the broader beginner audience and newer Import → Change Map → Review → Verification architecture.
-
-### Old learning/build roadmaps
-
-Store in:
-
-```text
-docs/archive/learning-roadmaps/
-```
-
-Examples:
-
-- `codize_roadmap_v2.html`
-
-Reason:
-
-- roadmap for building/learning Codize itself;
-- not current product direction;
-- too large and visually oriented for routine agent context.
-
-### Model-specific prompting guides
-
-Store in:
-
-```text
-docs/archive/tooling/
-```
-
-Examples:
-
-- `fable_5_prompting.md`
-
-Reason:
-
-- model-specific and time-sensitive;
-- not product context;
-- reusable model-agnostic lessons should live in `CLAUDE.md`, `AGENTS.md`, or a focused memory/skill.
-
-### Chat exports
-
-Prefer removing from the Git repository and retaining a private local backup.
-
-Example:
-
-- `conversations.json`
-
-Reason:
-
-- very large;
-- non-authoritative;
-- may contain personal or sensitive history;
-- expensive and distracting for agents;
-- product decisions should be distilled into the operating brief, decision records, or memory.
-
-When retention in the repository is unavoidable, place it under:
-
-```text
-docs/archive/private/
-```
-
-and prevent default agent loading.
-
----
-
-## The Full One-Stop PDF
-
-Store the human-readable PDF outside the active context directory:
-
-```text
-docs/strategy/Codize_One_Stop_Plan_Prevention_First_Recovery_Capable.pdf
-```
-
-The PDF remains valuable for:
-
-- detailed growth strategy;
-- beta plans;
-- institutionalization;
-- metrics;
-- competition preparation;
-- historical July–October sequencing;
-- human review.
-
-The active Markdown operating brief is the agent-facing synthesis.
-
-Repository state outranks stale milestone labels and dates in the PDF.
-
----
-
-## Decision Records
-
-Use:
-
-```text
-docs/decisions/
-```
-
-for narrow durable decisions.
-
-Current recommended record:
-
-```text
-docs/decisions/guided_workflow_navigation.md
-```
-
-Decision records should not duplicate the full operating brief. They should explain a specific accepted choice in enough detail to guide later implementation.
-
----
-
-## Final Recommended Structure
-
-```text
-docs/
-├── context/
-│   ├── README.md
-│   ├── context_authority.md
-│   ├── codize_product_operating_brief_v2.md
-│   └── codize_master_spec_v2.1.md
-│
-├── decisions/
-│   └── guided_workflow_navigation.md
-│
-├── strategy/
-│   └── Codize_One_Stop_Plan_Prevention_First_Recovery_Capable.pdf
-│
-├── plans/
-│   └── deferred/
-│       └── multi_project_dashboard_plan.md
-│
-└── archive/
-    ├── plans/
-    │   └── completed/
-    │       └── m13_ai_workflow_workspace_plan.md
-    ├── product/
-    │   └── codize_product_vision_v3.md
-    ├── learning-roadmaps/
-    │   └── codize_roadmap_v2.html
-    └── tooling/
-        └── fable_5_prompting.md
-```
-
-Keep `conversations.json` outside Git when possible.
-
----
-
-## Rules for Adding a New Context File
-
-Add a file to `docs/context/` only when it is:
-
-- durable for months;
-- needed across many future milestones;
-- authoritative for product direction or source precedence;
-- concise enough to load routinely;
-- not already represented by code, tests, decisions, or memory.
-
-Do not add:
-
-- per-milestone prompts;
-- completion reports;
-- full transcripts;
-- model guides;
-- temporary schedules;
-- large research dumps;
-- duplicate summaries;
-- speculative feature plans.
-
-Prefer updating an existing active context document over creating another overlapping source.
+Do not read `conversations.json` by default.

@@ -1,5 +1,8 @@
 # Linked Evidence UI conventions
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 M16B.3B is a frontend-only consumer of the reviewed M16B.3A contract. The
 existing `/app/phase/evidence` route and shared workflow store remain the one
 surface and persistence path. No backend, schema, provider, prompt, Defense,

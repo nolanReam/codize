@@ -1,5 +1,8 @@
 # Change Map UI conventions (Milestone 15C.2)
 
+> [!NOTE]
+> **Implementation/technical reference.** Preserve applicable security, provenance, validation, ownership, and engineering lessons, but do not treat this file as V2 product or architecture authority.
+
 **Purpose and framing:** prevention-first, recovery-capable. The page teaches
 the default habit: use AI → bring back what changed → review Codize's draft →
 correct it → preserve uncertainty honestly → confirm that the map was

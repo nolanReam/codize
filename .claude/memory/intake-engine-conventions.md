@@ -1,5 +1,8 @@
 # Intake engine conventions (Milestone 6)
 
+> [!WARNING]
+> **Current/legacy V1 product or lifecycle record.** Use this file only to understand or maintain the implemented V1 subsystem. It is not V2 product or architecture authority.
+
 The five intake questions in `backend/app/services/intake_service.py` are
 **spec-verbatim** — including Q4's odd phrasing "On a scale of honest to
 honest: …", which is literally what the master spec says (with its three fixed

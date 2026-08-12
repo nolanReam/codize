@@ -1,6 +1,13 @@
 # Codize Product Operating Brief v2.1
 
-**Status:** Active product-direction source
+> [!WARNING]
+> **Status: Historical V1 product-direction record — not V2 authority.**
+>
+> This document describes the prevention-first / Project Defense direction that shaped the current V1 implementation. Its required shared workflow, Change Map destinations, Verification/Evidence stages, mandatory Defense, reports, and related navigation do not govern Codize V2.
+>
+> For V2, start with `docs/context/context_authority.md` and the canonical documents in `docs/context/v2/`. Preserve this file for product history only.
+
+**Former status:** Active product-direction source
 **Purpose:** Stable, machine-readable summary of Codize's prevention-first, recovery-capable product direction
 **Supersedes for product direction:** `docs/archive/product/codize_product_vision_v3.md`
 **Derived from:** `docs/strategy/Codize_One_Stop_Plan_Prevention_First_Recovery_Capable.pdf`
