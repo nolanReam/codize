@@ -1,11 +1,30 @@
 # Codize Database Schema (Milestone 2)
 
 > [!NOTE]
-> **Current V1 implementation reference.** The schema below accurately records the implemented/legacy system. It is not the V2 schema. The accepted V2 [Technical Architecture](../context/v2/codize_v2_technical_architecture.md) and [Schema and Persistence Design](../context/v2/codize_v2_schema_design.md) define a separate, not-yet-implemented `public.v2_*` domain. Do not repurpose this V1 phase, gate, workflow-artifact, or unlock storage as V2 truth.
+> **Current V1 deployment reference.** The schema below accurately records the implemented/legacy system. It is not the V2 schema. The accepted V2 [Technical Architecture](../context/v2/codize_v2_technical_architecture.md) and [Schema and Persistence Design](../context/v2/codize_v2_schema_design.md) define a separate `public.v2_*` domain. The additive V2.2 migration package now exists locally in `supabase/migrations/20260812074622_v2_database_foundation.sql`, but it has not been applied or deployed by this milestone. Do not repurpose this V1 phase, gate, workflow-artifact, or unlock storage as V2 truth.
 
 Supabase project: `tadkbymxkdncqahzshml` (Postgres 17). Applied migrations live in
 `supabase/migrations/` and mirror what was applied via MCP on 2026-07-02.
 Audit queries: `scripts/verify_rls.sql`.
+
+## Local V2.2 migration package (not deployed)
+
+`supabase/migrations/20260812074622_v2_database_foundation.sql` creates the
+separate eleven-table `public.v2_*` domain, its constraints/indexes/transition
+guards, default-deny RLS/grants, and backend-only atomic completion and purge
+transactions. `scripts/verify_v2_database_foundation.sql` is the isolated,
+rollback-only PostgreSQL behavior/catalog verifier;
+`scripts/verify_v2_completion_concurrency.py` is the opt-in two-session lock
+and duplicate-command verifier for a disposable migrated database. V1 remains the only
+documented deployed product schema until a separately authorized migration is
+applied and verified.
+
+This package is forward-only. Before any remote application, defects are fixed
+in the unapplied migration. After an application, corrections must use a new
+additive forward migration; rollback must never drop, rewrite, or backfill V1
+product data. If access must be stopped while a correction is prepared, revoke
+the affected V2 RPC/table privileges in a reviewed forward migration rather
+than deleting either product domain.
 
 Note: this project previously held an unrelated legacy schema (20 empty tables,
 migrations 001–010 from 2026-06-16). It was dropped with owner approval in

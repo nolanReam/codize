@@ -1,7 +1,7 @@
 # Codize V2 canonical context
 
 **Status:** Active canonical product authority set.
-**Stage:** Product, UX, character, and technical architecture approved; physical MVP schema designed; implementation and migration not begun.
+**Stage:** Product, UX, character, and technical architecture approved; the physical MVP schema is designed; the V2.2 database migration and local verifier are implemented but not applied or deployed. V2 application/API/UI implementation has not begun.
 
 Read in this order:
 
@@ -16,4 +16,4 @@ These files are repository-local copies of the supplied canonical documents. The
 
 The approved Figma controls visual composition only. The complete precedence and conflict rules live in [the context authority router](../context_authority.md).
 
-The V2 architecture, eleven-table MVP entity cut, state model, compatibility boundary, and physical schema design are canonical documentation only. They are not implemented. Exact learner qualification/fading rules, high-risk teaching minimums, retention durations, V1 cutover, and later GitHub/character-economy decisions remain unresolved until their own accepted policy or milestone.
+The V2 architecture, eleven-table MVP entity cut, state model, compatibility boundary, and physical schema design remain canonical authority. Their V2.2 PostgreSQL foundation now exists as an additive local migration plus database verifier; that package is not evidence of a remote migration, deployed API, or product surface. Exact learner qualification/fading rules, high-risk teaching minimums, retention durations, V1 cutover, and later GitHub/character-economy decisions remain unresolved until their own accepted policy or milestone.

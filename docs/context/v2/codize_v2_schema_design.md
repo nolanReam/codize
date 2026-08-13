@@ -6,7 +6,7 @@
 
 **Milestone:** V2.1 — documentation and schema design only.
 
-**Implementation status:** Designed, not implemented. No table, migration, RPC, grant, policy, backend route, frontend surface, cutover, or deployment described here exists until a later authorized milestone implements and verifies it.
+**Implementation status:** The V2.2 additive migration and local database verifier are implemented in the repository. They are not applied or deployed, and no V2 backend route, frontend surface, cutover, or external integration is implemented. Verified deployment evidence remains required before treating any remote database as migrated.
 
 **Authority:** This document implements the [Codize V2 Technical Architecture and State Model](codize_v2_technical_architecture.md). The [Product Thesis](codize_v2_product_thesis.md), [Exact UX Specification](codize_v2_exact_ux_specification.md), and [Character System Blueprint](codize_v2_character_system_blueprint.md) remain higher authority in their scopes. If this document conflicts with them or with the Technical Architecture, the higher source wins and this design must be corrected.
 
@@ -103,6 +103,7 @@ The following checks belong in V2.2 DDL. API enums mirror these strings exactly.
 | effort | `quick`, `standard`, `deep` |
 | teaching mode | `skip`, `ask`, `remind`, `teach` |
 | risk | `normal`, `slowdown` |
+| check requirement | `required`, `waived` |
 | support level | `none`, `nudge`, `clue`, `teach` |
 | return outcome | `worked`, `broken`, `unsure` |
 | check source | `codize`, `student` |
@@ -263,13 +264,13 @@ Constraints tie deletion timestamps to `deletion_pending`; `temporary_recovery` 
 | `intended_outcome` | `text` | no | bounded 4 KiB |
 | `scope_band` | `varchar(24)` | no | `first_version` or `later` |
 | `status` | `varchar(16)` | no | controlled plan status |
-| `order_key` | `bigint` | no | positive stable order within a scope band |
+| `order_key` | `bigint` | no | positive stable order within a visible scope band; removed tombstones use an internal negative key |
 | `completed_at` | `timestamptz` | yes | present only for `done` |
 | `terminal_current_change_id` | `uuid` | yes | same-project terminal Current Change that completed the item |
 | `version` | `bigint` | no | optimistic row version |
 | `created_at`, `updated_at` | `timestamptz` | no | server-authored |
 
-The circular `terminal_current_change_id` FK is added after Current Changes exist, uses the same project/owner composite identity, and specifies column-specific `on delete set null (terminal_current_change_id)`. It is a backward historical convenience pointer, not ownership. `completed_at`, label, outcome, and the terminal Current Change's own immutable snapshots preserve meaning if that pointer is cleared. A partial unique index enforces unique `(project_id, scope_band, order_key)` for rows whose status is not `removed`.
+The circular `terminal_current_change_id` FK is added after Current Changes exist, uses the same project/owner composite identity, and specifies column-specific `on delete set null (terminal_current_change_id)`. It is a backward historical convenience pointer, not ownership. `completed_at`, label, outcome, and the terminal Current Change's own immutable snapshots preserve meaning if that pointer is cleared. The physical ordering constraint is deferrable and covers `(project_id, scope_band, order_key)` for every row so an atomic multi-item reorder can swap keys safely. Removing an item rehomes its tombstone to a unique negative key; visible Plan items remain positive, and ordinary Plan reads plus their ordering index exclude `removed` rows.
 
 **Delete:** Plan items are normally statused `removed`, not physically deleted. Project purge cascades. Removing the linked item while a change is active requires the explicit keep-and-detach or cancel-and-remove command from the architecture.
 
@@ -304,6 +305,8 @@ The circular `terminal_current_change_id` FK is added after Current Changes exis
 | `risk` | `varchar(16)` | no | `normal` or `slowdown` |
 | `risk_reason_key` | `varchar(128)` | yes | required for slowdown |
 | `risk_policy_version` | `varchar(64)` | no | persisted risk classifier identity |
+| `check_requirement` | `varchar(16)` | no | deterministic `required` or explicit `waived`; defaults fail-closed to `required` |
+| `check_waiver_reason_key` | `varchar(128)` | yes | required only for `waived`; bounded noncontent policy reason |
 | `help_context_key` | `varchar(64)` | yes | current intervention/help target |
 | `support_level_disclosed` | `varchar(16)` | no | default `none`; monotonic within one help context |
 | `student_return_outcome` | `varchar(16)` | yes | worked/broken/unsure report, not proof |
@@ -326,7 +329,7 @@ on public.v2_current_changes (project_id)
 where lifecycle_state in ('preparing', 'awaiting_agent', 'reviewing', 'recovering');
 ```
 
-Additional unique indexes cover `(owner_user_id, create_command_id)` and nonnull handoff/completion/cancellation command IDs. Check constraints enforce terminal timestamps and slowdown reason presence. The lifecycle/resume matrix is exact:
+Additional unique indexes cover `(owner_user_id, create_command_id)` and nonnull handoff/completion/cancellation command IDs. Check constraints enforce terminal timestamps, slowdown reason presence, and the minimal persisted check decision. `risk = slowdown` always requires a Check in V2.2; a normal-risk omission is legal only when `check_requirement = waived` and a nonblank policy reason is persisted. This stores a later deterministic teaching-policy decision without inventing its thresholds. The lifecycle/resume matrix is exact:
 
 | Lifecycle state | Legal `resume_step` values |
 |---|---|
@@ -452,7 +455,16 @@ The only status transition is `proposed -> performed|not_run`, with `version + 1
 | `system_observed` | `current_change`, `prompt_version`, `check`, `recovery_case` | source field must actually establish the narrow value; a Check must be performed |
 | `codize_inferred` | `build_turn`, `current_change`, `prompt_version`, `check`, `recovery_case` | source is the stable input/context record supporting the inference; a Check must be performed |
 
-`generation_attempt` is deliberately absent. A Generation Attempt may explain operational production of a prompt/turn, but a durable Fact points to that accepted stable record instead and never requires operational metadata to be retained. When the future GitHub table exists, `repository_observation` becomes legal only after its validator ships.
+`generation_attempt` is deliberately absent. A Generation Attempt may explain operational production of a prompt/turn, but a durable Fact points to that accepted stable record instead and never requires operational metadata to be retained. When the future GitHub table exists, `repository_observation` becomes legal only after its validator ships. For every source kind above that permits `check`, the Check must be `performed` and the following additional result-strength matrix applies:
+
+| Check result | `known_working_behavior` statuses | `unresolved_behavior` statuses |
+|---|---|---|
+| `worked` | `active`, or later `contradicted`, `stale`, `superseded` | only `contradicted`, `stale`, `superseded`; never a new active unresolved claim |
+| `partly_worked` | `unresolved`, `contradicted`, `stale`, `superseded` | `unresolved`, `contradicted`, `stale`, `superseded` |
+| `did_not_work` | `contradicted` or `superseded`; never active | `active`, `unresolved`, `contradicted`, `stale`, `superseded` |
+| `unsure` | `unresolved`, `stale`, `superseded` | `unresolved`, `stale`, `superseded` |
+
+All other Fact type/status pairings for a Check source fail closed. This matrix is enforced on insertion and on later status changes, so a valid original observation may age or be superseded without allowing the source to overstate what it established.
 
 There is no uniqueness constraint that collapses all active facts for one subject: contradictory sources may coexist. A unique `(id, project_id, owner_user_id, fact_type, subject_key)` key supports the same-subject supersession FK. Supersession is stricter than contradiction. A single transaction inserts a successor, changes the prior same-subject Fact to `superseded` with `version + 1`, and links the successor back to it. A partial unique constraint on nonnull `supersedes_fact_id` prevents two direct successors. A deferred constraint trigger verifies reciprocal truth at commit: an extant `superseded` Fact has exactly one linked successor, and a linked predecessor is `superseded`; self-links, cross-subject links, and standalone status changes to `superseded` fail. Physical project purge may delete both ends, and the nullable backward pointer cannot block it.
 
@@ -646,7 +658,7 @@ V2.2 DDL must include and test at least the following.
 | idempotent project/change/check/recovery creation | unique owner + operation command ID |
 | idempotent prompt acceptance/handoff/completion/cancellation | partial unique owner + relevant command ID |
 | latest plan-command scope | partial unique `(owner_user_id, last_plan_command_id)` where the command ID is nonnull |
-| plan ordering and ordinary plan read | partial unique `(project_id, scope_band, order_key)` and `(owner_user_id, project_id, scope_band, order_key)` where status is not `removed` |
+| plan ordering and ordinary plan read | deferrable unique `(project_id, scope_band, order_key)` plus `(owner_user_id, project_id, scope_band, order_key)` where status is not `removed` |
 | project list/switcher | `(owner_user_id, lifecycle_state, updated_at desc)` |
 | explicit Current Change lookup/history | `(owner_user_id, project_id, created_at desc)` |
 | terminal History ordering | partial expression index `(owner_user_id, project_id, (coalesce(completed_at, cancelled_at)) desc)` for terminal Current Changes |
@@ -665,7 +677,7 @@ V2.2 DDL must include and test at least the following.
 | optional Prompt/Turn/Attempt/Recovery links | partial indexes on `generation_attempt_id`; Build Turn `current_change_id`/`recovery_case_id`; Generation Attempt target Current Change/Recovery Case; and Recovery candidate Current Change |
 | active-project `set null` | partial index on `v2_user_preferences.active_v2_project_id` where nonnull |
 
-These indexes correspond to an accepted read path, uniqueness rule, or PostgreSQL scan needed to enforce an optional foreign-key action. V2.2 should inspect generated plans and the catalog and should omit a mechanically duplicate index when an existing unique/composite index has the same useful leading columns. No speculative analytics or telemetry indexes belong in the MVP migration.
+These indexes correspond to an accepted read path, uniqueness rule, or PostgreSQL scan needed to enforce an optional foreign-key action. The all-status order constraint is a narrow physical clarification: deferral is required for atomic swaps/reorders, and removed rows retain their last unique order key rather than weakening the logical nonremoved-plan contract. V2.2 should inspect generated plans and the catalog and should omit a mechanically duplicate index when an existing unique/composite index has the same useful leading columns. No speculative analytics or telemetry indexes belong in the MVP migration.
 
 Database transition guards must reject:
 
@@ -706,7 +718,7 @@ Rules:
 
 ### 8.1 Plan mutation transaction
 
-A plan edit/reorder is one database transaction:
+A plan add/edit/reorder/move/remove command, including multiple affected Plan Items, is one database transaction:
 
 1. optionally perform an initial owner/project/`last_plan_command_id` lookup as a nonauthoritative retry hint;
 2. lock the owned Project;
@@ -714,7 +726,7 @@ A plan edit/reorder is one database transaction:
 4. compare `expected_plan_version` and `expected_project_version`;
 5. when the command can detach/cancel an active change, lock that Current Change before any Plan Item and compare its expected version;
 6. lock affected Plan Items in stable ID order;
-7. validate same project, row versions, order uniqueness, and active-item behavior;
+7. validate the exact bounded operation array, same project, row versions, final order uniqueness, and active-item behavior;
 8. apply edits/reorder/status changes;
 9. increment each affected row version and Project `plan_version`/`version` by exactly one;
 10. store `last_plan_command_id` and return the current ordered Plan.
@@ -808,14 +820,15 @@ The global lock-class order is always **Project -> Current Change -> Plan Item, 
 
 - revoke `execute` from `public`, `anon`, and `authenticated`;
 - grant only to the backend role used by FastAPI;
-- declare `security invoker` explicitly;
+- keep the `public` PostgREST RPC as a locked-down `security invoker` wrapper;
+- place the write-capable body in an unexposed internal schema as `security definer` under the dedicated nonlogin V2 execution role because the backend role has no direct table writes;
 - use a fixed empty `search_path` (`set search_path = ''`) and schema-qualify every object;
 - use no dynamic SQL;
 - verify owner in the locked transaction even though FastAPI already authorized the request;
 - validate all bounds and controlled values again;
 - map stale/terminal/not-found outcomes to safe API errors without leaking project existence.
 
-If a later direct PostgreSQL driver replaces the RPC, the transaction contract remains canonical but the function name does not need to remain an application API.
+The nonlogin owner has no credentials, no schema-creation privilege after migration setup, and receives access only to the eleven V2 tables, the Build Turn sequence, and the bounded validation helpers. The exposed wrapper has no write capability of its own; only the private body can mutate V2 state. This is the narrow architecture-permitted `security definer` case: it removes broad backend DML instead of escalating an ownership bug, while the function still revalidates owner/project identity and every transition. If a later direct PostgreSQL driver replaces the RPC, the transaction contract remains canonical but the function name does not need to remain an application API.
 
 ## 10. RLS, grants, and access paths
 
@@ -825,14 +838,14 @@ If a later direct PostgreSQL driver replaces the RPC, the transaction contract r
 |---|---:|---:|---|
 | `anon` | none | none | Supabase public Auth flows only |
 | `authenticated` | none | none | Supabase Auth session; V2 data through FastAPI |
-| FastAPI backend role | minimum required statements | completion only as needed | owner-scoped repositories/application services |
+| FastAPI backend role | read only; no direct V2 DML | narrowly reviewed mutation RPCs only | owner-scoped repositories/application services |
 | migration/owner role | schema administration | administration | migration workflow only |
 
 Every V2 table has RLS enabled in the same migration that creates it. The initial browser-facing policy set is deliberately empty/default-deny because browser roles have no legitimate V2 table operation. Grants and RLS are independently verified; neither substitutes for the other.
 
-If the deployed backend role has `bypassrls` (as Supabase `service_role` normally does), application queries and internal functions remain responsible for explicit owner filtering. A future non-bypass backend role may add narrowly reviewed owner policies; it must not add direct browser access accidentally.
+The deployed Supabase `service_role` normally bypasses RLS, so V2.2 does not grant it direct table writes. Public PostgREST RPCs are `security invoker` wrappers; mutations execute only through their unexposed-schema bodies owned by a dedicated nonlogin execution role with access limited to the eleven V2 tables and sequence. The private bodies use `security definer`, an empty fixed `search_path`, fully qualified objects, exact owner/project checks, no dynamic SQL, and explicit schema/`EXECUTE` revocation/grants. This is the least-privilege path required to prevent a backend caller from bypassing transaction invariants with direct DML. A future direct-driver backend may instead use a comparably restricted database role, but may not restore broad `service_role` table writes.
 
-Sequences/identity objects, helper functions, and internal transaction functions receive the same explicit revocation review. Default privileges are inspected rather than assumed.
+Sequences/identity objects, helper functions, and internal transaction functions receive the same explicit revocation review. PostgreSQL's global default `PUBLIC EXECUTE` on newly created functions is revoked for both the migration role and the dedicated V2 execution owner; `pg_default_acl` is inspected rather than assuming that object-level revokes protect future objects.
 
 ### 10.2 Required negative tests
 

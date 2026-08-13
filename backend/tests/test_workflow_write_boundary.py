@@ -44,10 +44,12 @@ def test_migration_preserves_service_role_anon_and_rls_contracts():
 
 def test_historical_migrations_remain_separate_from_m16s1():
     files = sorted(MIGRATIONS.glob("*.sql"))
-    assert files[-1] == MIGRATION
-    assert len(files) == 7
-    older = "\n".join(_sql(path) for path in files[:-1])
+    v1_files = [path for path in files if "_v2_" not in path.name]
+    assert v1_files[-1] == MIGRATION
+    assert len(v1_files) == 7
+    older = "\n".join(_sql(path) for path in v1_files[:-1])
     assert "harden_workflow_artifact_write_boundary" not in older
+    assert all(path.name > MIGRATION.name for path in files if path not in v1_files)
 
 
 def test_rls_and_owner_read_policy_still_exist_in_schema_history():
@@ -81,7 +83,9 @@ def test_backend_project_writes_use_the_owner_filtered_service_repository():
 
 
 def test_no_exposed_view_or_rpc_bypass_exists_in_migration_history():
-    sql = "\n".join(_sql(path) for path in MIGRATIONS.glob("*.sql"))
+    sql = "\n".join(
+        _sql(path) for path in MIGRATIONS.glob("*.sql") if "_v2_" not in path.name
+    )
     assert not re.search(r"\bcreate\s+(?:or\s+replace\s+)?view\b", sql)
     functions = re.findall(r"create\s+function\s+public\.([a-z0-9_]+)\s*\(", sql)
     assert set(functions) == {"set_updated_at", "handle_new_user"}
