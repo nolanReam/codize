@@ -1,7 +1,7 @@
 # Codize backend (FastAPI)
 
 > [!NOTE]
-> **Current implementation reference (V1).** This README documents the backend that exists today. Its intake, archetypes, roadmap, phases, gates, cooldowns, Defense, workflow artifacts, and unlocks are not future V2 requirements. For V2 direction, read `docs/context/context_authority.md`. The accepted V2 Technical Architecture and Schema Design are documentation only and are not implemented by this backend yet.
+> **Current implementation reference.** Most of this README documents the maintained V1 backend. Its intake, archetypes, roadmap, phases, gates, cooldowns, Defense, workflow artifacts, and unlocks are not V2 requirements. V2.3A adds the separate Project/Plan/Current Change backend core described below; it does not migrate or reinterpret V1. For V2 direction, read `docs/context/context_authority.md`.
 
 Async FastAPI service. Architecture rule: **Frontend → this backend → external
 services (Supabase, LLM providers)** — the frontend never calls external
@@ -48,6 +48,43 @@ app/
 └── prompts/       the six system prompts (Milestone 1)
 tests/             pytest suite
 ```
+
+## V2.3A backend core
+
+V2 uses a separate domain, schemas, application services, repository, and
+`/v2` router. Every project-scoped operation takes an explicit Project ID and
+derives the owner from the verified JWT. Table reads remain owner-scoped;
+mutations use the reviewed V2 PostgreSQL command functions, including the
+existing atomic Plan and temporary-project purge primitives. The browser has
+no V2 Data API path.
+
+Implemented routes:
+
+- `POST /v2/projects`
+- `GET /v2/project-refs`
+- `GET /v2/projects/{project_id}`
+- `POST /v2/projects/{project_id}/promote`
+- `POST /v2/projects/{project_id}/discard-temporary`
+- `GET /v2/projects/{project_id}/plan`
+- `POST /v2/projects/{project_id}/plan/mutations`
+- `POST|GET /v2/projects/{project_id}/current-change`
+- `POST /v2/projects/{project_id}/current-change/{current_change_id}/cancel`
+
+This slice has no V2 frontend, provider/LLM calls, teaching policy, GitHub
+integration, or character progression. Project creation requires an explicit
+`new_idea`, `already_building`, or `recovery_first` intent. The first two begin
+in `draft` at their canonical setup step; Recovery-first requires bounded
+Recovery context and atomically creates a `temporary_recovery` Project plus an
+unresolved recovery Current Change.
+
+Current Change start persists explicit backend-only unevaluated policy markers
+required by the accepted non-null schema. PostgreSQL confines either unresolved
+policy version to `preparing / confirm_change` or cancellation and rejects
+prompt acceptance, handoff, later lifecycle states, and completion. A narrow
+backend-only atomic resolver exists for a future accepted policy implementation;
+it defines no thresholds. Temporary promotion requires completed Current Change
+and resolved Recovery Case evidence, records the exact promotion command, and
+resumes at `existing_project_context` rather than claiming setup is ready.
 
 ## Setup & run
 

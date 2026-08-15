@@ -19,6 +19,7 @@ from app.routers import (
     reconnection,
     roadmap,
     unlocks,
+    v2_projects,
     workflow,
 )
 from app.services import template_service
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(reconnection.router)
     app.include_router(evaluation.router)
     app.include_router(workflow.router)
+    app.include_router(v2_projects.router)
     return app
 
 

@@ -320,7 +320,7 @@ insert into public.v2_current_changes (
   'build', 'preparing', 'prompt', 'Persist the form', 'Refresh preserves it',
   array['Keep the change inside the local form state'],
   'Implement local persistence.', 'cursor', 'standard',
-  'skip', 'policy_not_set', 'unresolved-v0',
+  'skip', 'policy_not_set', 'teaching-v1',
   'normal', 'risk-v1', 'a2000000-0000-4000-8000-000000000032'
 );
 
@@ -335,7 +335,7 @@ begin
       'a2000000-0000-4000-8000-000000000011',
       'a2000000-0000-4000-8000-000000000001',
       'build', 'preparing', 'confirm_change', 'A second active change',
-      'skip', 'policy_not_set', 'unresolved-v0', 'normal', 'risk-v1',
+      'skip', 'policy_not_set', 'teaching-v1', 'normal', 'risk-v1',
       'a2000000-0000-4000-8000-000000000033'
     );
     raise exception 'second nonterminal Current Change unexpectedly succeeded';
@@ -745,7 +745,7 @@ begin
     p_current_change_id, p_project_id, p_owner_user_id, 'build', 'preparing',
     'prompt', 'Exercise completion eligibility', 'The eligibility rule holds',
     'Apply the isolated change.', 'test-agent', 'standard', 'skip',
-    'policy_not_set', 'unresolved-v0', p_risk,
+    'policy_not_set', 'teaching-v1', p_risk,
     case when p_risk = 'slowdown' then 'high_risk_change' else null end,
     'risk-v1', p_check_requirement,
     case when p_check_requirement = 'waived' then 'policy_redundant' else null end,
@@ -962,7 +962,7 @@ insert into public.v2_current_changes (
   'a2000000-0000-4000-8000-000000000001',
   'b4000000-0000-4000-8000-000000000021',
   'build', 'preparing', 'confirm_change', 'Immutable active goal',
-  'skip', 'policy_not_set', 'unresolved-v0', 'normal', 'risk-v1',
+  'skip', 'policy_not_set', 'teaching-v1', 'normal', 'risk-v1',
   gen_random_uuid()
 );
 do $$
@@ -1077,7 +1077,7 @@ insert into public.v2_current_changes (
   'a2000000-0000-4000-8000-000000000001',
   'b5000000-0000-4000-8000-000000000021',
   'build', 'preparing', 'confirm_change', 'Cancel this active change',
-  'skip', 'policy_not_set', 'unresolved-v0', 'normal', 'risk-v1',
+  'skip', 'policy_not_set', 'teaching-v1', 'normal', 'risk-v1',
   gen_random_uuid()
 );
 select public.mutate_v2_plan(
@@ -1125,7 +1125,7 @@ begin
       'b2000000-0000-4000-8000-000000000011',
       'b2000000-0000-4000-8000-000000000002',
       'build', 'preparing', 'return_outcome', 'Illegal resume pairing',
-      'skip', 'policy_not_set', 'unresolved-v0', 'normal', 'risk-v1',
+      'skip', 'policy_not_set', 'teaching-v1', 'normal', 'risk-v1',
       'b2000000-0000-4000-8000-000000000013'
     );
     raise exception 'illegal lifecycle/resume pairing unexpectedly succeeded';
@@ -1144,7 +1144,7 @@ insert into public.v2_current_changes (
   'b2000000-0000-4000-8000-000000000002',
   'recovery', 'preparing', 'prompt', 'Repair loading', 'Loading works again',
   'Repair the load path.', 'cursor', 'deep', 'skip', 'policy_not_set',
-  'unresolved-v0', 'normal', 'risk-v1',
+  'teaching-v1', 'normal', 'risk-v1',
   'b2000000-0000-4000-8000-000000000032'
 );
 select * from public.accept_v2_prompt_version(
@@ -1816,7 +1816,7 @@ insert into public.v2_current_changes (
   'a2000000-0000-4000-8000-000000000121',
   'recovery', 'preparing', 'prompt', 'Private recovery goal', 'Private done',
   'Private correction prompt.', 'cursor', 'deep',
-  'skip', 'policy_not_set', 'unresolved-v0',
+  'skip', 'policy_not_set', 'teaching-v1',
   'normal', 'risk-v1', 'a2000000-0000-4000-8000-000000000132'
 );
 insert into public.v2_generation_attempts (

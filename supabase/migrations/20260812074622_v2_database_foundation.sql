@@ -1320,6 +1320,26 @@ begin
     if new.lifecycle_state <> 'preparing' then
       raise exception using errcode = '23514', message = 'v2 current change must start in preparing';
     end if;
+    if (new.teaching_policy_version = 'unresolved-v0'
+        or new.risk_policy_version = 'unresolved-v0')
+       and not (
+         new.lifecycle_state = 'preparing'
+         and new.resume_step = 'confirm_change'
+         and new.done_condition_snapshot is null
+         and pg_catalog.cardinality(new.boundary_snapshots) = 0
+         and new.prompt_draft is null
+         and new.coding_agent_key is null
+         and new.effort_category is null
+         and new.latest_prompt_version_id is null
+         and new.handoff_command_id is null
+         and new.completion_command_id is null
+         and new.student_return_outcome is null
+         and new.accepted_outcome_summary is null
+         and new.unresolved_uncertainty_summary is null
+       ) then
+      raise exception using errcode = '23514',
+        message = 'unresolved V2 policy permits only initial preparation';
+    end if;
     new.created_at := pg_catalog.now();
     new.updated_at := new.created_at;
     return new;
@@ -1342,6 +1362,27 @@ begin
   end if;
   if old.lifecycle_state in ('completed', 'cancelled') then
     raise exception using errcode = '23514', message = 'terminal v2 current change cannot be updated';
+  end if;
+  if (new.teaching_policy_version = 'unresolved-v0'
+      or new.risk_policy_version = 'unresolved-v0')
+     and new.lifecycle_state <> 'cancelled'
+     and not (
+       new.lifecycle_state = 'preparing'
+       and new.resume_step = 'confirm_change'
+       and new.done_condition_snapshot is null
+       and pg_catalog.cardinality(new.boundary_snapshots) = 0
+       and new.prompt_draft is null
+       and new.coding_agent_key is null
+       and new.effort_category is null
+       and new.latest_prompt_version_id is null
+       and new.handoff_command_id is null
+       and new.completion_command_id is null
+       and new.student_return_outcome is null
+       and new.accepted_outcome_summary is null
+       and new.unresolved_uncertainty_summary is null
+     ) then
+    raise exception using errcode = '23514',
+      message = 'unresolved V2 policy permits only initial preparation or cancellation';
   end if;
   if new.lifecycle_state is distinct from old.lifecycle_state and not (
     (old.lifecycle_state = 'preparing' and new.lifecycle_state in ('awaiting_agent', 'cancelled'))
@@ -1424,6 +1465,18 @@ declare
   v_handoff boolean;
   v_origin_clear boolean;
 begin
+  if exists (
+    select 1 from public.v2_current_changes as cc
+    where cc.id = new.current_change_id
+      and cc.project_id = new.project_id
+      and cc.owner_user_id = new.owner_user_id
+      and (cc.teaching_policy_version = 'unresolved-v0'
+        or cc.risk_policy_version = 'unresolved-v0')
+  ) then
+    raise exception using errcode = '23514',
+      message = 'prompt acceptance and handoff require resolved V2 policy';
+  end if;
+
   if tg_op = 'INSERT' then
     if new.version <> 1 then
       raise exception using errcode = '23514', message = 'v2 prompt version must start at 1';
@@ -2826,6 +2879,12 @@ begin
     raise exception using errcode = 'P0002', message = 'v2 current change not found';
   end if;
 
+  if v_change.teaching_policy_version = 'unresolved-v0'
+     or v_change.risk_policy_version = 'unresolved-v0' then
+    raise exception using errcode = '23514',
+      message = 'prompt acceptance requires resolved V2 policy';
+  end if;
+
   if p_recovery_case_id is not null then
     select * into v_recovery
     from public.v2_recovery_cases as rc
@@ -2962,6 +3021,12 @@ begin
     raise exception using errcode = 'P0002', message = 'v2 current change not found';
   end if;
 
+  if v_change.teaching_policy_version = 'unresolved-v0'
+     or v_change.risk_policy_version = 'unresolved-v0' then
+    raise exception using errcode = '23514',
+      message = 'prompt handoff requires resolved V2 policy';
+  end if;
+
   if p_recovery_case_id is not null then
     select * into v_recovery
     from public.v2_recovery_cases as rc
@@ -3090,6 +3155,7 @@ begin
   where rc.id = p_recovery_case_id and rc.current_change_id = v_change.id
     and rc.project_id = p_project_id and rc.owner_user_id = p_owner_user_id
   for update;
+
   if not found then
     raise exception using errcode = 'P0002', message = 'v2 recovery case not found';
   end if;
@@ -3483,6 +3549,12 @@ begin
   for update;
 
   -- This recheck is intentionally after every applicable aggregate lock.
+  if v_change.teaching_policy_version = 'unresolved-v0'
+     or v_change.risk_policy_version = 'unresolved-v0' then
+    raise exception using errcode = '23514',
+      message = 'completion requires resolved V2 policy';
+  end if;
+
   if v_change.lifecycle_state = 'completed'
      and v_change.completion_command_id = p_completion_command_id then
     return query select
@@ -3505,7 +3577,9 @@ begin
     raise exception using errcode = '23505', message = 'completion command id was already used';
   end if;
 
-  if v_project.lifecycle_state <> 'active'
+  if v_project.lifecycle_state not in ('active', 'temporary_recovery')
+     or (v_project.lifecycle_state = 'temporary_recovery'
+       and v_change.change_kind <> 'recovery')
      or v_change.lifecycle_state not in ('reviewing', 'recovering')
      or v_change.version <> p_expected_current_change_version then
     raise exception using errcode = '40001', message = 'stale or ineligible v2 completion';

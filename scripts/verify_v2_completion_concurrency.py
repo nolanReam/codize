@@ -108,7 +108,7 @@ def setup_fixture() -> None:
                   %s, %s, %s, 'build', 'preparing', 'prompt',
                   'Exercise duplicate completion', 'Only one command writes',
                   %s, 'test-agent', 'standard', 'skip', 'policy_not_set',
-                  'unresolved-v0', 'normal', 'risk-v1', %s
+                  'teaching-v1', 'normal', 'risk-v1', %s
                 )
                 """,
                 (CHANGE_ID, PROJECT_ID, OWNER_ID, PROMPT, uuid.uuid4()),
