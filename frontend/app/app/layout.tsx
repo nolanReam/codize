@@ -10,6 +10,7 @@ import GuidedProjectNavigationProvider, {
 } from "@/components/GuidedProjectNavigationProvider";
 import ReconnectionModal from "@/components/ReconnectionModal";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "@/components/Tutorial";
+import V2AppShell from "@/components/v2/V2AppShell";
 import { acknowledgeReconnection, getReconnection } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
 import type { ReconnectionSummary } from "@/lib/types";
@@ -101,6 +102,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!ready || !userId) return <div className="loading" style={{ padding: 40 }}>checking session</div>;
+
+  const isV2Path =
+    pathname === "/app/projects" ||
+    pathname.startsWith("/app/project/") ||
+    pathname === "/app/character" ||
+    pathname === "/app/settings";
+
+  if (isV2Path) {
+    return (
+      <V2AppShell email={email} onSignOut={() => void signOut()}>
+        {children}
+      </V2AppShell>
+    );
+  }
 
   return (
     <GuidedProjectNavigationProvider userId={userId}>

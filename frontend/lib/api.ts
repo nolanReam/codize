@@ -70,7 +70,7 @@ function baseUrl(): string {
   return base.replace(/\/+$/, "");
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init: { method?: string; body?: unknown } = {}
 ): Promise<T> {
@@ -110,9 +110,16 @@ async function request<T>(
       : (GENERIC[res.status] ?? "Request failed.");
   if (res.status < 500) {
     try {
-      const body = (await res.json()) as { error?: { message?: unknown } };
+      const body = (await res.json()) as {
+        error?: { message?: unknown };
+        detail?: unknown;
+      };
       if (typeof body?.error?.message === "string" && body.error.message) {
         message = body.error.message;
+      } else if (typeof body?.detail === "string" && body.detail) {
+        // Native FastAPI HTTPException responses use `detail`. V2 endpoints
+        // currently retain that shape, so keep the same safe 4xx treatment.
+        message = body.detail;
       }
     } catch {
       // keep the generic message

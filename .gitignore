@@ -18,6 +18,13 @@ node_modules/
 dist/
 build/
 
+# V2 Build is an application route, not generated build output. Keep the
+# source route trackable while the generic rule continues to ignore real
+# build-output directories everywhere else.
+!frontend/app/app/project/\[id\]/build/
+!frontend/app/app/project/\[id\]/build/page.tsx
+!frontend/app/app/project/\[id\]/build/page.contract.test.ts
+
 # Logs / local runtime artifacts
 *.log
 logs/

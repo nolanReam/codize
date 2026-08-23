@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
-import { DM_Sans, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import {
+  DM_Mono,
+  DM_Sans,
+  IBM_Plex_Mono,
+  Inter,
+  Press_Start_2P,
+  Space_Grotesk,
+} from "next/font/google";
 
 import "./globals.css";
 
@@ -11,6 +18,19 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", display: "swap" });
+const v2Sans = Inter({ subsets: ["latin"], variable: "--font-v2-sans", display: "swap" });
+const v2Mono = DM_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-v2-mono",
+  display: "swap",
+});
+const v2Display = Press_Start_2P({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-v2-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Codize — Stop debugging blindly",
@@ -20,7 +40,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} ${display.variable}`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable} ${display.variable} ${v2Sans.variable} ${v2Mono.variable} ${v2Display.variable}`}
+    >
       <body>{children}</body>
     </html>
   );
