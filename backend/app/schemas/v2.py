@@ -1,4 +1,4 @@
-"""Typed, client-safe request and response contracts for Codize V2.3A."""
+"""Typed, client-safe request and response contracts for Codize V2."""
 
 from __future__ import annotations
 
@@ -9,10 +9,16 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.v2 import (
+    BuildStage,
+    CodingAgentKey,
     CurrentChangeKind,
     CurrentChangeState,
+    EffortCategory,
+    GenerationPurpose,
+    GenerationStatus,
     PlanItemStatus,
     PlanScopeBand,
+    PromptPurpose,
     ProjectLifecycle,
     ResumeStep,
     SetupResumeStep,
@@ -29,6 +35,14 @@ CancellationReason = Literal[
 def _bounded_utf8(value: str, maximum: int, field_name: str) -> str:
     value = value.strip()
     if not value:
+        raise ValueError(f"{field_name} cannot be empty")
+    if len(value.encode("utf-8")) > maximum:
+        raise ValueError(f"{field_name} is too long")
+    return value
+
+
+def _bounded_utf8_preserving(value: str, maximum: int, field_name: str) -> str:
+    if not value.strip():
         raise ValueError(f"{field_name} cannot be empty")
     if len(value.encode("utf-8")) > maximum:
         raise ValueError(f"{field_name} is too long")
@@ -358,6 +372,11 @@ class CurrentChangeView(BaseModel):
     goal_snapshot: str
     done_condition_snapshot: str | None
     boundary_snapshots: list[str]
+    prompt_draft: str | None
+    prompt_draft_version: int
+    coding_agent_key: CodingAgentKey | None
+    effort_category: EffortCategory | None
+    latest_prompt_version_id: UUID | None
     version: int
     created_at: datetime
     updated_at: datetime
@@ -370,3 +389,311 @@ class CurrentChangeResponse(BaseModel):
 
     current_change: CurrentChangeView | None
     replayed: bool = False
+
+
+class AgentMetadataView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: CodingAgentKey
+    display_name: str
+    reasoning_controls_known: bool
+    mapping_available: bool
+    stale_fallback: str
+
+
+class CodingAgentSelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: WorkflowV2
+    expected_project_version: int = Field(gt=0)
+    expected_current_change_version: int = Field(gt=0)
+    choice: Literal[
+        "codex",
+        "claude_code",
+        "cursor",
+        "chatgpt",
+        "replit",
+        "other",
+        "help_me_choose",
+    ]
+
+
+class CodingAgentSelectionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: Literal["v2"] = "v2"
+    project_id: UUID
+    current_change_id: UUID
+    project_version: int
+    current_change_version: int
+    selected_agent: AgentMetadataView | None
+    guidance_required: bool
+
+
+class PromptDraftUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: WorkflowV2
+    expected_current_change_version: int = Field(gt=0)
+    expected_prompt_draft_version: int = Field(gt=0)
+    prompt_text: str
+    done_condition: str | None = None
+    boundaries: list[str] = Field(default_factory=list, max_length=32)
+
+    @field_validator("prompt_text")
+    @classmethod
+    def validate_prompt_text(cls, value: str) -> str:
+        return _bounded_utf8_preserving(value, 65536, "prompt_text")
+
+    @field_validator("done_condition")
+    @classmethod
+    def validate_done_condition(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _bounded_utf8_preserving(value, 8192, "done_condition")
+
+    @field_validator("boundaries")
+    @classmethod
+    def validate_boundaries(cls, values: list[str]) -> list[str]:
+        cleaned = [
+            _bounded_utf8_preserving(value, 256, "boundary") for value in values
+        ]
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("boundaries cannot contain duplicates")
+        if len("".join(cleaned).encode("utf-8")) > 8192:
+            raise ValueError("boundaries are too long")
+        return cleaned
+
+
+class EffortSelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: WorkflowV2
+    expected_current_change_version: int = Field(gt=0)
+    effort: EffortCategory
+
+
+class PromptAcceptanceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    expected_prompt_draft_version: int = Field(gt=0)
+
+
+class PromptVersionView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    current_change_id: UUID
+    ordinal: int
+    purpose: PromptPurpose
+    content: str
+    coding_agent_key: CodingAgentKey
+    effort_category: EffortCategory | None
+    accepted_at: datetime
+    handed_off_at: datetime | None
+    version: int
+
+
+class PromptAcceptanceResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_change: CurrentChangeView
+    prompt_version: PromptVersionView
+    replayed: bool
+
+
+class PromptVersionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: Literal["v2"] = "v2"
+    project_id: UUID
+    current_change_id: UUID
+    prompt_versions: list[PromptVersionView]
+
+
+class PromptHandoffRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: WorkflowV2
+    command_id: UUID
+    prompt_version_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    expected_prompt_version: int = Field(gt=0)
+
+
+class PromptHandoffResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_change: CurrentChangeView
+    prompt_version: PromptVersionView
+    exact_prompt: str
+    replayed: bool
+
+
+class StructuredPromptDecisionsView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    intended_result: str
+    done_condition: str | None
+    boundaries: list[str]
+    coding_agent_key: CodingAgentKey | None
+
+
+class BuildResumeStateView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: Literal["v2"] = "v2"
+    project_id: UUID
+    current_change_id: UUID
+    lifecycle_state: CurrentChangeState
+    resume_step: ResumeStep | None
+    build_stage: BuildStage
+    selected_agent: AgentMetadataView | None
+    prompt_draft: str | None
+    prompt_draft_version: int
+    effort_category: EffortCategory | None
+    structured_decisions: StructuredPromptDecisionsView
+    accepted_prompt_version: PromptVersionView | None
+    ready_to_handoff: bool
+    exact_handoff_prompt: str | None
+    current_change_version: int
+
+
+class StartGenerationAttemptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: UUID
+    target_current_change_id: UUID | None = None
+    target_recovery_case_id: UUID | None = None
+    purpose: GenerationPurpose
+    target_aggregate_version: int = Field(gt=0)
+    policy_version: str | None = Field(default=None, max_length=64)
+    config_version: str = Field(min_length=1, max_length=64)
+    provider_key: str = Field(min_length=1, max_length=64)
+    model_key: str = Field(min_length=1, max_length=128)
+    input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "StartGenerationAttemptRequest":
+        if self.target_current_change_id is not None and self.target_recovery_case_id is not None:
+            raise ValueError("a Generation Attempt has one target")
+        project_purposes = {
+            GenerationPurpose.SETUP_SUMMARY,
+            GenerationPurpose.FIRST_VERSION_PROPOSAL,
+            GenerationPurpose.PLAN_PROPOSAL,
+            GenerationPurpose.PROJECT_ANSWER,
+        }
+        current_change_purposes = {
+            GenerationPurpose.INTERVENTION_COPY,
+            GenerationPurpose.PROMPT_DRAFT,
+            GenerationPurpose.CONCEPT_EXPLANATION,
+        }
+        recovery_purposes = {
+            GenerationPurpose.RECOVERY_SUMMARY,
+            GenerationPurpose.DIAGNOSTIC_PROMPT,
+            GenerationPurpose.CORRECTION_PROMPT,
+        }
+        if self.purpose in project_purposes and (
+            self.target_current_change_id is not None
+            or self.target_recovery_case_id is not None
+        ):
+            raise ValueError("this generation purpose targets the Project")
+        if (
+            self.purpose in current_change_purposes
+            and self.target_current_change_id is None
+        ):
+            raise ValueError("this generation purpose requires a Current Change target")
+        if self.purpose in recovery_purposes and self.target_recovery_case_id is None:
+            raise ValueError("this generation purpose requires a Recovery Case target")
+        return self
+
+
+class FinishGenerationAttemptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_attempt_version: int = Field(gt=0)
+    status: Literal["succeeded", "failed"]
+    safe_error_category: str | None = Field(default=None, min_length=1, max_length=64)
+    retryable: bool | None = None
+    result_record_type: Literal["prompt_version", "build_turn"] | None = None
+    result_record_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_completion(self) -> "FinishGenerationAttemptRequest":
+        if self.status == "failed":
+            if self.safe_error_category is None or self.retryable is None:
+                raise ValueError("failed generation requires a safe category and retryability")
+            if self.result_record_type is not None or self.result_record_id is not None:
+                raise ValueError("failed generation cannot have a result record")
+        else:
+            if self.safe_error_category is not None or self.retryable is not None:
+                raise ValueError("successful generation cannot have failure metadata")
+            if self.result_record_type is None or self.result_record_id is None:
+                raise ValueError("successful generation requires an accepted result record")
+        return self
+
+
+class ApplyGeneratedPromptDraftRequest(BaseModel):
+    """Validated provider output for one atomic Generation Attempt application."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_attempt_version: int = Field(gt=0)
+    expected_current_change_version: int = Field(gt=0)
+    expected_prompt_draft_version: int = Field(gt=0)
+    prompt_text: str
+    done_condition: str | None = None
+    boundaries: list[str] = Field(default_factory=list, max_length=32)
+
+    @field_validator("prompt_text")
+    @classmethod
+    def validate_prompt_text(cls, value: str) -> str:
+        return _bounded_utf8_preserving(value, 65536, "prompt_text")
+
+    @field_validator("done_condition")
+    @classmethod
+    def validate_done_condition(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _bounded_utf8_preserving(value, 8192, "done_condition")
+
+    @field_validator("boundaries")
+    @classmethod
+    def validate_boundaries(cls, values: list[str]) -> list[str]:
+        cleaned = [
+            _bounded_utf8_preserving(value, 256, "boundary") for value in values
+        ]
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("boundaries cannot contain duplicates")
+        if len("".join(cleaned).encode("utf-8")) > 8192:
+            raise ValueError("boundaries are too long")
+        return cleaned
+
+
+class GenerationAttemptView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    project_id: UUID
+    purpose: GenerationPurpose
+    target_aggregate_version: int
+    status: GenerationStatus
+    safe_error_category: str | None
+    retryable: bool | None
+    result_record_type: str | None
+    result_record_id: UUID | None
+    started_at: datetime
+    completed_at: datetime | None
+    version: int
+
+
+class ApplyGeneratedPromptDraftResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generation_attempt: GenerationAttemptView
+    current_change: CurrentChangeView
+    applied: bool
+    replayed: bool

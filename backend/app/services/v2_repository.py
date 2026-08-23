@@ -7,6 +7,7 @@ credential has no direct V2 table-write grants.
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
@@ -16,18 +17,25 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.config import Settings, get_settings
 from app.domain.v2 import (
+    CodingAgentKey,
     CurrentChangeKind,
     CurrentChangeState,
+    EffortCategory,
+    GenerationPurpose,
+    GenerationStatus,
     PlanItemStatus,
     PlanScopeBand,
     ProjectLifecycle,
     ProjectRef,
+    PromptPurpose,
     ResumeStep,
     SetupResumeStep,
     V2CurrentChange,
+    V2GenerationAttempt,
     V2Plan,
     V2PlanItem,
     V2Project,
+    V2PromptVersion,
     WorkflowVersion,
     validate_resume_state,
 )
@@ -45,8 +53,25 @@ _PLAN_ITEM_SELECT = (
 _CURRENT_CHANGE_SELECT = (
     "id,project_id,owner_user_id,plan_item_id,change_kind,lifecycle_state,"
     "resume_step,goal_snapshot,done_condition_snapshot,boundary_snapshots,"
+    "prompt_draft,prompt_draft_version,coding_agent_key,effort_category,"
+    "latest_prompt_version_id,teaching_policy_version,risk_policy_version,"
+    "handoff_command_id,"
     "version,created_at,updated_at,completed_at,cancelled_at,"
     "cancellation_command_id,cancellation_reason_key"
+)
+_PROMPT_VERSION_SELECT = (
+    "id,project_id,owner_user_id,current_change_id,ordinal,purpose,content,"
+    "content_sha256,input_current_change_version,generation_attempt_id,"
+    "input_goal_snapshot,input_done_condition_snapshot,input_boundary_snapshots,"
+    "coding_agent_key,effort_category,provider_mapping_key,"
+    "provider_mapping_version,accepted_at,handed_off_at,version"
+)
+_GENERATION_ATTEMPT_SELECT = (
+    "id,project_id,owner_user_id,target_current_change_id,"
+    "target_recovery_case_id,purpose,target_aggregate_version,policy_version,"
+    "config_version,status,provider_key,model_key,input_sha256,"
+    "safe_error_category,retryable,result_record_type,result_record_id,"
+    "started_at,completed_at,version"
 )
 
 
@@ -112,6 +137,14 @@ class _CurrentChangeRow(BaseModel):
     goal_snapshot: str
     done_condition_snapshot: str | None
     boundary_snapshots: list[str]
+    prompt_draft: str | None = None
+    prompt_draft_version: int = Field(default=1, gt=0)
+    coding_agent_key: CodingAgentKey | None = None
+    effort_category: EffortCategory | None = None
+    latest_prompt_version_id: UUID | None = None
+    teaching_policy_version: str = "unresolved-v0"
+    risk_policy_version: str = "unresolved-v0"
+    handoff_command_id: UUID | None = None
     version: int = Field(gt=0)
     created_at: datetime
     updated_at: datetime
@@ -119,6 +152,56 @@ class _CurrentChangeRow(BaseModel):
     cancelled_at: datetime | None
     cancellation_command_id: UUID | None
     cancellation_reason_key: str | None
+
+
+class _PromptVersionRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: UUID
+    project_id: UUID
+    owner_user_id: UUID
+    current_change_id: UUID
+    ordinal: int = Field(gt=0)
+    purpose: PromptPurpose
+    content: str
+    content_sha256: str
+    input_current_change_version: int = Field(gt=0)
+    input_goal_snapshot: str | None
+    input_done_condition_snapshot: str | None
+    input_boundary_snapshots: list[str] | None
+    generation_attempt_id: UUID | None
+    coding_agent_key: CodingAgentKey
+    effort_category: EffortCategory | None
+    provider_mapping_key: str | None
+    provider_mapping_version: str | None
+    accepted_at: datetime
+    handed_off_at: datetime | None
+    version: int = Field(gt=0)
+
+
+class _GenerationAttemptRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: UUID
+    project_id: UUID
+    owner_user_id: UUID
+    target_current_change_id: UUID | None
+    target_recovery_case_id: UUID | None
+    purpose: GenerationPurpose
+    target_aggregate_version: int = Field(gt=0)
+    policy_version: str | None
+    config_version: str
+    status: GenerationStatus
+    provider_key: str
+    model_key: str
+    input_sha256: str
+    safe_error_category: str | None
+    retryable: bool | None
+    result_record_type: str | None
+    result_record_id: UUID | None
+    started_at: datetime
+    completed_at: datetime | None
+    version: int = Field(gt=0)
 
 
 class V2Repository(Protocol):
@@ -200,6 +283,93 @@ class V2Repository(Protocol):
         cancellation_command_id: UUID,
         cancellation_reason_key: str,
     ) -> tuple[V2CurrentChange, bool]: ...
+
+    async def update_coding_agent(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_project_version: int,
+        expected_current_change_version: int,
+        coding_agent_key: str,
+    ) -> tuple[V2Project, V2CurrentChange]: ...
+
+    async def update_prompt_draft(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        prompt_text: str,
+        done_condition: str | None,
+        boundaries: list[str],
+    ) -> V2CurrentChange: ...
+
+    async def update_effort(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_current_change_version: int,
+        effort_category: str,
+    ) -> V2CurrentChange: ...
+
+    async def accept_prompt_version(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        acceptance_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]: ...
+
+    async def handoff_prompt_version(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        prompt_version_id: UUID,
+        expected_current_change_version: int,
+        expected_prompt_version: int,
+        handoff_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]: ...
+
+    async def list_prompt_versions(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+    ) -> list[V2PromptVersion]: ...
+
+    async def start_generation_attempt(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        payload: dict[str, Any],
+    ) -> tuple[V2GenerationAttempt, bool]: ...
+
+    async def finish_generation_attempt(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        generation_attempt_id: UUID,
+        payload: dict[str, Any],
+    ) -> V2GenerationAttempt: ...
+
+    async def apply_generated_prompt_draft(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        generation_attempt_id: UUID,
+        expected_attempt_version: int,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        prompt_text: str,
+        done_condition: str | None,
+        boundaries: list[str],
+    ) -> tuple[V2GenerationAttempt, V2CurrentChange, bool, bool]: ...
 
 
 def _project_from_row(raw: Any, *, expected_owner: str | None = None) -> V2Project:
@@ -318,6 +488,95 @@ def _current_change_from_row(
         cancelled_at=row.cancelled_at,
         cancellation_command_id=row.cancellation_command_id,
         cancellation_reason_key=row.cancellation_reason_key,
+        prompt_draft=row.prompt_draft,
+        prompt_draft_version=row.prompt_draft_version,
+        coding_agent_key=row.coding_agent_key,
+        effort_category=row.effort_category,
+        latest_prompt_version_id=row.latest_prompt_version_id,
+        teaching_policy_version=row.teaching_policy_version,
+        risk_policy_version=row.risk_policy_version,
+        handoff_command_id=row.handoff_command_id,
+    )
+
+
+def _prompt_version_from_row(
+    raw: Any,
+    *,
+    expected_owner: str,
+    expected_project_id: UUID,
+    expected_current_change_id: UUID,
+) -> V2PromptVersion:
+    try:
+        row = _PromptVersionRow.model_validate(raw)
+    except ValidationError as exc:
+        raise V2RepositoryError("malformed V2 Prompt Version row") from exc
+    if (
+        str(row.owner_user_id) != expected_owner
+        or row.project_id != expected_project_id
+        or row.current_change_id != expected_current_change_id
+    ):
+        raise V2RepositoryError("database returned a V2 Prompt Version outside the owned change")
+    if not row.content.strip():
+        raise V2RepositoryError("database returned a blank V2 Prompt Version")
+    return V2PromptVersion(
+        id=row.id,
+        project_ref=ProjectRef(WorkflowVersion.V2, row.project_id),
+        current_change_id=row.current_change_id,
+        ordinal=row.ordinal,
+        purpose=row.purpose,
+        content=row.content,
+        content_sha256=row.content_sha256,
+        input_current_change_version=row.input_current_change_version,
+        input_goal_snapshot=row.input_goal_snapshot,
+        input_done_condition_snapshot=row.input_done_condition_snapshot,
+        input_boundary_snapshots=(
+            tuple(row.input_boundary_snapshots)
+            if row.input_boundary_snapshots is not None
+            else None
+        ),
+        generation_attempt_id=row.generation_attempt_id,
+        coding_agent_key=row.coding_agent_key,
+        effort_category=row.effort_category,
+        provider_mapping_key=row.provider_mapping_key,
+        provider_mapping_version=row.provider_mapping_version,
+        accepted_at=row.accepted_at,
+        handed_off_at=row.handed_off_at,
+        version=row.version,
+    )
+
+
+def _generation_attempt_from_row(
+    raw: Any,
+    *,
+    expected_owner: str,
+    expected_project_id: UUID,
+) -> V2GenerationAttempt:
+    try:
+        row = _GenerationAttemptRow.model_validate(raw)
+    except ValidationError as exc:
+        raise V2RepositoryError("malformed V2 Generation Attempt row") from exc
+    if str(row.owner_user_id) != expected_owner or row.project_id != expected_project_id:
+        raise V2RepositoryError("database returned a Generation Attempt outside the owned Project")
+    return V2GenerationAttempt(
+        id=row.id,
+        project_ref=ProjectRef(WorkflowVersion.V2, row.project_id),
+        target_current_change_id=row.target_current_change_id,
+        target_recovery_case_id=row.target_recovery_case_id,
+        purpose=row.purpose,
+        target_aggregate_version=row.target_aggregate_version,
+        policy_version=row.policy_version,
+        config_version=row.config_version,
+        status=row.status,
+        provider_key=row.provider_key,
+        model_key=row.model_key,
+        input_sha256=row.input_sha256,
+        safe_error_category=row.safe_error_category,
+        retryable=row.retryable,
+        result_record_type=row.result_record_type,
+        result_record_id=row.result_record_id,
+        started_at=row.started_at,
+        completed_at=row.completed_at,
+        version=row.version,
     )
 
 
@@ -644,6 +903,364 @@ class SupabaseV2Repository:
                 expected_project_id=project_id,
             ),
             payload["replayed"],
+        )
+
+    async def update_coding_agent(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_project_version: int,
+        expected_current_change_version: int,
+        coding_agent_key: str,
+    ) -> tuple[V2Project, V2CurrentChange]:
+        payload = self._object(
+            await self._rpc(
+                "update_v2_coding_agent",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    "p_current_change_id": str(current_change_id),
+                    "p_expected_project_version": expected_project_version,
+                    "p_expected_current_change_version": expected_current_change_version,
+                    "p_coding_agent_key": coding_agent_key,
+                },
+            ),
+            "update_v2_coding_agent",
+        )
+        return (
+            _project_from_row(payload.get("project"), expected_owner=owner_user_id),
+            _current_change_from_row(
+                payload.get("current_change"),
+                expected_owner=owner_user_id,
+                expected_project_id=project_id,
+            ),
+        )
+
+    async def update_prompt_draft(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        prompt_text: str,
+        done_condition: str | None,
+        boundaries: list[str],
+    ) -> V2CurrentChange:
+        payload = self._object(
+            await self._rpc(
+                "update_v2_prompt_draft",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    "p_current_change_id": str(current_change_id),
+                    "p_expected_current_change_version": expected_current_change_version,
+                    "p_expected_prompt_draft_version": expected_prompt_draft_version,
+                    "p_prompt_draft": prompt_text,
+                    "p_done_condition_snapshot": done_condition,
+                    "p_boundary_snapshots": boundaries,
+                },
+            ),
+            "update_v2_prompt_draft",
+        )
+        return _current_change_from_row(
+            payload.get("current_change"),
+            expected_owner=owner_user_id,
+            expected_project_id=project_id,
+        )
+
+    async def update_effort(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_current_change_version: int,
+        effort_category: str,
+    ) -> V2CurrentChange:
+        payload = self._object(
+            await self._rpc(
+                "update_v2_effort",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    "p_current_change_id": str(current_change_id),
+                    "p_expected_current_change_version": expected_current_change_version,
+                    "p_effort_category": effort_category,
+                },
+            ),
+            "update_v2_effort",
+        )
+        return _current_change_from_row(
+            payload.get("current_change"),
+            expected_owner=owner_user_id,
+            expected_project_id=project_id,
+        )
+
+    async def _get_prompt_version(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        prompt_version_id: UUID,
+    ) -> V2PromptVersion | None:
+        rows = await self._request(
+            "GET",
+            "/v2_prompt_versions",
+            params={
+                "select": _PROMPT_VERSION_SELECT,
+                "id": f"eq.{prompt_version_id}",
+                "current_change_id": f"eq.{current_change_id}",
+                "project_id": f"eq.{project_id}",
+                "owner_user_id": f"eq.{owner_user_id}",
+                "limit": "1",
+            },
+        )
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise V2RepositoryError("V2 Prompt Version read returned malformed rows")
+        if not rows:
+            return None
+        return _prompt_version_from_row(
+            rows[0],
+            expected_owner=owner_user_id,
+            expected_project_id=project_id,
+            expected_current_change_id=current_change_id,
+        )
+
+    async def list_prompt_versions(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+    ) -> list[V2PromptVersion]:
+        change = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        if change is None:
+            raise V2RepositoryNotFound("owned V2 Current Change not found")
+        rows = await self._request(
+            "GET",
+            "/v2_prompt_versions",
+            params={
+                "select": _PROMPT_VERSION_SELECT,
+                "current_change_id": f"eq.{current_change_id}",
+                "project_id": f"eq.{project_id}",
+                "owner_user_id": f"eq.{owner_user_id}",
+                "order": "ordinal.asc,id.asc",
+            },
+        )
+        if not isinstance(rows, list):
+            raise V2RepositoryError("V2 Prompt Version list returned malformed rows")
+        return [
+            _prompt_version_from_row(
+                row,
+                expected_owner=owner_user_id,
+                expected_project_id=project_id,
+                expected_current_change_id=current_change_id,
+            )
+            for row in rows
+        ]
+
+    async def accept_prompt_version(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        acceptance_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        change = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        if change is None:
+            raise V2RepositoryNotFound("owned V2 Current Change not found")
+        if (
+            change.prompt_draft is None
+            or change.coding_agent_key is None
+            or change.effort_category is None
+        ):
+            raise V2RepositoryInvalidState("prompt acceptance prerequisites are missing")
+        content_hash = hashlib.sha256(change.prompt_draft.encode("utf-8")).hexdigest()
+        payload = self._object(
+            await self._rpc(
+                "accept_v2_prompt_version",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    "p_current_change_id": str(current_change_id),
+                    "p_expected_current_change_version": expected_current_change_version,
+                    "p_expected_prompt_draft_version": expected_prompt_draft_version,
+                    "p_acceptance_command_id": str(acceptance_command_id),
+                    "p_purpose": "feature",
+                    "p_recovery_case_id": None,
+                    "p_content": change.prompt_draft,
+                    "p_content_sha256": content_hash,
+                    "p_generation_attempt_id": None,
+                    "p_coding_agent_key": change.coding_agent_key.value,
+                    "p_effort_category": change.effort_category.value,
+                    "p_provider_mapping_key": None,
+                    "p_provider_mapping_version": None,
+                },
+            ),
+            "accept_v2_prompt_version",
+        )
+        try:
+            prompt_version_id = UUID(str(payload["prompt_version_id"]))
+            replayed = payload["replayed"]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise V2RepositoryError("prompt acceptance returned malformed identity") from exc
+        if not isinstance(replayed, bool):
+            raise V2RepositoryError("prompt acceptance omitted replay state")
+        current = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        prompt = await self._get_prompt_version(
+            owner_user_id, project_id, current_change_id, prompt_version_id
+        )
+        if current is None or prompt is None:
+            raise V2RepositoryError("accepted prompt could not be reloaded")
+        return current, prompt, replayed
+
+    async def handoff_prompt_version(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        current_change_id: UUID,
+        prompt_version_id: UUID,
+        expected_current_change_version: int,
+        expected_prompt_version: int,
+        handoff_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        payload = self._object(
+            await self._rpc(
+                "handoff_v2_prompt_version",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    "p_current_change_id": str(current_change_id),
+                    "p_prompt_version_id": str(prompt_version_id),
+                    "p_recovery_case_id": None,
+                    "p_expected_current_change_version": expected_current_change_version,
+                    "p_expected_prompt_version": expected_prompt_version,
+                    "p_handoff_command_id": str(handoff_command_id),
+                },
+            ),
+            "handoff_v2_prompt_version",
+        )
+        replayed = payload.get("replayed")
+        if not isinstance(replayed, bool):
+            raise V2RepositoryError("prompt handoff omitted replay state")
+        current = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        prompt = await self._get_prompt_version(
+            owner_user_id, project_id, current_change_id, prompt_version_id
+        )
+        if current is None or prompt is None:
+            raise V2RepositoryError("handed-off prompt could not be reloaded")
+        return current, prompt, replayed
+
+    async def start_generation_attempt(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        payload: dict[str, Any],
+    ) -> tuple[V2GenerationAttempt, bool]:
+        result = self._object(
+            await self._rpc(
+                "start_v2_generation_attempt",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    **{f"p_{key}": value for key, value in payload.items()},
+                },
+            ),
+            "start_v2_generation_attempt",
+        )
+        replayed = result.get("replayed")
+        if not isinstance(replayed, bool):
+            raise V2RepositoryError("Generation Attempt start omitted replay state")
+        return (
+            _generation_attempt_from_row(
+                result.get("generation_attempt"),
+                expected_owner=owner_user_id,
+                expected_project_id=project_id,
+            ),
+            replayed,
+        )
+
+    async def finish_generation_attempt(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        generation_attempt_id: UUID,
+        payload: dict[str, Any],
+    ) -> V2GenerationAttempt:
+        result = self._object(
+            await self._rpc(
+                "finish_v2_generation_attempt",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    "p_generation_attempt_id": str(generation_attempt_id),
+                    **{f"p_{key}": value for key, value in payload.items()},
+                },
+            ),
+            "finish_v2_generation_attempt",
+        )
+        return _generation_attempt_from_row(
+            result.get("generation_attempt"),
+            expected_owner=owner_user_id,
+            expected_project_id=project_id,
+        )
+
+    async def apply_generated_prompt_draft(
+        self,
+        owner_user_id: str,
+        project_id: UUID,
+        generation_attempt_id: UUID,
+        expected_attempt_version: int,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        prompt_text: str,
+        done_condition: str | None,
+        boundaries: list[str],
+    ) -> tuple[V2GenerationAttempt, V2CurrentChange, bool, bool]:
+        result = self._object(
+            await self._rpc(
+                "apply_v2_generated_prompt_draft",
+                {
+                    "p_owner_user_id": owner_user_id,
+                    "p_project_id": str(project_id),
+                    "p_generation_attempt_id": str(generation_attempt_id),
+                    "p_expected_attempt_version": expected_attempt_version,
+                    "p_expected_current_change_version": expected_current_change_version,
+                    "p_expected_prompt_draft_version": expected_prompt_draft_version,
+                    "p_prompt_draft": prompt_text,
+                    "p_done_condition_snapshot": done_condition,
+                    "p_boundary_snapshots": boundaries,
+                },
+            ),
+            "apply_v2_generated_prompt_draft",
+        )
+        replayed = result.get("replayed")
+        applied = result.get("applied")
+        if not isinstance(replayed, bool) or not isinstance(applied, bool):
+            raise V2RepositoryError("generated prompt application omitted replay state")
+        return (
+            _generation_attempt_from_row(
+                result.get("generation_attempt"),
+                expected_owner=owner_user_id,
+                expected_project_id=project_id,
+            ),
+            _current_change_from_row(
+                result.get("current_change"),
+                expected_owner=owner_user_id,
+                expected_project_id=project_id,
+            ),
+            applied,
+            replayed,
         )
 
     async def get_current_change(

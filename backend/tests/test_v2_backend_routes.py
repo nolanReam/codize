@@ -161,6 +161,102 @@ def start_change(
     )
 
 
+def prepare_v23b_change(client: TestClient) -> tuple[dict, dict]:
+    project = create_project(client)["project"]
+    started = start_change(client, project["project_id"], project["version"])
+    assert started.status_code == 200, started.text
+    change = started.json()["current_change"]
+    resolved = client.app.state.test_v2_repo.resolve_policy_for_test(
+        USER_A, uuid.UUID(project["project_id"]), uuid.UUID(change["id"])
+    )
+    change["version"] = resolved.version
+    change["resume_step"] = resolved.resume_step.value
+    return project, change
+
+
+def select_agent(client: TestClient, project: dict, change: dict, choice: str = "codex") -> dict:
+    response = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/coding-agent",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_project_version": project["version"],
+            "expected_current_change_version": change["version"],
+            "choice": choice,
+        },
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    project["version"] = result["project_version"]
+    change["version"] = result["current_change_version"]
+    return result
+
+
+def save_prompt(
+    client: TestClient,
+    project: dict,
+    change: dict,
+    text: str = "Add totals safely",
+    done_condition: str | None = "Totals are correct",
+    boundaries: list[str] | None = None,
+) -> dict:
+    if boundaries is None:
+        boundaries = ["Keep existing scoring behavior"]
+    response = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-draft",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change.get("prompt_draft_version", 1),
+            "prompt_text": text,
+            "done_condition": done_condition,
+            "boundaries": boundaries,
+        },
+    )
+    assert response.status_code == 200, response.text
+    change.update(response.json())
+    return response.json()
+
+
+def accept_ready_v23b_prompt(
+    client: TestClient,
+    project: dict,
+    change: dict,
+    *,
+    agent: str = "codex",
+    effort: str = "standard",
+    prompt_text: str = "Add totals safely",
+) -> dict:
+    select_agent(client, project, change, agent)
+    save_prompt(client, project, change, prompt_text)
+    effort_response = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "effort": effort,
+        },
+    )
+    assert effort_response.status_code == 200, effort_response.text
+    change.update(effort_response.json())
+    accepted = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-versions",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change["prompt_draft_version"],
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+    result = accepted.json()
+    change.update(result["current_change"])
+    return result
+
+
 @pytest.mark.parametrize(
     ("method", "path", "body"),
     [
@@ -931,3 +1027,595 @@ def test_v2_responses_never_include_server_secrets_or_internal_policy(client, mo
         assert "policy_not_evaluated" not in response_text
         assert "unresolved-v0" not in response_text
         assert "owner_user_id" not in response_text
+@pytest.mark.parametrize("choice", ["codex", "claude_code", "cursor", "chatgpt", "replit", "other"])
+def test_v23b_selects_each_supported_real_agent(client, choice):
+    project, change = prepare_v23b_change(client)
+    result = select_agent(client, project, change, choice)
+    assert result["selected_agent"]["key"] == choice
+    assert result["guidance_required"] is False
+    assert result["selected_agent"]["mapping_available"] is False
+
+
+def test_v23b_help_me_choose_does_not_persist_or_default_an_agent(client):
+    project, change = prepare_v23b_change(client)
+    result = select_agent(client, project, change, "help_me_choose")
+    assert result["selected_agent"] is None
+    assert result["guidance_required"] is True
+    state = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert state["build_stage"] == "choose_agent"
+    assert state["selected_agent"] is None
+
+
+def test_v23b_agent_rejects_invalid_stale_cross_owner_and_unresolved(client):
+    project, change = prepare_v23b_change(client)
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/coding-agent"
+    body = {
+        "workflow_version": "v2",
+        "expected_project_version": project["version"],
+        "expected_current_change_version": change["version"],
+        "choice": "not-a-real-agent",
+    }
+    assert client.put(path, headers=auth_headers(), json=body).status_code == 422
+    body["choice"] = "codex"
+    assert client.put(path, headers=auth_headers(USER_B), json=body).status_code == 404
+    body["expected_current_change_version"] -= 1
+    assert client.put(path, headers=auth_headers(), json=body).status_code == 409
+
+    unresolved_project = create_project(client, name="Unresolved")["project"]
+    unresolved = start_change(
+        client, unresolved_project["project_id"], unresolved_project["version"]
+    ).json()["current_change"]
+    body.update(
+        expected_project_version=unresolved_project["version"],
+        expected_current_change_version=unresolved["version"],
+    )
+    unresolved_path = (
+        f"/v2/projects/{unresolved_project['project_id']}"
+        f"/current-change/{unresolved['id']}/coding-agent"
+    )
+    assert client.put(unresolved_path, headers=auth_headers(), json=body).status_code == 409
+
+
+def test_v23b_prompt_draft_create_edit_resume_and_bounds(client):
+    project, change = prepare_v23b_change(client)
+    select_agent(client, project, change)
+    first = save_prompt(client, project, change, "  Student's first wording\n")
+    assert first["prompt_draft"] == "  Student's first wording\n"
+    assert first["prompt_draft_version"] == 2
+    assert client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-versions",
+        headers=auth_headers(),
+    ).json()["prompt_versions"] == []
+
+    second = save_prompt(client, project, change, "Student's revised wording")
+    assert second["prompt_draft"] == "Student's revised wording"
+    assert second["prompt_draft_version"] == 3
+    resume = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert resume["prompt_draft"] == "Student's revised wording"
+    assert resume["structured_decisions"]["boundaries"] == ["Keep existing scoring behavior"]
+    assert resume["build_stage"] == "choose_effort"
+    assert resume["effort_category"] is None
+
+    stale = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-draft",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"] - 1,
+            "expected_prompt_draft_version": change["prompt_draft_version"],
+            "prompt_text": "stale edit",
+        },
+    )
+    assert stale.status_code == 409
+    too_long = stale.request.content
+    assert client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-draft",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change["prompt_draft_version"],
+            "prompt_text": "x" * 65537,
+        },
+    ).status_code == 422
+    assert too_long is not None
+
+
+@pytest.mark.parametrize("effort", ["quick", "standard", "deep"])
+def test_v23b_effort_is_explicit_valid_and_versioned(client, effort):
+    project, change = prepare_v23b_change(client)
+    select_agent(client, project, change)
+    save_prompt(client, project, change)
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort"
+    response = client.put(
+        path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "effort": effort,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["effort_category"] == effort
+    assert client.put(
+        path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"] - 1,
+            "effort": effort,
+        },
+    ).status_code == 409
+    assert client.put(
+        path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": response.json()["version"],
+            "effort": "maximum",
+        },
+    ).status_code == 422
+
+
+def test_v23b_acceptance_handoff_resume_and_idempotency(client):
+    project, change = prepare_v23b_change(client)
+    select_agent(client, project, change, "other")
+    editing = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert editing["build_stage"] == "edit_prompt"
+    save_prompt(client, project, change, "Use exactly this student-edited prompt")
+    effort = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "effort": "standard",
+        },
+    ).json()
+    change.update(effort)
+    reviewing = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert reviewing["build_stage"] == "review_prompt"
+    accept_command = str(uuid.uuid4())
+    acceptance_body = {
+        "workflow_version": "v2",
+        "command_id": accept_command,
+        "expected_current_change_version": change["version"],
+        "expected_prompt_draft_version": change["prompt_draft_version"],
+    }
+    prompt_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/prompt-versions"
+    )
+    stale_acceptance = dict(acceptance_body)
+    stale_acceptance["expected_current_change_version"] -= 1
+    assert client.post(
+        prompt_path, headers=auth_headers(), json=stale_acceptance
+    ).status_code == 409
+    accepted = client.post(prompt_path, headers=auth_headers(), json=acceptance_body)
+    assert accepted.status_code == 200, accepted.text
+    accepted_json = accepted.json()
+    prompt = accepted_json["prompt_version"]
+    assert prompt["content"] == "Use exactly this student-edited prompt"
+    assert prompt["coding_agent_key"] == "other"
+    assert prompt["effort_category"] == "standard"
+    assert accepted_json["current_change"]["lifecycle_state"] == "preparing"
+
+    retried = client.post(prompt_path, headers=auth_headers(), json=acceptance_body)
+    assert retried.status_code == 200
+    assert retried.json()["replayed"] is True
+    listed = client.get(prompt_path, headers=auth_headers()).json()["prompt_versions"]
+    assert len(listed) == 1
+
+    ready = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert ready["build_stage"] == "ready_to_handoff"
+    assert ready["ready_to_handoff"] is True
+
+    handoff_command = str(uuid.uuid4())
+    handoff_body = {
+        "workflow_version": "v2",
+        "command_id": handoff_command,
+        "prompt_version_id": prompt["id"],
+        "expected_current_change_version": accepted_json["current_change"]["version"],
+        "expected_prompt_version": prompt["version"],
+    }
+    handoff_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/handoff"
+    stale_handoff = dict(handoff_body)
+    stale_handoff["expected_prompt_version"] += 1
+    assert client.post(
+        handoff_path, headers=auth_headers(), json=stale_handoff
+    ).status_code == 409
+    handed = client.post(handoff_path, headers=auth_headers(), json=handoff_body)
+    assert handed.status_code == 200, handed.text
+    assert handed.json()["exact_prompt"] == prompt["content"]
+    assert handed.json()["current_change"]["lifecycle_state"] == "awaiting_agent"
+    assert handed.json()["current_change"]["resume_step"] == "return_outcome"
+    retry = client.post(handoff_path, headers=auth_headers(), json=handoff_body)
+    assert retry.status_code == 200
+    assert retry.json()["replayed"] is True
+    wrong_command = dict(handoff_body)
+    wrong_command["command_id"] = str(uuid.uuid4())
+    wrong_command["expected_current_change_version"] = handed.json()["current_change"]["version"]
+    wrong_command["expected_prompt_version"] = handed.json()["prompt_version"]["version"]
+    assert client.post(
+        handoff_path, headers=auth_headers(), json=wrong_command
+    ).status_code == 409
+    waiting = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert waiting["build_stage"] == "waiting_for_return"
+    assert waiting["exact_handoff_prompt"] == prompt["content"]
+    assert client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/coding-agent",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_project_version": project["version"],
+            "expected_current_change_version": waiting["current_change_version"],
+            "choice": "codex",
+        },
+    ).status_code == 409
+
+
+def test_v23b_plan_detach_preserves_prompt_freshness_and_handoff(client):
+    project = create_project(client)["project"]
+    plan, item_ids = add_plan_items(client, project, count=1)
+    project["version"] = plan["project_version"]
+    project["plan_version"] = plan["plan_version"]
+    started = start_change(
+        client,
+        project["project_id"],
+        project["version"],
+        plan_item_id=item_ids[0],
+    )
+    assert started.status_code == 200, started.text
+    change = started.json()["current_change"]
+    resolved = client.app.state.test_v2_repo.resolve_policy_for_test(
+        USER_A, uuid.UUID(project["project_id"]), uuid.UUID(change["id"])
+    )
+    change["version"] = resolved.version
+    change["resume_step"] = resolved.resume_step.value
+    accepted = accept_ready_v23b_prompt(client, project, change)
+
+    detached = client.post(
+        f"/v2/projects/{project['project_id']}/plan/mutations",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_project_version": project["version"],
+            "expected_plan_version": project["plan_version"],
+            "expected_current_change_version": change["version"],
+            "linked_item_action": "detach",
+            "operations": [
+                {
+                    "action": "remove",
+                    "plan_item_id": item_ids[0],
+                    "expected_version": 1,
+                }
+            ],
+        },
+    )
+    assert detached.status_code == 200, detached.text
+
+    resume_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/build-state"
+    )
+    resume = client.get(resume_path, headers=auth_headers())
+    assert resume.status_code == 200, resume.text
+    state = resume.json()
+    assert state["build_stage"] == "ready_to_handoff"
+    assert state["ready_to_handoff"] is True
+    assert state["current_change_version"] == change["version"] + 1
+
+    prompt = accepted["prompt_version"]
+    handed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/handoff",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "prompt_version_id": prompt["id"],
+            "expected_current_change_version": state["current_change_version"],
+            "expected_prompt_version": prompt["version"],
+        },
+    )
+    assert handed.status_code == 200, handed.text
+    assert handed.json()["current_change"]["lifecycle_state"] == "awaiting_agent"
+
+
+@pytest.mark.parametrize("mutation", ["draft", "agent", "effort"])
+def test_v23b_mutable_prompt_inputs_invalidate_old_acceptance(client, mutation):
+    project, change = prepare_v23b_change(client)
+    accepted = accept_ready_v23b_prompt(client, project, change)
+    prompt = accepted["prompt_version"]
+
+    if mutation == "draft":
+        save_prompt(client, project, change, "A newly edited prompt")
+    elif mutation == "agent":
+        select_agent(client, project, change, "cursor")
+    else:
+        response = client.put(
+            f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+            headers=auth_headers(),
+            json={
+                "workflow_version": "v2",
+                "expected_current_change_version": change["version"],
+                "effort": "deep",
+            },
+        )
+        assert response.status_code == 200, response.text
+        change.update(response.json())
+
+    resume_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/build-state"
+    )
+    resume = client.get(resume_path, headers=auth_headers())
+    assert resume.status_code == 200, resume.text
+    state = resume.json()
+    assert state["build_stage"] == "review_prompt"
+    assert state["ready_to_handoff"] is False
+
+    stale_handoff = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/handoff",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "prompt_version_id": prompt["id"],
+            "expected_current_change_version": state["current_change_version"],
+            "expected_prompt_version": prompt["version"],
+        },
+    )
+    assert stale_handoff.status_code == 409
+
+
+@pytest.mark.parametrize(
+    ("new_done_condition", "new_boundaries"),
+    [
+        ("A newly edited done condition", ["Keep existing scoring behavior"]),
+        ("Totals are correct", ["A newly edited boundary"]),
+    ],
+    ids=["done-condition-only", "boundaries-only"],
+)
+def test_v23b_structured_prompt_edits_invalidate_acceptance_until_reaccepted(
+    client,
+    new_done_condition,
+    new_boundaries,
+):
+    project, change = prepare_v23b_change(client)
+    select_agent(client, project, change)
+    save_prompt(client, project, change, "Keep this exact prompt text")
+    effort = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "effort": "standard",
+        },
+    )
+    assert effort.status_code == 200, effort.text
+    change.update(effort.json())
+
+    prompt_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/prompt-versions"
+    )
+    accepted = client.post(
+        prompt_path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change["prompt_draft_version"],
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+    first = accepted.json()
+
+    edited = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-draft",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": first["current_change"]["version"],
+            "expected_prompt_draft_version": first["current_change"]["prompt_draft_version"],
+            "prompt_text": "Keep this exact prompt text",
+            "done_condition": new_done_condition,
+            "boundaries": new_boundaries,
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    edited_change = edited.json()
+
+    resume_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/build-state"
+    )
+    stale_resume = client.get(resume_path, headers=auth_headers())
+    assert stale_resume.status_code == 200, stale_resume.text
+    assert stale_resume.json()["build_stage"] == "review_prompt"
+    assert stale_resume.json()["ready_to_handoff"] is False
+
+    handoff_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/handoff"
+    )
+    stale_handoff = client.post(
+        handoff_path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "prompt_version_id": first["prompt_version"]["id"],
+            "expected_current_change_version": edited_change["version"],
+            "expected_prompt_version": first["prompt_version"]["version"],
+        },
+    )
+    assert stale_handoff.status_code == 409
+
+    reaccepted = client.post(
+        prompt_path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": edited_change["version"],
+            "expected_prompt_draft_version": edited_change["prompt_draft_version"],
+        },
+    )
+    assert reaccepted.status_code == 200, reaccepted.text
+    second = reaccepted.json()
+    assert second["prompt_version"]["ordinal"] == 2
+    assert second["prompt_version"]["id"] != first["prompt_version"]["id"]
+    ready = client.get(resume_path, headers=auth_headers()).json()
+    assert ready["build_stage"] == "ready_to_handoff"
+    assert ready["ready_to_handoff"] is True
+
+    handed = client.post(
+        handoff_path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "prompt_version_id": second["prompt_version"]["id"],
+            "expected_current_change_version": second["current_change"]["version"],
+            "expected_prompt_version": second["prompt_version"]["version"],
+        },
+    )
+    assert handed.status_code == 200, handed.text
+    assert handed.json()["current_change"]["lifecycle_state"] == "awaiting_agent"
+
+
+def test_v23b_unresolved_policy_and_missing_handoff_prerequisites_fail_closed(client):
+    project = create_project(client)["project"]
+    change = start_change(
+        client, project["project_id"], project["version"]
+    ).json()["current_change"]
+    prompt_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/prompt-versions"
+    )
+    assert client.post(
+        prompt_path,
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change["prompt_draft_version"],
+        },
+    ).status_code == 409
+    assert client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/handoff",
+        headers=auth_headers(),
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "prompt_version_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_prompt_version": 1,
+        },
+    ).status_code == 409
+
+
+def test_v23b_resolved_acceptance_requires_agent_prompt_and_effort(client):
+    project, change = prepare_v23b_change(client)
+    prompt_path = (
+        f"/v2/projects/{project['project_id']}"
+        f"/current-change/{change['id']}/prompt-versions"
+    )
+
+    def accept() -> int:
+        return client.post(
+            prompt_path,
+            headers=auth_headers(),
+            json={
+                "workflow_version": "v2",
+                "command_id": str(uuid.uuid4()),
+                "expected_current_change_version": change["version"],
+                "expected_prompt_draft_version": change.get("prompt_draft_version", 1),
+            },
+        ).status_code
+
+    assert accept() == 409
+    select_agent(client, project, change)
+    assert accept() == 409
+    save_prompt(client, project, change)
+    assert accept() == 409
+
+
+def test_v23b_cross_owner_cannot_probe_any_build_resource(client):
+    project, change = prepare_v23b_change(client)
+    select_agent(client, project, change)
+    save_prompt(client, project, change)
+    root = f"/v2/projects/{project['project_id']}/current-change/{change['id']}"
+    headers = auth_headers(USER_B)
+    assert client.get(f"{root}/build-state", headers=headers).status_code == 404
+    assert client.get(f"{root}/prompt-versions", headers=headers).status_code == 404
+    assert client.put(
+        f"{root}/effort",
+        headers=headers,
+        json={
+            "workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "effort": "quick",
+        },
+    ).status_code == 404
+    assert client.post(
+        f"{root}/prompt-versions",
+        headers=headers,
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change["prompt_draft_version"],
+        },
+    ).status_code == 404
+    assert client.post(
+        f"{root}/handoff",
+        headers=headers,
+        json={
+            "workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "prompt_version_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_prompt_version": 1,
+        },
+    ).status_code == 404
+
+
+def test_v23b_build_routes_require_verified_authentication_and_explicit_ids(client):
+    project_id = str(uuid.uuid4())
+    change_id = str(uuid.uuid4())
+    response = client.get(
+        f"/v2/projects/{project_id}/current-change/{change_id}/build-state"
+    )
+    assert response.status_code == 401
+    malformed = client.get(
+        "/v2/projects/current-change/build-state", headers=auth_headers()
+    )
+    assert malformed.status_code in {
+        404,
+        422,
+    }

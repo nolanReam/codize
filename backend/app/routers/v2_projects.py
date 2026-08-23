@@ -1,4 +1,4 @@
-"""Authenticated, explicit-ID Codize V2 Project/Plan/Current Change routes."""
+"""Authenticated, explicit-ID Codize V2 Project and Build routes."""
 
 from uuid import UUID
 
@@ -6,13 +6,24 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import CurrentUser, require_user
 from app.schemas.v2 import (
+    BuildResumeStateView,
     CancelCurrentChangeRequest,
+    CodingAgentSelectionRequest,
+    CodingAgentSelectionResponse,
     CreateProjectRequest,
     CurrentChangeResponse,
+    CurrentChangeView,
+    EffortSelectionRequest,
     PlanMutationRequest,
     PlanResponse,
     ProjectCommandResponse,
     ProjectRefsResponse,
+    PromptAcceptanceRequest,
+    PromptAcceptanceResponse,
+    PromptDraftUpdateRequest,
+    PromptHandoffRequest,
+    PromptHandoffResponse,
+    PromptVersionsResponse,
     PromoteProjectRequest,
     PurgeProjectResponse,
     PurgeTemporaryProjectRequest,
@@ -20,6 +31,7 @@ from app.schemas.v2 import (
     V2ProjectView,
 )
 from app.services import (
+    v2_build_service,
     v2_current_change_service,
     v2_plan_service,
     v2_project_service,
@@ -208,6 +220,137 @@ async def cancel_current_change(
             project_id,
             current_change_id,
             body,
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.put(
+    "/projects/{project_id}/current-change/{current_change_id}/coding-agent",
+    response_model=CodingAgentSelectionResponse,
+)
+async def select_coding_agent(
+    project_id: UUID,
+    current_change_id: UUID,
+    body: CodingAgentSelectionRequest,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> CodingAgentSelectionResponse:
+    try:
+        return await v2_build_service.select_coding_agent(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.put(
+    "/projects/{project_id}/current-change/{current_change_id}/prompt-draft",
+    response_model=CurrentChangeView,
+)
+async def update_prompt_draft(
+    project_id: UUID,
+    current_change_id: UUID,
+    body: PromptDraftUpdateRequest,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> CurrentChangeView:
+    try:
+        return await v2_build_service.update_prompt_draft(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.put(
+    "/projects/{project_id}/current-change/{current_change_id}/effort",
+    response_model=CurrentChangeView,
+)
+async def select_effort(
+    project_id: UUID,
+    current_change_id: UUID,
+    body: EffortSelectionRequest,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> CurrentChangeView:
+    try:
+        return await v2_build_service.select_effort(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/prompt-versions",
+    response_model=PromptAcceptanceResponse,
+)
+async def accept_prompt_version(
+    project_id: UUID,
+    current_change_id: UUID,
+    body: PromptAcceptanceRequest,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> PromptAcceptanceResponse:
+    try:
+        return await v2_build_service.accept_prompt(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get(
+    "/projects/{project_id}/current-change/{current_change_id}/prompt-versions",
+    response_model=PromptVersionsResponse,
+)
+async def list_prompt_versions(
+    project_id: UUID,
+    current_change_id: UUID,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> PromptVersionsResponse:
+    try:
+        return await v2_build_service.list_prompt_versions(
+            repo, user.user_id, project_id, current_change_id
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/handoff",
+    response_model=PromptHandoffResponse,
+)
+async def handoff_prompt(
+    project_id: UUID,
+    current_change_id: UUID,
+    body: PromptHandoffRequest,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> PromptHandoffResponse:
+    try:
+        return await v2_build_service.handoff_prompt(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get(
+    "/projects/{project_id}/current-change/{current_change_id}/build-state",
+    response_model=BuildResumeStateView,
+)
+async def get_build_resume_state(
+    project_id: UUID,
+    current_change_id: UUID,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> BuildResumeStateView:
+    try:
+        return await v2_build_service.get_build_resume_state(
+            repo, user.user_id, project_id, current_change_id
         )
     except V2ApplicationError as exc:
         raise _http_error(exc) from exc

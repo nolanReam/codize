@@ -2,24 +2,32 @@
 against these; the live Supabase/LLM paths are verified separately."""
 
 import copy
+import hashlib
 import itertools
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from app.domain.v2 import (
+    CodingAgentKey,
     CurrentChangeKind,
     CurrentChangeState,
+    EffortCategory,
+    GenerationPurpose,
+    GenerationStatus,
     PlanItemStatus,
     PlanScopeBand,
     ProjectLifecycle,
     ProjectRef,
+    PromptPurpose,
     ResumeStep,
     SetupResumeStep,
     V2CurrentChange,
+    V2GenerationAttempt,
     V2Plan,
     V2PlanItem,
     V2Project,
+    V2PromptVersion,
     WorkflowVersion,
 )
 from app.services.llm_service import LLMError
@@ -261,6 +269,11 @@ class InMemoryV2Repository:
         self._last_plan_commands: dict[uuid.UUID, uuid.UUID] = {}
         self._changes: dict[uuid.UUID, tuple[str, V2CurrentChange]] = {}
         self._change_commands: dict[tuple[str, uuid.UUID], uuid.UUID] = {}
+        self._prompt_versions: dict[uuid.UUID, tuple[str, V2PromptVersion]] = {}
+        self._acceptance_commands: dict[tuple[str, uuid.UUID], uuid.UUID] = {}
+        self._handoff_commands: dict[tuple[str, uuid.UUID], uuid.UUID] = {}
+        self._generation_attempts: dict[uuid.UUID, tuple[str, V2GenerationAttempt]] = {}
+        self._generation_commands: dict[tuple[str, uuid.UUID], uuid.UUID] = {}
         self._recovery_case_statuses: dict[uuid.UUID, list[str]] = {}
         self._tick = itertools.count()
 
@@ -289,6 +302,35 @@ class InMemoryV2Repository:
                 setup_resume_step=SetupResumeStep.READY,
             ),
         )
+
+    def resolve_policy_for_test(
+        self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID
+    ) -> V2CurrentChange:
+        """Test seam for the accepted policy resolver that V2.3B consumes."""
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        resolved = replace(
+            change,
+            teaching_policy_version="test-teaching-v1",
+            risk_policy_version="test-risk-v1",
+            resume_step=ResumeStep.CHOOSE_AGENT,
+            version=change.version + 1,
+            updated_at=self._now(),
+        )
+        self._changes[current_change_id] = (owner_user_id, resolved)
+        return resolved
+
+    def _owned_change(
+        self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID
+    ) -> V2CurrentChange:
+        self._owned_project(owner_user_id, project_id)
+        entry = self._changes.get(current_change_id)
+        if (
+            entry is None
+            or entry[0] != owner_user_id
+            or entry[1].project_ref.project_id != project_id
+        ):
+            raise V2RepositoryNotFound("Current Change not found")
+        return entry[1]
 
     async def create_project(
         self,
@@ -857,6 +899,527 @@ class InMemoryV2Repository:
         self._changes[current_change_id] = (owner_user_id, cancelled)
         return cancelled, False
 
+    async def update_coding_agent(
+        self,
+        owner_user_id: str,
+        project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+        expected_project_version: int,
+        expected_current_change_version: int,
+        coding_agent_key: str,
+    ) -> tuple[V2Project, V2CurrentChange]:
+        project = self._owned_project(owner_user_id, project_id)
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        try:
+            agent = CodingAgentKey(coding_agent_key)
+        except ValueError as exc:
+            raise V2RepositoryInvalidState("unsupported coding agent") from exc
+        if not change.policy_is_resolved:
+            raise V2RepositoryInvalidState("policy is unresolved")
+        if change.lifecycle_state is not CurrentChangeState.PREPARING or change.handoff_command_id:
+            raise V2RepositoryInvalidState("agent cannot change after handoff")
+        if (
+            project.version != expected_project_version
+            or change.version != expected_current_change_version
+        ):
+            raise V2RepositoryConflict("stale Build state")
+        if project.coding_agent_key != agent.value:
+            project = replace(
+                project,
+                coding_agent_key=agent.value,
+                version=project.version + 1,
+                updated_at=self._now(),
+            )
+            self._store_project(owner_user_id, project)
+        if change.coding_agent_key != agent:
+            change = replace(
+                change,
+                coding_agent_key=agent,
+                resume_step=ResumeStep.PROMPT,
+                version=change.version + 1,
+                updated_at=self._now(),
+            )
+            self._changes[current_change_id] = (owner_user_id, change)
+        return project, change
+
+    async def update_prompt_draft(
+        self,
+        owner_user_id: str,
+        project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        prompt_text: str,
+        done_condition: str | None,
+        boundaries: list[str],
+    ) -> V2CurrentChange:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        if not change.policy_is_resolved:
+            raise V2RepositoryInvalidState("policy is unresolved")
+        if (
+            change.lifecycle_state is not CurrentChangeState.PREPARING
+            or change.handoff_command_id
+            or change.coding_agent_key is None
+        ):
+            raise V2RepositoryInvalidState("prompt cannot be edited")
+        if (
+            change.version != expected_current_change_version
+            or change.prompt_draft_version != expected_prompt_draft_version
+        ):
+            raise V2RepositoryConflict("stale prompt draft")
+        values_changed = (
+            change.prompt_draft != prompt_text
+            or change.done_condition_snapshot != done_condition
+            or change.boundary_snapshots != tuple(boundaries)
+        )
+        if values_changed:
+            text_changed = change.prompt_draft != prompt_text
+            change = replace(
+                change,
+                prompt_draft=prompt_text,
+                prompt_draft_version=change.prompt_draft_version + (1 if text_changed else 0),
+                done_condition_snapshot=done_condition,
+                boundary_snapshots=tuple(boundaries),
+                resume_step=(
+                    ResumeStep.EFFORT
+                    if change.effort_category is None
+                    else ResumeStep.PROMPT
+                ),
+                version=change.version + 1,
+                updated_at=self._now(),
+            )
+            self._changes[current_change_id] = (owner_user_id, change)
+        return change
+
+    async def update_effort(
+        self,
+        owner_user_id: str,
+        project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+        expected_current_change_version: int,
+        effort_category: str,
+    ) -> V2CurrentChange:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        try:
+            effort = EffortCategory(effort_category)
+        except ValueError as exc:
+            raise V2RepositoryInvalidState("unsupported effort") from exc
+        if not change.policy_is_resolved:
+            raise V2RepositoryInvalidState("policy is unresolved")
+        if (
+            change.lifecycle_state is not CurrentChangeState.PREPARING
+            or change.handoff_command_id
+            or change.coding_agent_key is None
+            or change.prompt_draft is None
+        ):
+            raise V2RepositoryInvalidState("effort cannot be selected")
+        if change.version != expected_current_change_version:
+            raise V2RepositoryConflict("stale Build state")
+        if change.effort_category != effort:
+            change = replace(
+                change,
+                effort_category=effort,
+                resume_step=ResumeStep.EFFORT,
+                version=change.version + 1,
+                updated_at=self._now(),
+            )
+            self._changes[current_change_id] = (owner_user_id, change)
+        return change
+
+    async def list_prompt_versions(
+        self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID
+    ) -> list[V2PromptVersion]:
+        self._owned_change(owner_user_id, project_id, current_change_id)
+        return sorted(
+            (
+                prompt
+                for owner, prompt in self._prompt_versions.values()
+                if owner == owner_user_id
+                and prompt.project_ref.project_id == project_id
+                and prompt.current_change_id == current_change_id
+            ),
+            key=lambda prompt: (prompt.ordinal, prompt.id),
+        )
+
+    async def accept_prompt_version(
+        self,
+        owner_user_id: str,
+        project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        acceptance_command_id: uuid.UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        command_key = (owner_user_id, acceptance_command_id)
+        existing_id = self._acceptance_commands.get(command_key)
+        if existing_id is not None:
+            prompt = self._prompt_versions[existing_id][1]
+            if prompt.current_change_id != current_change_id:
+                raise V2RepositoryConflict("acceptance command reused")
+            return change, prompt, True
+        if (
+            not change.policy_is_resolved
+            or change.lifecycle_state is not CurrentChangeState.PREPARING
+            or change.handoff_command_id
+            or change.prompt_draft is None
+            or change.coding_agent_key is None
+            or change.effort_category is None
+        ):
+            raise V2RepositoryInvalidState("prompt is not ready")
+        if (
+            change.version != expected_current_change_version
+            or change.prompt_draft_version != expected_prompt_draft_version
+        ):
+            raise V2RepositoryConflict("stale prompt")
+        prompt_id = uuid.uuid4()
+        now = self._now()
+        prior = await self.list_prompt_versions(owner_user_id, project_id, current_change_id)
+        prompt = V2PromptVersion(
+            id=prompt_id,
+            project_ref=change.project_ref,
+            current_change_id=current_change_id,
+            ordinal=len(prior) + 1,
+            purpose=PromptPurpose.FEATURE,
+            content=change.prompt_draft,
+            content_sha256=hashlib.sha256(change.prompt_draft.encode()).hexdigest(),
+            input_current_change_version=change.version,
+            input_goal_snapshot=change.goal_snapshot,
+            input_done_condition_snapshot=change.done_condition_snapshot,
+            input_boundary_snapshots=change.boundary_snapshots,
+            generation_attempt_id=None,
+            coding_agent_key=change.coding_agent_key,
+            effort_category=change.effort_category,
+            provider_mapping_key=None,
+            provider_mapping_version=None,
+            accepted_at=now,
+            handed_off_at=None,
+            version=1,
+        )
+        change = replace(
+            change,
+            latest_prompt_version_id=prompt_id,
+            resume_step=ResumeStep.PROMPT,
+            version=change.version + 1,
+            updated_at=now,
+        )
+        self._prompt_versions[prompt_id] = (owner_user_id, prompt)
+        self._acceptance_commands[command_key] = prompt_id
+        self._changes[current_change_id] = (owner_user_id, change)
+        return change, prompt, False
+
+    async def handoff_prompt_version(
+        self,
+        owner_user_id: str,
+        project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+        prompt_version_id: uuid.UUID,
+        expected_current_change_version: int,
+        expected_prompt_version: int,
+        handoff_command_id: uuid.UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        if not change.policy_is_resolved:
+            raise V2RepositoryInvalidState("policy is unresolved")
+        command_key = (owner_user_id, handoff_command_id)
+        existing_id = self._handoff_commands.get(command_key)
+        if existing_id is not None:
+            if existing_id != prompt_version_id:
+                raise V2RepositoryConflict("handoff command reused")
+            return change, self._prompt_versions[existing_id][1], True
+        entry = self._prompt_versions.get(prompt_version_id)
+        if entry is None or entry[0] != owner_user_id:
+            raise V2RepositoryNotFound("Prompt Version not found")
+        prompt = entry[1]
+        if (
+            prompt.project_ref.project_id != project_id
+            or prompt.current_change_id != current_change_id
+        ):
+            raise V2RepositoryNotFound("Prompt Version not found")
+        if (
+            change.lifecycle_state is not CurrentChangeState.PREPARING
+            or change.latest_prompt_version_id != prompt.id
+            or change.version != expected_current_change_version
+            or prompt.version != expected_prompt_version
+            or prompt.handed_off_at is not None
+            or prompt.content != change.prompt_draft
+            or prompt.coding_agent_key != change.coding_agent_key
+            or prompt.effort_category != change.effort_category
+            or prompt.input_goal_snapshot != change.goal_snapshot
+            or prompt.input_done_condition_snapshot != change.done_condition_snapshot
+            or prompt.input_boundary_snapshots != change.boundary_snapshots
+        ):
+            raise V2RepositoryConflict("prompt is stale or already handed off")
+        now = self._now()
+        prompt = replace(prompt, handed_off_at=now, version=prompt.version + 1)
+        change = replace(
+            change,
+            lifecycle_state=CurrentChangeState.AWAITING_AGENT,
+            resume_step=ResumeStep.RETURN_OUTCOME,
+            handoff_command_id=handoff_command_id,
+            version=change.version + 1,
+            updated_at=now,
+        )
+        self._prompt_versions[prompt.id] = (owner_user_id, prompt)
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._handoff_commands[command_key] = prompt.id
+        return change, prompt, False
+
+    async def start_generation_attempt(
+        self, owner_user_id: str, project_id: uuid.UUID, payload: dict
+    ) -> tuple[V2GenerationAttempt, bool]:
+        project = self._owned_project(owner_user_id, project_id)
+        command_id = uuid.UUID(str(payload["command_id"]))
+        command_key = (owner_user_id, command_id)
+        existing_id = self._generation_commands.get(command_key)
+        if existing_id is not None:
+            existing = self._generation_attempts[existing_id][1]
+            if (
+                existing.project_ref.project_id != project_id
+                or existing.target_current_change_id
+                != (
+                    uuid.UUID(str(payload["target_current_change_id"]))
+                    if payload.get("target_current_change_id")
+                    else None
+                )
+                or existing.target_recovery_case_id
+                != (
+                    uuid.UUID(str(payload["target_recovery_case_id"]))
+                    if payload.get("target_recovery_case_id")
+                    else None
+                )
+                or existing.purpose.value != payload["purpose"]
+                or existing.target_aggregate_version
+                != payload["target_aggregate_version"]
+                or existing.policy_version != payload.get("policy_version")
+                or existing.config_version != payload["config_version"]
+                or existing.provider_key != payload["provider_key"]
+                or existing.model_key != payload["model_key"]
+                or existing.input_sha256 != payload["input_sha256"]
+            ):
+                raise V2RepositoryConflict("generation command reused")
+            return existing, True
+        current_id = payload.get("target_current_change_id")
+        recovery_id = payload.get("target_recovery_case_id")
+        if current_id and recovery_id:
+            raise V2RepositoryInvalidState("Generation Attempt has multiple targets")
+        current = None
+        if current_id:
+            current = self._owned_change(owner_user_id, project_id, uuid.UUID(str(current_id)))
+            target_version = current.version
+        elif recovery_id:
+            raise V2RepositoryNotFound("Recovery target not available in this fake")
+        else:
+            target_version = project.version
+        if target_version != payload["target_aggregate_version"]:
+            raise V2RepositoryConflict("stale generation target")
+        attempt_id = uuid.uuid4()
+        attempt = V2GenerationAttempt(
+            id=attempt_id,
+            project_ref=project.ref,
+            target_current_change_id=current.id if current else None,
+            target_recovery_case_id=None,
+            purpose=GenerationPurpose(payload["purpose"]),
+            target_aggregate_version=target_version,
+            policy_version=payload.get("policy_version"),
+            config_version=payload["config_version"],
+            status=GenerationStatus.PENDING,
+            provider_key=payload["provider_key"],
+            model_key=payload["model_key"],
+            input_sha256=payload["input_sha256"],
+            safe_error_category=None,
+            retryable=None,
+            result_record_type=None,
+            result_record_id=None,
+            started_at=self._now(),
+            completed_at=None,
+            version=1,
+        )
+        self._generation_attempts[attempt_id] = (owner_user_id, attempt)
+        self._generation_commands[command_key] = attempt_id
+        return attempt, False
+
+    async def finish_generation_attempt(
+        self,
+        owner_user_id: str,
+        project_id: uuid.UUID,
+        generation_attempt_id: uuid.UUID,
+        payload: dict,
+    ) -> V2GenerationAttempt:
+        project = self._owned_project(owner_user_id, project_id)
+        entry = self._generation_attempts.get(generation_attempt_id)
+        if (
+            entry is None
+            or entry[0] != owner_user_id
+            or entry[1].project_ref.project_id != project_id
+        ):
+            raise V2RepositoryNotFound("Generation Attempt not found")
+        attempt = entry[1]
+        if attempt.version != payload["expected_attempt_version"]:
+            raise V2RepositoryConflict("stale Generation Attempt")
+        if attempt.status is not GenerationStatus.PENDING:
+            raise V2RepositoryInvalidState("Generation Attempt already finished")
+        if attempt.target_current_change_id:
+            target = self._owned_change(owner_user_id, project_id, attempt.target_current_change_id)
+            current_target_version = target.version
+        else:
+            current_target_version = project.version
+        requested = GenerationStatus(payload["status"])
+        stale = (
+            requested is GenerationStatus.SUCCEEDED
+            and current_target_version != attempt.target_aggregate_version
+        )
+        status = GenerationStatus.SUPERSEDED if stale else requested
+        if status is GenerationStatus.SUCCEEDED:
+            record_type = payload.get("result_record_type")
+            record_id = uuid.UUID(str(payload["result_record_id"]))
+            if record_type not in {"prompt_version", "build_turn"}:
+                raise V2RepositoryInvalidState("invalid generation result record")
+        completed = replace(
+            attempt,
+            status=status,
+            safe_error_category=(
+                payload.get("safe_error_category")
+                if status is GenerationStatus.FAILED
+                else None
+            ),
+            retryable=payload.get("retryable") if status is GenerationStatus.FAILED else None,
+            result_record_type=(
+                payload.get("result_record_type")
+                if status is GenerationStatus.SUCCEEDED
+                else None
+            ),
+            result_record_id=(
+                uuid.UUID(str(payload["result_record_id"]))
+                if status is GenerationStatus.SUCCEEDED
+                else None
+            ),
+            completed_at=self._now(),
+            version=attempt.version + 1,
+        )
+        self._generation_attempts[generation_attempt_id] = (owner_user_id, completed)
+        return completed
+
+    async def apply_generated_prompt_draft(
+        self,
+        owner_user_id: str,
+        project_id: uuid.UUID,
+        generation_attempt_id: uuid.UUID,
+        expected_attempt_version: int,
+        expected_current_change_version: int,
+        expected_prompt_draft_version: int,
+        prompt_text: str,
+        done_condition: str | None,
+        boundaries: list[str],
+    ) -> tuple[V2GenerationAttempt, V2CurrentChange, bool, bool]:
+        self._owned_project(owner_user_id, project_id)
+        entry = self._generation_attempts.get(generation_attempt_id)
+        if (
+            entry is None
+            or entry[0] != owner_user_id
+            or entry[1].project_ref.project_id != project_id
+        ):
+            raise V2RepositoryNotFound("Generation Attempt not found")
+        attempt = entry[1]
+        if attempt.target_current_change_id is None:
+            raise V2RepositoryInvalidState("prompt draft generation requires a Current Change")
+        change = self._owned_change(
+            owner_user_id, project_id, attempt.target_current_change_id
+        )
+
+        if attempt.status is GenerationStatus.SUCCEEDED:
+            if (
+                attempt.purpose is not GenerationPurpose.PROMPT_DRAFT
+                or attempt.result_record_type != "prompt_draft"
+                or attempt.result_record_id != change.id
+            ):
+                raise V2RepositoryConflict("Generation Attempt completion mismatch")
+            return attempt, change, True, True
+        if attempt.status is GenerationStatus.SUPERSEDED:
+            return attempt, change, False, True
+        if attempt.status is not GenerationStatus.PENDING:
+            raise V2RepositoryInvalidState("Generation Attempt already finished")
+        if attempt.version != expected_attempt_version:
+            raise V2RepositoryConflict("stale Generation Attempt")
+        if attempt.purpose is not GenerationPurpose.PROMPT_DRAFT:
+            raise V2RepositoryInvalidState("Generation Attempt has the wrong purpose")
+        if (
+            change.version != attempt.target_aggregate_version
+            or change.version != expected_current_change_version
+        ):
+            if change.version != attempt.target_aggregate_version:
+                superseded = replace(
+                    attempt,
+                    status=GenerationStatus.SUPERSEDED,
+                    completed_at=self._now(),
+                    version=attempt.version + 1,
+                )
+                self._generation_attempts[generation_attempt_id] = (
+                    owner_user_id,
+                    superseded,
+                )
+                return superseded, change, False, False
+            raise V2RepositoryConflict("stale Current Change command")
+        if change.prompt_draft_version != expected_prompt_draft_version:
+            raise V2RepositoryConflict("stale prompt draft")
+        if (
+            not change.policy_is_resolved
+            or change.lifecycle_state is not CurrentChangeState.PREPARING
+            or change.handoff_command_id is not None
+            or change.coding_agent_key is None
+        ):
+            raise V2RepositoryInvalidState("generated prompt cannot be applied")
+        if (
+            not prompt_text.strip()
+            or len(prompt_text.encode("utf-8")) > 65536
+            or (
+                done_condition is not None
+                and (
+                    not done_condition.strip()
+                    or len(done_condition.encode("utf-8")) > 8192
+                )
+            )
+            or len(boundaries) > 32
+            or any(
+                not boundary.strip() or len(boundary.encode("utf-8")) > 256
+                for boundary in boundaries
+            )
+            or len("".join(boundaries).encode("utf-8")) > 8192
+            or len(set(boundaries)) != len(boundaries)
+        ):
+            raise V2RepositoryInvalidState("invalid bounded generated prompt")
+        if (
+            change.prompt_draft == prompt_text
+            and change.done_condition_snapshot == done_condition
+            and change.boundary_snapshots == tuple(boundaries)
+        ):
+            raise V2RepositoryInvalidState("generated prompt did not change the draft")
+
+        now = self._now()
+        text_changed = change.prompt_draft != prompt_text
+        applied = replace(
+            change,
+            prompt_draft=prompt_text,
+            prompt_draft_version=(
+                change.prompt_draft_version + (1 if text_changed else 0)
+            ),
+            done_condition_snapshot=done_condition,
+            boundary_snapshots=tuple(boundaries),
+            version=change.version + 1,
+            updated_at=now,
+        )
+        succeeded = replace(
+            attempt,
+            status=GenerationStatus.SUCCEEDED,
+            result_record_type="prompt_draft",
+            result_record_id=change.id,
+            completed_at=now,
+            version=attempt.version + 1,
+        )
+        self._changes[change.id] = (owner_user_id, applied)
+        self._generation_attempts[generation_attempt_id] = (owner_user_id, succeeded)
+        return succeeded, applied, True, False
+
 
 class ScriptedLLM:
     """Returns queued responses in order; an Exception in the queue is raised.
@@ -874,3 +1437,8 @@ class ScriptedLLM:
         if isinstance(item, Exception):
             raise item
         return item
+    EffortCategory,
+    GenerationPurpose,
+    GenerationStatus,
+    PromptPurpose,
+    V2PromptVersion,
