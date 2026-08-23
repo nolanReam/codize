@@ -11,9 +11,17 @@ from app.schemas.v2 import (
     CodingAgentSelectionRequest,
     CodingAgentSelectionResponse,
     CreateProjectRequest,
+    CompleteManualChangeRequest,
+    CompleteManualChangeResponse,
+    ConfirmManualChangeRequest,
     CurrentChangeResponse,
     CurrentChangeView,
     EffortSelectionRequest,
+    EstablishManualProjectRequest,
+    EstablishManualProjectResponse,
+    ManualCheckRequest,
+    ManualLoopResponse,
+    ManualReturnRequest,
     PlanMutationRequest,
     PlanResponse,
     ProjectCommandResponse,
@@ -24,15 +32,19 @@ from app.schemas.v2 import (
     PromptHandoffRequest,
     PromptHandoffResponse,
     PromptVersionsResponse,
+    RecentChangesResponse,
     PromoteProjectRequest,
     PurgeProjectResponse,
     PurgeTemporaryProjectRequest,
     StartCurrentChangeRequest,
+    UpdateDialogueSoundRequest,
+    UserPreferencesView,
     V2ProjectView,
 )
 from app.services import (
     v2_build_service,
     v2_current_change_service,
+    v2_manual_loop_service,
     v2_plan_service,
     v2_project_service,
 )
@@ -72,6 +84,17 @@ async def create_project(
         raise _http_error(exc) from exc
 
 
+@router.post("/projects/{project_id}/manual-setup", response_model=EstablishManualProjectResponse)
+async def establish_manual_project(
+    project_id: UUID, body: EstablishManualProjectRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> EstablishManualProjectResponse:
+    try:
+        return await v2_project_service.establish_manual_project(repo, user.user_id, project_id, body)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
 @router.get("/project-refs", response_model=ProjectRefsResponse)
 async def list_project_refs(
     user: CurrentUser = Depends(require_user),
@@ -93,6 +116,17 @@ async def get_project(
 ) -> V2ProjectView:
     try:
         return await v2_project_service.get_project(repo, user.user_id, project_id)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/projects/{project_id}/recent-changes", response_model=RecentChangesResponse)
+async def list_recent_changes(
+    project_id: UUID, user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> RecentChangesResponse:
+    try:
+        return await v2_project_service.list_recent_changes(repo, user.user_id, project_id)
     except V2ApplicationError as exc:
         raise _http_error(exc) from exc
 
@@ -179,6 +213,76 @@ async def start_current_change(
             project_id,
             body,
         )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post("/projects/{project_id}/current-change/{current_change_id}/confirm",
+             response_model=CurrentChangeResponse)
+async def confirm_manual_change(
+    project_id: UUID, current_change_id: UUID, body: ConfirmManualChangeRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> CurrentChangeResponse:
+    try:
+        return await v2_manual_loop_service.confirm_change(
+            repo, user.user_id, project_id, current_change_id, body)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post("/projects/{project_id}/current-change/{current_change_id}/return",
+             response_model=ManualLoopResponse)
+async def record_manual_return(
+    project_id: UUID, current_change_id: UUID, body: ManualReturnRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> ManualLoopResponse:
+    try:
+        return await v2_manual_loop_service.record_return(
+            repo, user.user_id, project_id, current_change_id, body)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post("/projects/{project_id}/current-change/{current_change_id}/checks/{check_id}",
+             response_model=ManualLoopResponse)
+async def record_manual_check(
+    project_id: UUID, current_change_id: UUID, check_id: UUID, body: ManualCheckRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> ManualLoopResponse:
+    try:
+        return await v2_manual_loop_service.record_check(
+            repo, user.user_id, project_id, current_change_id, check_id, body)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post("/projects/{project_id}/current-change/{current_change_id}/complete",
+             response_model=CompleteManualChangeResponse)
+async def complete_manual_change(
+    project_id: UUID, current_change_id: UUID, body: CompleteManualChangeRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> CompleteManualChangeResponse:
+    try:
+        return await v2_manual_loop_service.complete_change(
+            repo, user.user_id, project_id, current_change_id, body)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/preferences", response_model=UserPreferencesView)
+async def get_preferences(
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> UserPreferencesView:
+    return await v2_manual_loop_service.get_preferences(repo, user.user_id)
+
+
+@router.put("/preferences/dialogue-sound", response_model=UserPreferencesView)
+async def update_dialogue_sound(
+    body: UpdateDialogueSoundRequest, user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> UserPreferencesView:
+    try:
+        return await v2_manual_loop_service.update_dialogue_sound(repo, user.user_id, body)
     except V2ApplicationError as exc:
         raise _http_error(exc) from exc
 

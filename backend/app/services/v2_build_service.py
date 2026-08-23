@@ -22,6 +22,7 @@ from app.schemas.v2 import (
 )
 from app.services.v2_agent_guidance import get_agent_metadata
 from app.services.v2_current_change_service import current_change_view
+from app.services.v2_manual_loop_service import check_view
 from app.services.v2_errors import V2ConflictError, V2NotFoundError
 from app.services.v2_repository import (
     V2Repository,
@@ -271,11 +272,24 @@ async def get_build_resume_state(
         and accepted.input_done_condition_snapshot == change.done_condition_snapshot
         and accepted.input_boundary_snapshots == change.boundary_snapshots
     )
+    latest_check = await repo.get_latest_check(owner_user_id, project_id, current_change_id)
 
     if change.lifecycle_state is CurrentChangeState.AWAITING_AGENT:
         stage = BuildStage.WAITING_FOR_RETURN
+    elif change.lifecycle_state is CurrentChangeState.REVIEWING:
+        if latest_check is not None and latest_check.status == "performed" and latest_check.result.value == "worked":
+            stage = BuildStage.READY_TO_COMPLETE
+        elif latest_check is not None and latest_check.status == "proposed":
+            stage = (BuildStage.CHECK_UNSURE if change.student_return_outcome == "unsure"
+                     else BuildStage.PERFORM_CHECK)
+        else:
+            stage = BuildStage.REPORT_RETURN_OUTCOME
+    elif change.lifecycle_state is CurrentChangeState.RECOVERING:
+        stage = BuildStage.CHECK_FAILED
     elif change.lifecycle_state is not CurrentChangeState.PREPARING:
-        raise V2ConflictError("This Current Change is outside the prompt handoff slice.")
+        raise V2ConflictError("This Current Change is no longer active.")
+    elif change.resume_step.value == "confirm_change":
+        stage = BuildStage.CONFIRM_CHANGE
     elif change.coding_agent_key is None:
         stage = BuildStage.CHOOSE_AGENT
     elif change.prompt_draft is None:
@@ -307,8 +321,10 @@ async def get_build_resume_state(
         ready_to_handoff=(stage is BuildStage.READY_TO_HANDOFF),
         exact_handoff_prompt=(
             accepted.content
-            if stage is BuildStage.WAITING_FOR_RETURN and accepted
+            if stage in {BuildStage.READY_TO_HANDOFF, BuildStage.WAITING_FOR_RETURN} and accepted
             else None
         ),
         current_change_version=change.version,
+        active_check=check_view(latest_check),
+        last_check_result=latest_check.result if latest_check else None,
     )

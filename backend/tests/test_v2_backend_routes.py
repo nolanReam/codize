@@ -174,6 +174,178 @@ def prepare_v23b_change(client: TestClient) -> tuple[dict, dict]:
     return project, change
 
 
+def test_phase4_manual_loop_completes_only_after_student_check(client):
+    created = create_project(client, activate=False)["project"]
+    item_id = str(uuid.uuid4())
+    setup = client.post(
+        f"/v2/projects/{created['project_id']}/manual-setup",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_project_version": created["version"],
+              "project_context": "A small volleyball score tracker",
+              "plan_item_id": item_id, "change_label": "Show the current score",
+              "done_condition": "Changing a point updates the visible score"},
+    )
+    assert setup.status_code == 200, setup.text
+    project = setup.json()["project"]
+    started = start_change(client, project["project_id"], project["version"],
+                           plan_item_id=item_id, goal="ignored client label")
+    assert started.status_code == 200, started.text
+    change = started.json()["current_change"]
+    assert change["goal_snapshot"] == "ignored client label"  # fake preserves legacy seam
+
+    confirmed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/confirm",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    change = confirmed.json()["current_change"]
+    assert change["done_condition_snapshot"] == "Changing a point updates the visible score"
+
+    selected = select_agent(client, project, change)
+    change["version"] = selected["current_change_version"]
+    project["version"] = selected["project_version"]
+    drafted = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-draft",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change["prompt_draft_version"],
+            "prompt_text": "Add the focused score display change.",
+            "done_condition": change["done_condition_snapshot"], "boundaries": []},
+    )
+    assert drafted.status_code == 200, drafted.text
+    change = drafted.json()
+    effort = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "expected_current_change_version": change["version"], "effort": "standard"},
+    )
+    assert effort.status_code == 200, effort.text
+    change = effort.json()
+    accepted = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-versions",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_prompt_draft_version": change["prompt_draft_version"]},
+    )
+    assert accepted.status_code == 200, accepted.text
+    change = accepted.json()["current_change"]
+    prompt = accepted.json()["prompt_version"]
+    handed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/handoff",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "prompt_version_id": prompt["id"], "expected_current_change_version": change["version"],
+            "expected_prompt_version": prompt["version"]},
+    )
+    assert handed.status_code == 200, handed.text
+    change = handed.json()["current_change"]
+
+    check_id = str(uuid.uuid4())
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "outcome": "worked",
+            "check_id": check_id},
+    )
+    assert returned.status_code == 200, returned.text
+    change = returned.json()["current_change"]
+    check = returned.json()["check"]
+
+    rejected_claim = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "expected_check_version": check["version"],
+            "result": "worked", "observation": "The agent said it passed",
+            "performed_by_student": False, "next_check_id": None},
+    )
+    assert rejected_claim.status_code == 422
+
+    checked = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "expected_check_version": check["version"],
+            "result": "worked", "observation": "I added a point and saw the score change",
+            "performed_by_student": True, "next_check_id": None},
+    )
+    assert checked.status_code == 200, checked.text
+    change = checked.json()["current_change"]
+    completion_command = str(uuid.uuid4())
+    completion_body = {"workflow_version": "v2", "command_id": completion_command,
+        "expected_current_change_version": change["version"],
+        "expected_plan_version": project["plan_version"], "expected_plan_item_version": 1}
+    completion_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/complete"
+    completion = client.post(
+        completion_path, headers=auth_headers(), json=completion_body,
+    )
+    assert completion.status_code == 200, completion.text
+    assert completion.json()["current_change"]["lifecycle_state"] == "completed"
+    assert completion.json()["plan"]["items"][0]["status"] == "done"
+    assert completion.json()["check"]["student_observation"] == "I added a point and saw the score change"
+    replay = client.post(completion_path, headers=auth_headers(), json=completion_body)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["replayed"] is True
+    assert replay.json()["plan"]["plan_version"] == completion.json()["plan"]["plan_version"]
+    recent = client.get(f"/v2/projects/{project['project_id']}/recent-changes",
+                        headers=auth_headers()).json()["recent_changes"]
+    assert recent[0]["observation"] == "I added a point and saw the score change"
+
+
+@pytest.mark.parametrize("intent", ["new_idea", "already_building"])
+def test_phase4_setup_intents_reach_a_resumable_first_change(client, intent):
+    created = create_project(client, intent=intent, activate=False)["project"]
+    draft_refs = client.get("/v2/project-refs", headers=auth_headers()).json()["projects"]
+    draft_ref = next(ref for ref in draft_refs if ref["project_id"] == created["project_id"])
+    assert draft_ref["lifecycle_state"] == "draft"
+    assert draft_ref["setup_resume_step"] == created["setup_resume_step"]
+    item_id = str(uuid.uuid4())
+    setup_path = f"/v2/projects/{created['project_id']}/manual-setup"
+    setup_payload = {"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_project_version": created["version"], "project_context": "A real student project",
+        "plan_item_id": item_id, "change_label": "Add one useful interaction",
+        "done_condition": "The interaction visibly responds"}
+    stale_setup = client.post(setup_path, headers=auth_headers(), json={
+        **setup_payload, "command_id": str(uuid.uuid4()),
+        "expected_project_version": created["version"] + 1,
+    })
+    assert stale_setup.status_code == 409
+    setup = client.post(setup_path, headers=auth_headers(), json=setup_payload)
+    assert setup.status_code == 200, setup.text
+    project = setup.json()["project"]
+
+    # Simulate a successful response being lost and a fresh browser session
+    # retrying from durable Project state with entirely new client IDs.
+    fresh_retry = client.post(setup_path, headers=auth_headers(), json={
+        **setup_payload, "command_id": str(uuid.uuid4()),
+        "plan_item_id": str(uuid.uuid4()),
+    })
+    assert fresh_retry.status_code == 200, fresh_retry.text
+    assert fresh_retry.json()["replayed"] is True
+    assert fresh_retry.json()["plan_item"]["id"] == item_id
+    refreshed_plan = client.get(
+        f"/v2/projects/{created['project_id']}/plan", headers=auth_headers()
+    ).json()
+    assert [item["id"] for item in refreshed_plan["items"]] == [item_id]
+    assert refreshed_plan["plan_version"] == project["plan_version"]
+    mismatched_retry = client.post(setup_path, headers=auth_headers(), json={
+        **setup_payload, "command_id": str(uuid.uuid4()),
+        "plan_item_id": str(uuid.uuid4()), "change_label": "A different initial item",
+    })
+    assert mismatched_retry.status_code == 409
+    assert len(client.get(
+        f"/v2/projects/{created['project_id']}/plan", headers=auth_headers()
+    ).json()["items"]) == 1
+
+    started = start_change(client, project["project_id"], project["version"], plan_item_id=item_id)
+    assert started.status_code == 200, started.text
+    duplicate = start_change(client, project["project_id"], project["version"], plan_item_id=item_id)
+    assert duplicate.status_code == 409
+    resumed = client.get(f"/v2/projects/{project['project_id']}/current-change",
+                         headers=auth_headers()).json()["current_change"]
+    assert resumed["id"] == started.json()["current_change"]["id"]
+
+
 def select_agent(client: TestClient, project: dict, change: dict, choice: str = "codex") -> dict:
     response = client.put(
         f"/v2/projects/{project['project_id']}/current-change/{change['id']}/coding-agent",
@@ -255,6 +427,150 @@ def accept_ready_v23b_prompt(
     result = accepted.json()
     change.update(result["current_change"])
     return result
+
+
+def prepare_handed_off_change(client: TestClient) -> tuple[dict, dict]:
+    project, change = prepare_v23b_change(client)
+    accepted = accept_ready_v23b_prompt(client, project, change)
+    prompt = accepted["prompt_version"]
+    handed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/handoff",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "prompt_version_id": prompt["id"], "expected_current_change_version": change["version"],
+            "expected_prompt_version": prompt["version"]},
+    )
+    assert handed.status_code == 200, handed.text
+    return project, handed.json()["current_change"]
+
+
+def test_phase4_unsure_check_creates_retry_and_duplicate_return_replays(client):
+    project, change = prepare_handed_off_change(client)
+    check_id = str(uuid.uuid4())
+    command_id = str(uuid.uuid4())
+    body = {"workflow_version": "v2", "command_id": command_id,
+        "expected_current_change_version": change["version"], "outcome": "unsure",
+        "check_id": check_id}
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return"
+    first = client.post(path, headers=auth_headers(), json=body)
+    replay = client.post(path, headers=auth_headers(), json=body)
+    assert first.status_code == replay.status_code == 200
+    assert replay.json()["replayed"] is True
+    change = first.json()["current_change"]
+    check = first.json()["check"]
+    next_id = str(uuid.uuid4())
+    check_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}"
+    unsure_command = str(uuid.uuid4())
+    unsure_body = {"workflow_version": "v2", "command_id": unsure_command,
+            "expected_current_change_version": change["version"], "expected_check_version": check["version"],
+            "result": "unsure", "observation": "I could not tell whether the number refreshed",
+            "performed_by_student": True, "next_check_id": next_id}
+    unsure = client.post(check_path, headers=auth_headers(), json=unsure_body)
+    assert unsure.status_code == 200, unsure.text
+    first_unsure = unsure.json()
+    assert first_unsure["check"]["status"] == "performed"
+    assert first_unsure["check"]["student_observation"] == "I could not tell whether the number refreshed"
+    assert first_unsure["next_check"]["id"] == next_id
+    assert first_unsure["current_change"]["version"] == change["version"] + 1
+
+    unsure_replay = client.post(check_path, headers=auth_headers(), json=unsure_body)
+    assert unsure_replay.status_code == 200, unsure_replay.text
+    assert unsure_replay.json()["replayed"] is True
+    assert unsure_replay.json()["current_change"]["version"] == first_unsure["current_change"]["version"]
+
+    second_next_id = str(uuid.uuid4())
+    second_command = str(uuid.uuid4())
+    second_unsure = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{next_id}",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": second_command,
+            "expected_current_change_version": first_unsure["current_change"]["version"],
+            "expected_check_version": first_unsure["next_check"]["version"],
+            "result": "unsure", "observation": "The display still does not make the refresh clear",
+            "performed_by_student": True, "next_check_id": second_next_id},
+    )
+    assert second_unsure.status_code == 200, second_unsure.text
+    assert second_unsure.json()["check"]["student_observation"] == "The display still does not make the refresh clear"
+    assert second_unsure.json()["current_change"]["version"] == change["version"] + 2
+    assert second_unsure.json()["next_check"]["id"] == second_next_id
+    state = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers()).json()
+    assert state["build_stage"] == "check_unsure"
+    assert state["active_check"]["id"] == second_next_id
+    completion = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/complete",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": state["current_change_version"],
+            "expected_plan_version": project["plan_version"], "expected_plan_item_version": 1},
+    )
+    assert completion.status_code == 409
+
+
+def test_phase4_failed_check_never_completes_and_cross_owner_cannot_report(client):
+    project, change = prepare_handed_off_change(client)
+    cross_owner = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(USER_B), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "outcome": "worked",
+            "check_id": str(uuid.uuid4())},
+    )
+    assert cross_owner.status_code == 404
+    check_id = str(uuid.uuid4())
+    stale_return = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"] + 1, "outcome": "worked",
+            "check_id": check_id},
+    )
+    assert stale_return.status_code == 409
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "outcome": "worked", "check_id": check_id},
+    )
+    change = returned.json()["current_change"]
+    check = returned.json()["check"]
+    stale_check = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "expected_check_version": check["version"] + 1,
+            "result": "did_not_work", "observation": "The score stayed at zero",
+            "performed_by_student": True, "next_check_id": None},
+    )
+    assert stale_check.status_code == 409
+    failed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "expected_check_version": check["version"],
+            "result": "did_not_work", "observation": "The score stayed at zero",
+            "performed_by_student": True, "next_check_id": None},
+    )
+    assert failed.status_code == 200, failed.text
+    change = failed.json()["current_change"]
+    state = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers()).json()
+    assert state["build_stage"] == "check_failed"
+    completion = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/complete",
+        headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_plan_version": project["plan_version"], "expected_plan_item_version": 1},
+    )
+    assert completion.status_code == 409
+
+
+def test_phase4_dialogue_sound_preference_persists_and_is_owner_scoped(client):
+    initial = client.get("/v2/preferences", headers=auth_headers()).json()
+    assert initial == {"dialogue_sound_enabled": True, "motion_preference": "system", "version": 0}
+    saved = client.put("/v2/preferences/dialogue-sound", headers=auth_headers(),
+        json={"expected_version": 0, "dialogue_sound_enabled": False})
+    assert saved.status_code == 200, saved.text
+    assert client.get("/v2/preferences", headers=auth_headers()).json()["dialogue_sound_enabled"] is False
+    assert client.get("/v2/preferences", headers=auth_headers(USER_B)).json()["dialogue_sound_enabled"] is True
+    replay = client.put("/v2/preferences/dialogue-sound", headers=auth_headers(),
+        json={"expected_version": 0, "dialogue_sound_enabled": False})
+    assert replay.status_code == 200
+    assert replay.json()["version"] == saved.json()["version"]
 
 
 @pytest.mark.parametrize(

@@ -123,12 +123,25 @@ class GenerationPurpose(StrEnum):
 
 
 class BuildStage(StrEnum):
+    CONFIRM_CHANGE = "confirm_change"
     CHOOSE_AGENT = "choose_agent"
     EDIT_PROMPT = "edit_prompt"
     CHOOSE_EFFORT = "choose_effort"
     REVIEW_PROMPT = "review_prompt"
     READY_TO_HANDOFF = "ready_to_handoff"
     WAITING_FOR_RETURN = "waiting_for_return"
+    REPORT_RETURN_OUTCOME = "report_return_outcome"
+    PERFORM_CHECK = "perform_check"
+    CHECK_UNSURE = "check_unsure"
+    CHECK_FAILED = "check_failed"
+    READY_TO_COMPLETE = "ready_to_complete"
+
+
+class CheckResult(StrEnum):
+    WORKED = "worked"
+    PARTLY_WORKED = "partly_worked"
+    DID_NOT_WORK = "did_not_work"
+    UNSURE = "unsure"
 
 
 NONTERMINAL_STATES = frozenset(
@@ -293,6 +306,9 @@ class V2CurrentChange:
     teaching_policy_version: str = "unresolved-v0"
     risk_policy_version: str = "unresolved-v0"
     handoff_command_id: UUID | None = None
+    student_return_outcome: str | None = None
+    accepted_outcome_summary: str | None = None
+    unresolved_uncertainty_summary: str | None = None
 
     @property
     def policy_is_resolved(self) -> bool:
@@ -301,6 +317,34 @@ class V2CurrentChange:
             and self.risk_policy_version != "unresolved-v0"
         )
 
+
+@dataclass(frozen=True, slots=True)
+class V2Check:
+    id: UUID
+    project_id: UUID
+    current_change_id: UUID
+    check_plan: str
+    status: str
+    result: CheckResult | None
+    student_observation: str | None
+    performed_at: datetime | None
+    version: int
+
+
+@dataclass(frozen=True, slots=True)
+class V2UserPreferences:
+    dialogue_sound_enabled: bool
+    motion_preference: str
+    version: int
+
+
+@dataclass(frozen=True, slots=True)
+class V2RecentChange:
+    id: UUID
+    goal: str
+    completed_at: datetime
+    check_plan: str
+    observation: str
 
 @dataclass(frozen=True, slots=True)
 class V2PromptVersion:

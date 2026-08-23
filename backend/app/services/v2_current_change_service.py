@@ -44,6 +44,7 @@ def current_change_view(change: V2CurrentChange) -> CurrentChangeView:
         coding_agent_key=change.coding_agent_key,
         effort_category=change.effort_category,
         latest_prompt_version_id=change.latest_prompt_version_id,
+        student_return_outcome=change.student_return_outcome,
         version=change.version,
         created_at=change.created_at,
         updated_at=change.updated_at,

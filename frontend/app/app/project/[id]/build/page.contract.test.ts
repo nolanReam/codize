@@ -6,7 +6,7 @@ const source = readFileSync(resolve(process.cwd(), "app/app/project/[id]/build/p
 const css = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
 
 describe("V2 Build foundation contract", () => {
-  it("renders every backend-owned Phase 3A stage without inventing return or completion", () => {
+  it("renders the backend-owned manual loop from confirmation through completion", () => {
     for (const stage of [
       "choose_agent",
       "edit_prompt",
@@ -14,11 +14,17 @@ describe("V2 Build foundation contract", () => {
       "review_prompt",
       "ready_to_handoff",
       "waiting_for_return",
+      "confirm_change",
+      "perform_check",
+      "check_unsure",
+      "check_failed",
+      "ready_to_complete",
     ]) {
       expect(source).toContain(`build_stage === "${stage}"`);
     }
-    expect(source).not.toContain("It worked");
-    expect(source).not.toContain("Complete change");
+    expect(source).toContain("It worked");
+    expect(source).toContain("Complete change");
+    expect(source).toContain("recordCheck(");
   });
 
   it("reloads authoritative state after version conflicts", () => {

@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.core.config import Settings, get_settings
 from app.domain.v2 import (
     CodingAgentKey,
+    CheckResult,
     CurrentChangeKind,
     CurrentChangeState,
     EffortCategory,
@@ -31,11 +32,14 @@ from app.domain.v2 import (
     ResumeStep,
     SetupResumeStep,
     V2CurrentChange,
+    V2Check,
     V2GenerationAttempt,
     V2Plan,
     V2PlanItem,
     V2Project,
+    V2RecentChange,
     V2PromptVersion,
+    V2UserPreferences,
     WorkflowVersion,
     validate_resume_state,
 )
@@ -55,9 +59,17 @@ _CURRENT_CHANGE_SELECT = (
     "resume_step,goal_snapshot,done_condition_snapshot,boundary_snapshots,"
     "prompt_draft,prompt_draft_version,coding_agent_key,effort_category,"
     "latest_prompt_version_id,teaching_policy_version,risk_policy_version,"
-    "handoff_command_id,"
+    "handoff_command_id,student_return_outcome,accepted_outcome_summary,"
+    "unresolved_uncertainty_summary,"
     "version,created_at,updated_at,completed_at,cancelled_at,"
     "cancellation_command_id,cancellation_reason_key"
+)
+_CHECK_SELECT = (
+    "id,project_id,owner_user_id,current_change_id,check_plan,status,result,"
+    "student_observation,performed_at,version"
+)
+_PREFERENCE_SELECT = (
+    "owner_user_id,dialogue_sound_enabled,motion_preference,version"
 )
 _PROMPT_VERSION_SELECT = (
     "id,project_id,owner_user_id,current_change_id,ordinal,purpose,content,"
@@ -145,6 +157,9 @@ class _CurrentChangeRow(BaseModel):
     teaching_policy_version: str = "unresolved-v0"
     risk_policy_version: str = "unresolved-v0"
     handoff_command_id: UUID | None = None
+    student_return_outcome: str | None = None
+    accepted_outcome_summary: str | None = None
+    unresolved_uncertainty_summary: str | None = None
     version: int = Field(gt=0)
     created_at: datetime
     updated_at: datetime
@@ -204,7 +219,35 @@ class _GenerationAttemptRow(BaseModel):
     version: int = Field(gt=0)
 
 
+class _CheckRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: UUID
+    project_id: UUID
+    owner_user_id: UUID
+    current_change_id: UUID
+    check_plan: str
+    status: str
+    result: CheckResult | None = None
+    student_observation: str | None = None
+    performed_at: datetime | None = None
+    version: int = Field(gt=0)
+
+
+class _PreferenceRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    owner_user_id: UUID
+    dialogue_sound_enabled: bool
+    motion_preference: str
+    version: int = Field(gt=0)
+
+
 class V2Repository(Protocol):
+    async def establish_manual_project(
+        self, owner_user_id: str, project_id: UUID, expected_project_version: int,
+        command_id: UUID, project_context: str, plan_item_id: UUID,
+        change_label: str, done_condition: str,
+    ) -> tuple[V2Project, V2PlanItem, bool]: ...
+
     async def create_project(
         self,
         owner_user_id: str,
@@ -218,6 +261,9 @@ class V2Repository(Protocol):
     async def get_project(self, owner_user_id: str, project_id: UUID) -> V2Project | None: ...
 
     async def list_projects(self, owner_user_id: str) -> list[V2Project]: ...
+    async def list_recent_changes(
+        self, owner_user_id: str, project_id: UUID,
+    ) -> list[V2RecentChange]: ...
 
     async def promote_temporary_project(
         self,
@@ -260,6 +306,40 @@ class V2Repository(Protocol):
         change_kind: str,
         goal_snapshot: str,
     ) -> tuple[V2CurrentChange, bool]: ...
+
+    async def confirm_manual_current_change(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID,
+    ) -> tuple[V2CurrentChange, bool]: ...
+
+    async def record_manual_return(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID,
+        outcome: str, check_id: UUID | None,
+    ) -> tuple[V2CurrentChange, V2Check | None, bool]: ...
+
+    async def record_manual_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        check_id: UUID, expected_current_change_version: int,
+        expected_check_version: int, command_id: UUID, result: str,
+        observation: str, performed_by_student: bool, next_check_id: UUID | None,
+    ) -> tuple[V2CurrentChange, V2Check, V2Check | None, bool]: ...
+
+    async def get_latest_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2Check | None: ...
+
+    async def complete_manual_change(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, expected_plan_version: int,
+        expected_plan_item_version: int, command_id: UUID,
+        check: V2Check,
+    ) -> bool: ...
+
+    async def get_preferences(self, owner_user_id: str) -> V2UserPreferences: ...
+    async def update_dialogue_sound(
+        self, owner_user_id: str, expected_version: int, enabled: bool,
+    ) -> V2UserPreferences: ...
 
     async def get_current_change(
         self,
@@ -496,6 +576,38 @@ def _current_change_from_row(
         teaching_policy_version=row.teaching_policy_version,
         risk_policy_version=row.risk_policy_version,
         handoff_command_id=row.handoff_command_id,
+        student_return_outcome=row.student_return_outcome,
+        accepted_outcome_summary=row.accepted_outcome_summary,
+        unresolved_uncertainty_summary=row.unresolved_uncertainty_summary,
+    )
+
+
+def _check_from_row(raw: Any, *, expected_owner: str, expected_project_id: UUID) -> V2Check:
+    try:
+        row = _CheckRow.model_validate(raw)
+    except ValidationError as exc:
+        raise V2RepositoryError("malformed V2 Check row") from exc
+    if str(row.owner_user_id) != expected_owner or row.project_id != expected_project_id:
+        raise V2RepositoryError("database returned a Check outside the owned Project")
+    return V2Check(
+        id=row.id, project_id=row.project_id, current_change_id=row.current_change_id,
+        check_plan=row.check_plan, status=row.status, result=row.result,
+        student_observation=row.student_observation, performed_at=row.performed_at,
+        version=row.version,
+    )
+
+
+def _preference_from_row(raw: Any, *, expected_owner: str) -> V2UserPreferences:
+    try:
+        row = _PreferenceRow.model_validate(raw)
+    except ValidationError as exc:
+        raise V2RepositoryError("malformed V2 preferences row") from exc
+    if str(row.owner_user_id) != expected_owner:
+        raise V2RepositoryError("database returned preferences for the wrong owner")
+    return V2UserPreferences(
+        dialogue_sound_enabled=row.dialogue_sound_enabled,
+        motion_preference=row.motion_preference,
+        version=row.version,
     )
 
 
@@ -643,6 +755,27 @@ class SupabaseV2Repository:
             raise V2RepositoryError(f"{context} returned a malformed object")
         return value
 
+    async def establish_manual_project(
+        self, owner_user_id: str, project_id: UUID, expected_project_version: int,
+        command_id: UUID, project_context: str, plan_item_id: UUID,
+        change_label: str, done_condition: str,
+    ) -> tuple[V2Project, V2PlanItem, bool]:
+        payload = self._object(await self._rpc("establish_v2_manual_project", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_expected_project_version": expected_project_version,
+            "p_command_id": str(command_id), "p_project_context": project_context,
+            "p_plan_item_id": str(plan_item_id), "p_change_label": change_label,
+            "p_done_condition": done_condition,
+        }), "establish_v2_manual_project")
+        replayed = payload.get("replayed")
+        if not isinstance(replayed, bool):
+            raise V2RepositoryError("manual setup omitted replay state")
+        return (
+            _project_from_row(payload.get("project"), expected_owner=owner_user_id),
+            _plan_item_from_row(payload.get("plan_item"), expected_owner=owner_user_id,
+                                expected_project_id=project_id), replayed,
+        )
+
     async def create_project(
         self,
         owner_user_id: str,
@@ -713,6 +846,38 @@ class SupabaseV2Repository:
         if not isinstance(rows, list):
             raise V2RepositoryError("V2 Project list returned malformed rows")
         return [_project_from_row(row, expected_owner=owner_user_id) for row in rows]
+
+    async def list_recent_changes(
+        self, owner_user_id: str, project_id: UUID,
+    ) -> list[V2RecentChange]:
+        rows = await self._request("GET", "/v2_current_changes", params={
+            "select": _CURRENT_CHANGE_SELECT, "owner_user_id": f"eq.{owner_user_id}",
+            "project_id": f"eq.{project_id}", "lifecycle_state": "eq.completed",
+            "order": "completed_at.desc,id.desc", "limit": "3",
+        })
+        if not isinstance(rows, list):
+            raise V2RepositoryError("recent V2 Current Change read returned malformed rows")
+        result: list[V2RecentChange] = []
+        for raw in rows:
+            change = _current_change_from_row(raw, expected_owner=owner_user_id,
+                                              expected_project_id=project_id)
+            check_rows = await self._request("GET", "/v2_checks", params={
+                "select": _CHECK_SELECT, "owner_user_id": f"eq.{owner_user_id}",
+                "project_id": f"eq.{project_id}", "current_change_id": f"eq.{change.id}",
+                "status": "eq.performed", "result": "in.(worked,partly_worked)",
+                "order": "performed_at.desc,id.desc", "limit": "1",
+            })
+            if not isinstance(check_rows, list) or len(check_rows) > 1:
+                raise V2RepositoryError("recent V2 Check read returned malformed rows")
+            if not check_rows or change.completed_at is None:
+                continue
+            check = _check_from_row(check_rows[0], expected_owner=owner_user_id,
+                                    expected_project_id=project_id)
+            if not check.student_observation:
+                continue
+            result.append(V2RecentChange(change.id, change.goal_snapshot,
+                change.completed_at, check.check_plan, check.student_observation))
+        return result
 
     async def promote_temporary_project(
         self,
@@ -904,6 +1069,128 @@ class SupabaseV2Repository:
             ),
             payload["replayed"],
         )
+
+    async def confirm_manual_current_change(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID,
+    ) -> tuple[V2CurrentChange, bool]:
+        payload = self._object(await self._rpc("confirm_v2_manual_current_change", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id),
+        }), "confirm_v2_manual_current_change")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                bool(payload.get("replayed")))
+
+    async def record_manual_return(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID,
+        outcome: str, check_id: UUID | None,
+    ) -> tuple[V2CurrentChange, V2Check | None, bool]:
+        payload = self._object(await self._rpc("record_v2_manual_return", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id), "p_outcome": outcome,
+            "p_check_id": str(check_id) if check_id else None,
+        }), "record_v2_manual_return")
+        raw_check = payload.get("check")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                _check_from_row(raw_check, expected_owner=owner_user_id,
+                                expected_project_id=project_id) if raw_check else None,
+                bool(payload.get("replayed")))
+
+    async def record_manual_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        check_id: UUID, expected_current_change_version: int,
+        expected_check_version: int, command_id: UUID, result: str,
+        observation: str, performed_by_student: bool, next_check_id: UUID | None,
+    ) -> tuple[V2CurrentChange, V2Check, V2Check | None, bool]:
+        payload = self._object(await self._rpc("record_v2_manual_check", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id), "p_check_id": str(check_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_expected_check_version": expected_check_version,
+            "p_command_id": str(command_id), "p_result": result,
+            "p_observation": observation, "p_performed_by_student": performed_by_student,
+            "p_next_check_id": str(next_check_id) if next_check_id else None,
+        }), "record_v2_manual_check")
+        raw_next = payload.get("next_check")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                _check_from_row(payload.get("check"), expected_owner=owner_user_id,
+                                expected_project_id=project_id),
+                _check_from_row(raw_next, expected_owner=owner_user_id,
+                                expected_project_id=project_id) if raw_next else None,
+                bool(payload.get("replayed")))
+
+    async def get_latest_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2Check | None:
+        rows = await self._request("GET", "/v2_checks", params={
+            "select": _CHECK_SELECT, "owner_user_id": f"eq.{owner_user_id}",
+            "project_id": f"eq.{project_id}",
+            "current_change_id": f"eq.{current_change_id}",
+            "order": "created_at.desc,id.desc", "limit": "1",
+        })
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise V2RepositoryError("latest V2 Check read returned malformed rows")
+        return (_check_from_row(rows[0], expected_owner=owner_user_id,
+                expected_project_id=project_id) if rows else None)
+
+    async def complete_manual_change(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, expected_plan_version: int,
+        expected_plan_item_version: int, command_id: UUID, check: V2Check,
+    ) -> bool:
+        change = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        if change is None:
+            raise V2RepositoryNotFound("owned V2 Current Change not found")
+        observed_at = check.performed_at.isoformat() if check.performed_at else None
+        result = await self._rpc("complete_v2_current_change", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_expected_plan_version": expected_plan_version,
+            "p_expected_plan_item_version": expected_plan_item_version,
+            "p_completion_command_id": str(command_id),
+            "p_complete_linked_plan_item": True,
+            "p_accepted_outcome_summary": check.student_observation,
+            "p_unresolved_uncertainty_summary": change.unresolved_uncertainty_summary,
+            "p_fact_inputs": [{"fact_type": "known_working_behavior",
+                "subject_key": f"change/{current_change_id}", "value_kind": "text",
+                "value": check.student_observation, "source_kind": "student_observed",
+                "source_record_type": "check", "source_record_id": str(check.id),
+                "observed_at": observed_at}],
+            "p_learner_evidence_inputs": [],
+        })
+        if not isinstance(result, list) or len(result) != 1 or not isinstance(result[0].get("replayed"), bool):
+            raise V2RepositoryError("manual completion returned malformed state")
+        return result[0]["replayed"]
+
+    async def get_preferences(self, owner_user_id: str) -> V2UserPreferences:
+        rows = await self._request("GET", "/v2_user_preferences", params={
+            "select": _PREFERENCE_SELECT, "owner_user_id": f"eq.{owner_user_id}", "limit": "1"
+        })
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise V2RepositoryError("V2 preferences read returned malformed rows")
+        if not rows:
+            return V2UserPreferences(dialogue_sound_enabled=True, motion_preference="system", version=0)
+        return _preference_from_row(rows[0], expected_owner=owner_user_id)
+
+    async def update_dialogue_sound(
+        self, owner_user_id: str, expected_version: int, enabled: bool,
+    ) -> V2UserPreferences:
+        payload = self._object(await self._rpc("update_v2_dialogue_sound", {
+            "p_owner_user_id": owner_user_id, "p_expected_version": expected_version,
+            "p_dialogue_sound_enabled": enabled,
+        }), "update_v2_dialogue_sound")
+        return _preference_from_row(payload, expected_owner=owner_user_id)
 
     async def update_coding_agent(
         self,

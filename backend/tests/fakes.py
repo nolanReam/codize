@@ -9,6 +9,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from app.domain.v2 import (
+    CheckResult,
     CodingAgentKey,
     CurrentChangeKind,
     CurrentChangeState,
@@ -23,11 +24,14 @@ from app.domain.v2 import (
     ResumeStep,
     SetupResumeStep,
     V2CurrentChange,
+    V2Check,
     V2GenerationAttempt,
     V2Plan,
     V2PlanItem,
     V2Project,
+    V2RecentChange,
     V2PromptVersion,
+    V2UserPreferences,
     WorkflowVersion,
 )
 from app.services.llm_service import LLMError
@@ -275,6 +279,12 @@ class InMemoryV2Repository:
         self._generation_attempts: dict[uuid.UUID, tuple[str, V2GenerationAttempt]] = {}
         self._generation_commands: dict[tuple[str, uuid.UUID], uuid.UUID] = {}
         self._recovery_case_statuses: dict[uuid.UUID, list[str]] = {}
+        self._checks: dict[uuid.UUID, tuple[str, V2Check]] = {}
+        self._manual_commands: dict[uuid.UUID, tuple[str, uuid.UUID]] = {}
+        self._manual_setup_payloads: dict[
+            uuid.UUID, tuple[str, str, str, uuid.UUID]
+        ] = {}
+        self._preferences: dict[str, V2UserPreferences] = {}
         self._tick = itertools.count()
 
     def _now(self) -> datetime:
@@ -288,6 +298,58 @@ class InMemoryV2Repository:
 
     def _store_project(self, owner_user_id: str, project: V2Project) -> None:
         self._projects[project.ref.project_id] = (owner_user_id, project)
+
+    async def establish_manual_project(
+        self, owner_user_id: str, project_id: uuid.UUID, expected_project_version: int,
+        command_id: uuid.UUID, project_context: str, plan_item_id: uuid.UUID,
+        change_label: str, done_condition: str,
+    ) -> tuple[V2Project, V2PlanItem, bool]:
+        project = self._owned_project(owner_user_id, project_id)
+        existing = self._manual_commands.get(command_id)
+        if existing:
+            prior_setup = self._manual_setup_payloads.get(project_id)
+            if (
+                existing != ("setup", plan_item_id)
+                or prior_setup is None
+                or prior_setup != (
+                    project_context.strip(), change_label.strip(), done_condition.strip(), plan_item_id
+                )
+            ):
+                raise V2RepositoryConflict("manual setup command reused")
+            return project, self._plans[project_id][plan_item_id], True
+        prior_setup = self._manual_setup_payloads.get(project_id)
+        if (
+            project.lifecycle_state is ProjectLifecycle.ACTIVE
+            and project.setup_resume_step is SetupResumeStep.READY
+            and project.version == 2
+            and project.plan_version == 2
+            and prior_setup is not None
+            and prior_setup[:3] == (
+                project_context.strip(), change_label.strip(), done_condition.strip()
+            )
+            and len(self._plans.get(project_id, {})) == 1
+        ):
+            return project, self._plans[project_id][prior_setup[3]], True
+        if project.version != expected_project_version or project.lifecycle_state is not ProjectLifecycle.DRAFT:
+            raise V2RepositoryConflict("stale setup")
+        if self._plans.get(project_id):
+            raise V2RepositoryInvalidState("setup requires empty plan")
+        item = V2PlanItem(
+            id=plan_item_id, project_id=project_id, label=change_label,
+            intended_outcome=done_condition, scope_band=PlanScopeBand.FIRST_VERSION,
+            status=PlanItemStatus.READY, order_key=1024, version=1,
+            completed_at=None, terminal_current_change_id=None,
+        )
+        project = replace(project, lifecycle_state=ProjectLifecycle.ACTIVE,
+            setup_resume_step=SetupResumeStep.READY, plan_version=project.plan_version + 1,
+            version=project.version + 1, updated_at=self._now())
+        self._plans[project_id] = {plan_item_id: item}
+        self._store_project(owner_user_id, project)
+        self._manual_commands[command_id] = ("setup", plan_item_id)
+        self._manual_setup_payloads[project_id] = (
+            project_context.strip(), change_label.strip(), done_condition.strip(), plan_item_id
+        )
+        return project, item, False
 
     def activate_project_for_test(self, owner_user_id: str, project_id: uuid.UUID) -> None:
         """Test-only seam standing in for the later accepted setup command."""
@@ -438,6 +500,24 @@ class InMemoryV2Repository:
             and project.lifecycle_state is not ProjectLifecycle.DELETION_PENDING
         ]
         return sorted(projects, key=lambda project: (project.updated_at, project.ref.project_id), reverse=True)
+
+    async def list_recent_changes(self, owner_user_id: str,
+                                  project_id: uuid.UUID) -> list[V2RecentChange]:
+        self._owned_project(owner_user_id, project_id)
+        recent: list[V2RecentChange] = []
+        changes = sorted((change for owner, change in self._changes.values()
+            if owner == owner_user_id and change.project_ref.project_id == project_id
+            and change.lifecycle_state is CurrentChangeState.COMPLETED),
+            key=lambda value: value.completed_at or datetime.min.replace(tzinfo=UTC), reverse=True)
+        for change in changes[:3]:
+            checks = [check for owner, check in self._checks.values()
+                      if owner == owner_user_id and check.current_change_id == change.id
+                      and check.status == "performed" and check.student_observation]
+            if checks and change.completed_at:
+                check = checks[-1]
+                recent.append(V2RecentChange(change.id, change.goal_snapshot,
+                    change.completed_at, check.check_plan, check.student_observation or ""))
+        return recent
 
     async def promote_temporary_project(
         self,
@@ -780,8 +860,6 @@ class InMemoryV2Repository:
             raise V2RepositoryInvalidState("temporary Project requires recovery")
         if plan_item_id is not None:
             item = self._plans.get(project_id, {}).get(plan_item_id)
-            if item is None:
-                raise V2RepositoryNotFound("Plan Item not found")
             if item.status in {PlanItemStatus.DONE, PlanItemStatus.REMOVED}:
                 raise V2RepositoryInvalidState("terminal Plan Item")
         if any(
@@ -1164,6 +1242,159 @@ class InMemoryV2Repository:
         self._changes[current_change_id] = (owner_user_id, change)
         self._handoff_commands[command_key] = prompt.id
         return change, prompt, False
+
+    async def confirm_manual_current_change(
+        self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID,
+        expected_current_change_version: int, command_id: uuid.UUID,
+    ) -> tuple[V2CurrentChange, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        existing = self._manual_commands.get(command_id)
+        if existing:
+            if existing != ("confirm", current_change_id):
+                raise V2RepositoryConflict("manual confirmation command reused")
+            return change, True
+        if change.version != expected_current_change_version or change.resume_step is not ResumeStep.CONFIRM_CHANGE:
+            raise V2RepositoryConflict("stale confirmation")
+        if change.plan_item_id is None:
+            raise V2RepositoryInvalidState("manual change must be linked")
+        item = self._plans[project_id][change.plan_item_id]
+        change = replace(change, done_condition_snapshot=item.intended_outcome,
+            teaching_policy_version="phase4-mechanical-v1",
+            risk_policy_version="phase4-mechanical-v1", resume_step=ResumeStep.CHOOSE_AGENT,
+            version=change.version + 1, updated_at=self._now())
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._manual_commands[command_id] = ("confirm", current_change_id)
+        return change, False
+
+    async def record_manual_return(
+        self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID,
+        expected_current_change_version: int, command_id: uuid.UUID,
+        outcome: str, check_id: uuid.UUID | None,
+    ) -> tuple[V2CurrentChange, V2Check | None, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        existing = self._manual_commands.get(command_id)
+        if existing:
+            stored = self._checks.get(check_id) if check_id else None
+            return change, stored[1] if stored else None, True
+        if change.version != expected_current_change_version or change.lifecycle_state is not CurrentChangeState.AWAITING_AGENT:
+            raise V2RepositoryConflict("stale return")
+        check = None
+        if outcome in {"worked", "unsure"}:
+            if check_id is None or not change.done_condition_snapshot:
+                raise V2RepositoryInvalidState("return requires check")
+            check = V2Check(id=check_id, project_id=project_id,
+                current_change_id=current_change_id, check_plan=change.done_condition_snapshot,
+                status="proposed", result=None, student_observation=None,
+                performed_at=None, version=1)
+            self._checks[check_id] = (owner_user_id, check)
+            change = replace(change, lifecycle_state=CurrentChangeState.REVIEWING,
+                resume_step=ResumeStep.CHECK, student_return_outcome=outcome,
+                unresolved_uncertainty_summary=("The student was unsure before checking." if outcome == "unsure" else None),
+                version=change.version + 1, updated_at=self._now())
+        else:
+            change = replace(change, lifecycle_state=CurrentChangeState.RECOVERING,
+                resume_step=ResumeStep.RECOVERY_SYMPTOM, student_return_outcome="broken",
+                version=change.version + 1, updated_at=self._now())
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._manual_commands[command_id] = ("return", current_change_id)
+        return change, check, False
+
+    async def record_manual_check(
+        self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID,
+        check_id: uuid.UUID, expected_current_change_version: int,
+        expected_check_version: int, command_id: uuid.UUID, result: str,
+        observation: str, performed_by_student: bool, next_check_id: uuid.UUID | None,
+    ) -> tuple[V2CurrentChange, V2Check, V2Check | None, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        entry = self._checks.get(check_id)
+        if entry is None or entry[0] != owner_user_id:
+            raise V2RepositoryNotFound("Check not found")
+        check = entry[1]
+        if self._manual_commands.get(command_id):
+            next_entry = self._checks.get(next_check_id) if next_check_id else None
+            return change, check, next_entry[1] if next_entry else None, True
+        if not performed_by_student or not observation.strip():
+            raise V2RepositoryInvalidState("student performed check required")
+        if change.version != expected_current_change_version or check.version != expected_check_version or check.status != "proposed":
+            raise V2RepositoryConflict("stale check")
+        parsed = CheckResult(result)
+        check = replace(check, status="performed", result=parsed,
+            student_observation=observation.strip(), performed_at=self._now(),
+            version=check.version + 1)
+        self._checks[check_id] = (owner_user_id, check)
+        next_check = None
+        if parsed is CheckResult.UNSURE:
+            if next_check_id is None:
+                raise V2RepositoryInvalidState("unsure requires successor")
+            next_check = V2Check(id=next_check_id, project_id=project_id,
+                current_change_id=current_change_id, check_plan=check.check_plan,
+                status="proposed", result=None, student_observation=None,
+                performed_at=None, version=1)
+            self._checks[next_check_id] = (owner_user_id, next_check)
+        recovery = parsed in {CheckResult.DID_NOT_WORK, CheckResult.PARTLY_WORKED}
+        change = replace(change,
+            lifecycle_state=CurrentChangeState.RECOVERING if recovery else CurrentChangeState.REVIEWING,
+            resume_step=(ResumeStep.RECOVERY_SYMPTOM if recovery else
+                         ResumeStep.UNDERSTAND if parsed is CheckResult.WORKED else ResumeStep.CHECK),
+            unresolved_uncertainty_summary=(
+                f"Student remains unsure after check {check.id}."
+                if parsed is CheckResult.UNSURE
+                else change.unresolved_uncertainty_summary
+            ),
+            version=change.version + 1, updated_at=self._now())
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._manual_commands[command_id] = ("check", check_id)
+        return change, check, next_check, False
+
+    async def get_latest_check(self, owner_user_id: str, project_id: uuid.UUID,
+                               current_change_id: uuid.UUID) -> V2Check | None:
+        self._owned_change(owner_user_id, project_id, current_change_id)
+        checks = [check for owner, check in self._checks.values()
+                  if owner == owner_user_id and check.current_change_id == current_change_id]
+        return checks[-1] if checks else None
+
+    async def complete_manual_change(
+        self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID,
+        expected_current_change_version: int, expected_plan_version: int,
+        expected_plan_item_version: int, command_id: uuid.UUID, check: V2Check,
+    ) -> bool:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        project = self._owned_project(owner_user_id, project_id)
+        if self._manual_commands.get(command_id):
+            return True
+        if change.version != expected_current_change_version or project.plan_version != expected_plan_version or change.plan_item_id is None:
+            raise V2RepositoryConflict("stale completion")
+        item = self._plans[project_id][change.plan_item_id]
+        if item.version != expected_plan_item_version or check.result is not CheckResult.WORKED:
+            raise V2RepositoryInvalidState("ineligible completion")
+        now = self._now()
+        self._plans[project_id][item.id] = replace(item, status=PlanItemStatus.DONE,
+            completed_at=now, terminal_current_change_id=current_change_id,
+            version=item.version + 1)
+        self._changes[current_change_id] = (owner_user_id, replace(change,
+            lifecycle_state=CurrentChangeState.COMPLETED, resume_step=None,
+            accepted_outcome_summary=check.student_observation,
+            completed_at=now, version=change.version + 1, updated_at=now))
+        self._store_project(owner_user_id, replace(project,
+            plan_version=project.plan_version + 1, version=project.version + 1,
+            first_version_completed_at=now, updated_at=now))
+        self._manual_commands[command_id] = ("complete", current_change_id)
+        return False
+
+    async def get_preferences(self, owner_user_id: str) -> V2UserPreferences:
+        return self._preferences.get(owner_user_id, V2UserPreferences(True, "system", 0))
+
+    async def update_dialogue_sound(self, owner_user_id: str, expected_version: int,
+                                    enabled: bool) -> V2UserPreferences:
+        current = await self.get_preferences(owner_user_id)
+        if current.version > 0 and current.dialogue_sound_enabled == enabled:
+            return current
+        if current.version != expected_version:
+            raise V2RepositoryConflict("stale preference")
+        updated = V2UserPreferences(enabled, current.motion_preference,
+                                    1 if current.version == 0 else current.version + 1)
+        self._preferences[owner_user_id] = updated
+        return updated
 
     async def start_generation_attempt(
         self, owner_user_id: str, project_id: uuid.UUID, payload: dict

@@ -1,6 +1,6 @@
 export type V2LifecycleState =
   | "draft"
-  | "temp"
+  | "temporary_recovery"
   | "active"
   | "archived"
   | "deletion_pending";
@@ -16,18 +16,27 @@ export type CodingAgentKey =
 export type CodingAgentChoice = CodingAgentKey | "help_me_choose";
 export type EffortCategory = "quick" | "standard" | "deep";
 export type BuildStage =
+  | "confirm_change"
   | "choose_agent"
   | "edit_prompt"
   | "choose_effort"
   | "review_prompt"
   | "ready_to_handoff"
-  | "waiting_for_return";
+  | "waiting_for_return"
+  | "report_return_outcome"
+  | "perform_check"
+  | "check_unsure"
+  | "check_failed"
+  | "ready_to_complete";
+export type CheckResult = "worked" | "partly_worked" | "did_not_work" | "unsure";
 
 export interface ProjectRefView {
   workflow_version: "v1" | "v2";
   project_id: string;
   display_name: string;
   open_mode: "legacy_active_only" | "explicit";
+  lifecycle_state: V2LifecycleState | null;
+  setup_resume_step: string | null;
 }
 
 export interface V2ProjectView {
@@ -86,6 +95,7 @@ export interface CurrentChangeView {
   coding_agent_key: CodingAgentKey | null;
   effort_category: EffortCategory | null;
   latest_prompt_version_id: string | null;
+  student_return_outcome: "worked" | "broken" | "unsure" | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -140,6 +150,33 @@ export interface BuildResumeState {
   ready_to_handoff: boolean;
   exact_handoff_prompt: string | null;
   current_change_version: number;
+  active_check: CheckView | null;
+  last_check_result: CheckResult | null;
+}
+
+export interface CheckView {
+  id: string;
+  current_change_id: string;
+  check_plan: string;
+  status: "proposed" | "performed" | "not_run";
+  result: CheckResult | null;
+  student_observation: string | null;
+  performed_at: string | null;
+  version: number;
+}
+
+export interface UserPreferencesView {
+  dialogue_sound_enabled: boolean;
+  motion_preference: "system" | "full" | "reduced";
+  version: number;
+}
+
+export interface RecentChangeView {
+  id: string;
+  goal: string;
+  completed_at: string;
+  check_plan: string;
+  observation: string;
 }
 
 export interface CodingAgentSelectionResponse {

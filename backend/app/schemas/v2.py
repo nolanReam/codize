@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.domain.v2 import (
     BuildStage,
+    CheckResult,
     CodingAgentKey,
     CurrentChangeKind,
     CurrentChangeState,
@@ -56,6 +57,8 @@ class ProjectRefView(BaseModel):
     project_id: UUID
     display_name: str
     open_mode: Literal["legacy_active_only", "explicit"]
+    lifecycle_state: ProjectLifecycle | None = None
+    setup_resume_step: SetupResumeStep | None = None
 
 
 class ProjectRefIdentityView(BaseModel):
@@ -69,6 +72,20 @@ class ProjectRefsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     projects: list[ProjectRefView]
+
+
+class RecentChangeView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    goal: str
+    completed_at: datetime
+    check_plan: str
+    observation: str
+
+
+class RecentChangesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    recent_changes: list[RecentChangeView]
 
 
 class V2ProjectView(BaseModel):
@@ -92,6 +109,32 @@ class ProjectCommandResponse(BaseModel):
 
     project: V2ProjectView
     replayed: bool
+
+
+class EstablishManualProjectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_project_version: int = Field(gt=0)
+    project_context: str
+    plan_item_id: UUID
+    change_label: str
+    done_condition: str
+
+    @field_validator("project_context")
+    @classmethod
+    def validate_context(cls, value: str) -> str:
+        return _bounded_utf8(value, 8192, "project_context")
+
+    @field_validator("change_label")
+    @classmethod
+    def validate_change(cls, value: str) -> str:
+        return _bounded_utf8(value, 200, "change_label")
+
+    @field_validator("done_condition")
+    @classmethod
+    def validate_done(cls, value: str) -> str:
+        return _bounded_utf8(value, 4096, "done_condition")
 
 
 class _CreateProjectBase(BaseModel):
@@ -204,6 +247,13 @@ class PlanResponse(BaseModel):
     plan_version: int
     items: list[PlanItemView]
     replayed: bool = False
+
+
+class EstablishManualProjectResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project: V2ProjectView
+    plan_item: PlanItemView
+    replayed: bool
 
 
 class PlanAddOperation(BaseModel):
@@ -377,6 +427,7 @@ class CurrentChangeView(BaseModel):
     coding_agent_key: CodingAgentKey | None
     effort_category: EffortCategory | None
     latest_prompt_version_id: UUID | None
+    student_return_outcome: str | None
     version: int
     created_at: datetime
     updated_at: datetime
@@ -560,6 +611,106 @@ class BuildResumeStateView(BaseModel):
     ready_to_handoff: bool
     exact_handoff_prompt: str | None
     current_change_version: int
+    active_check: "CheckView | None" = None
+    last_check_result: CheckResult | None = None
+
+
+class ConfirmManualChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+
+
+class ManualReturnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    outcome: Literal["worked", "broken", "unsure"]
+    check_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_check_identity(self) -> "ManualReturnRequest":
+        if (self.outcome in {"worked", "unsure"}) != (self.check_id is not None):
+            raise ValueError("worked and unsure returns require a check_id")
+        return self
+
+
+class CheckView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    current_change_id: UUID
+    check_plan: str
+    status: str
+    result: CheckResult | None
+    student_observation: str | None
+    performed_at: datetime | None
+    version: int
+
+
+class ManualLoopResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_change: CurrentChangeView
+    check: CheckView | None = None
+    next_check: CheckView | None = None
+    replayed: bool = False
+
+
+class ManualCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    expected_check_version: int = Field(gt=0)
+    result: CheckResult
+    observation: str
+    performed_by_student: bool
+    next_check_id: UUID | None = None
+
+    @field_validator("observation")
+    @classmethod
+    def validate_observation(cls, value: str) -> str:
+        return _bounded_utf8(value, 16384, "observation")
+
+    @model_validator(mode="after")
+    def validate_next_check(self) -> "ManualCheckRequest":
+        if self.performed_by_student is not True:
+            raise ValueError("the student must perform the check")
+        if (self.result is CheckResult.UNSURE) != (self.next_check_id is not None):
+            raise ValueError("an unsure result requires next_check_id")
+        return self
+
+
+class CompleteManualChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    expected_plan_version: int = Field(gt=0)
+    expected_plan_item_version: int = Field(gt=0)
+
+
+class CompleteManualChangeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_change: CurrentChangeView
+    project: V2ProjectView
+    plan: PlanResponse
+    check: CheckView
+    replayed: bool
+
+
+class UserPreferencesView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dialogue_sound_enabled: bool
+    motion_preference: Literal["system", "full", "reduced"]
+    version: int = Field(ge=0)
+
+
+class UpdateDialogueSoundRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    dialogue_sound_enabled: bool
 
 
 class StartGenerationAttemptRequest(BaseModel):

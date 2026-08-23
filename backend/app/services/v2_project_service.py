@@ -7,10 +7,15 @@ from uuid import UUID
 from app.domain.v2 import ProjectRef, V2Project
 from app.schemas.v2 import (
     CreateProjectRequest,
+    EstablishManualProjectRequest,
+    EstablishManualProjectResponse,
+    PlanItemView,
     ProjectCommandResponse,
     ProjectRefIdentityView,
     ProjectRefsResponse,
     ProjectRefView,
+    RecentChangeView,
+    RecentChangesResponse,
     PurgeProjectResponse,
     V2ProjectView,
 )
@@ -72,6 +77,31 @@ async def create_project(
     return ProjectCommandResponse(project=project_view(project), replayed=replayed)
 
 
+async def establish_manual_project(
+    repo: V2Repository, owner_user_id: str, project_id: UUID,
+    request: EstablishManualProjectRequest,
+) -> EstablishManualProjectResponse:
+    try:
+        project, item, replayed = await repo.establish_manual_project(
+            owner_user_id, project_id, request.expected_project_version,
+            request.command_id, request.project_context, request.plan_item_id,
+            request.change_label, request.done_condition,
+        )
+    except V2RepositoryNotFound as exc:
+        raise V2NotFoundError("V2 Project not found.") from exc
+    except (V2RepositoryConflict, V2RepositoryInvalidState) as exc:
+        raise V2ConflictError("The Project setup changed or cannot be established.") from exc
+    return EstablishManualProjectResponse(
+        project=project_view(project),
+        plan_item=PlanItemView(
+            id=item.id, label=item.label, intended_outcome=item.intended_outcome,
+            scope_band=item.scope_band, status=item.status, order_key=item.order_key,
+            version=item.version, completed_at=item.completed_at,
+            terminal_current_change_id=item.terminal_current_change_id,
+        ), replayed=replayed,
+    )
+
+
 async def get_project(
     repo: V2Repository,
     owner_user_id: str,
@@ -81,6 +111,18 @@ async def get_project(
     if project is None:
         raise V2NotFoundError("V2 Project not found.")
     return project_view(project)
+
+
+async def list_recent_changes(repo: V2Repository, owner_user_id: str,
+                              project_id: UUID) -> RecentChangesResponse:
+    project = await repo.get_project(owner_user_id, project_id)
+    if project is None:
+        raise V2NotFoundError("V2 Project not found.")
+    changes = await repo.list_recent_changes(owner_user_id, project_id)
+    return RecentChangesResponse(recent_changes=[RecentChangeView(
+        id=change.id, goal=change.goal, completed_at=change.completed_at,
+        check_plan=change.check_plan, observation=change.observation,
+    ) for change in changes])
 
 
 async def list_project_refs(
@@ -105,6 +147,8 @@ async def list_project_refs(
                     project_id=legacy_id,
                     display_name="Legacy Codize project",
                     open_mode="legacy_active_only",
+                    lifecycle_state=None,
+                    setup_resume_step=None,
                 )
             )
 
@@ -114,6 +158,8 @@ async def list_project_refs(
             project_id=project.ref.project_id,
             display_name=project.display_name,
             open_mode="explicit",
+            lifecycle_state=project.lifecycle_state,
+            setup_resume_step=project.setup_resume_step,
         )
         for project in await v2_repo.list_projects(owner_user_id)
     )

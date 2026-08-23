@@ -402,6 +402,30 @@
   font-size: 14px;
   line-height: 1.55;
 }
+
+.v2-setup-card { display: grid; gap: 18px; }
+.v2-setup-choices { display: grid; gap: 10px; }
+.v2-setup-choices button {
+  display: grid; gap: 4px; text-align: left; padding: 16px 18px;
+  color: var(--v2-text); background: var(--v2-surface-raised);
+  border: 1px solid var(--v2-border); border-radius: 14px; cursor: pointer;
+}
+.v2-setup-choices button:hover:not(:disabled) { border-color: var(--v2-accent); transform: translateY(-1px); }
+.v2-setup-choices button:disabled { opacity: .52; cursor: not-allowed; }
+.v2-setup-choices small { color: var(--v2-text-secondary); }
+.v2-setup-form { display: grid; gap: 16px; }
+.v2-setup-form label { display: grid; gap: 7px; font-weight: 700; }
+.v2-setup-form input, .v2-setup-form textarea, .v2-check-card textarea {
+  width: 100%; color: var(--v2-text); background: var(--v2-canvas);
+  border: 1px solid var(--v2-border); border-radius: 12px; padding: 12px 14px;
+  font: inherit; resize: vertical;
+}
+.v2-dialogue { display: grid; gap: 8px; }
+.v2-dialogue p { min-height: 1.5em; }
+.v2-return-choices { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.v2-check-card, .v2-complete-card { display: grid; gap: 14px; }
+.v2-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.v2-setting-row p { margin: 4px 0 0; }
 .v2-action-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .v2-action-row-split { justify-content: space-between; }
 .v2-action-row-split > div { display: flex; gap: 10px; }
