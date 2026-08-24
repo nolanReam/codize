@@ -16,12 +16,15 @@ from app.schemas.v2 import (
     ConfirmManualChangeRequest,
     CurrentChangeResponse,
     CurrentChangeView,
+    EffortAttemptRequest,
+    EffortAttemptResponse,
     EffortSelectionRequest,
     EstablishManualProjectRequest,
     EstablishManualProjectResponse,
     ManualCheckRequest,
     ManualLoopResponse,
     ManualReturnRequest,
+    CheckPlanRequest,
     PlanMutationRequest,
     PlanResponse,
     ProjectCommandResponse,
@@ -38,6 +41,9 @@ from app.schemas.v2 import (
     PurgeTemporaryProjectRequest,
     StartCurrentChangeRequest,
     UpdateDialogueSoundRequest,
+    TeachingCommandResponse,
+    TeachingHelpRequest,
+    TeachingResponseRequest,
     UserPreferencesView,
     V2ProjectView,
 )
@@ -47,6 +53,7 @@ from app.services import (
     v2_manual_loop_service,
     v2_plan_service,
     v2_project_service,
+    v2_teaching_service,
 )
 from app.services.project_repository import ProjectRepository, get_project_repository
 from app.services.v2_errors import (
@@ -230,6 +237,70 @@ async def confirm_manual_change(
         raise _http_error(exc) from exc
 
 
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/teaching/help",
+    response_model=TeachingCommandResponse,
+)
+async def disclose_teaching_help(
+    project_id: UUID, current_change_id: UUID, body: TeachingHelpRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> TeachingCommandResponse:
+    try:
+        return await v2_teaching_service.disclose_help(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/teaching/respond",
+    response_model=TeachingCommandResponse,
+)
+async def record_teaching_response(
+    project_id: UUID, current_change_id: UUID, body: TeachingResponseRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> TeachingCommandResponse:
+    try:
+        return await v2_teaching_service.record_response(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/effort-attempts",
+    response_model=EffortAttemptResponse,
+)
+async def record_effort_attempt(
+    project_id: UUID, current_change_id: UUID, body: EffortAttemptRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> EffortAttemptResponse:
+    try:
+        return await v2_teaching_service.record_effort(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/checks",
+    response_model=ManualLoopResponse,
+)
+async def create_student_check_plan(
+    project_id: UUID, current_change_id: UUID, body: CheckPlanRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> ManualLoopResponse:
+    try:
+        return await v2_teaching_service.create_check_plan(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
 @router.post("/projects/{project_id}/current-change/{current_change_id}/return",
              response_model=ManualLoopResponse)
 async def record_manual_return(
@@ -370,14 +441,16 @@ async def update_prompt_draft(
 @router.put(
     "/projects/{project_id}/current-change/{current_change_id}/effort",
     response_model=CurrentChangeView,
+    deprecated=True,
 )
-async def select_effort(
+async def select_legacy_effort(
     project_id: UUID,
     current_change_id: UUID,
     body: EffortSelectionRequest,
     user: CurrentUser = Depends(require_user),
     repo: V2Repository = Depends(get_v2_repository),
 ) -> CurrentChangeView:
+    """Compatibility-only: Phase 5 policy rejects this mutation fail closed."""
     try:
         return await v2_build_service.select_effort(
             repo, user.user_id, project_id, current_change_id, body

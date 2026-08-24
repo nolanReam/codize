@@ -29,16 +29,21 @@ from app.domain.v2 import (
     ProjectLifecycle,
     ProjectRef,
     PromptPurpose,
+    RiskMode,
     ResumeStep,
     SetupResumeStep,
+    SupportLevel,
+    TeachingMode,
     V2CurrentChange,
     V2Check,
     V2GenerationAttempt,
+    V2LearnerEvidence,
     V2Plan,
     V2PlanItem,
     V2Project,
     V2RecentChange,
     V2PromptVersion,
+    V2TeachingProgress,
     V2UserPreferences,
     WorkflowVersion,
     validate_resume_state,
@@ -58,14 +63,20 @@ _CURRENT_CHANGE_SELECT = (
     "id,project_id,owner_user_id,plan_item_id,change_kind,lifecycle_state,"
     "resume_step,goal_snapshot,done_condition_snapshot,boundary_snapshots,"
     "prompt_draft,prompt_draft_version,coding_agent_key,effort_category,"
-    "latest_prompt_version_id,teaching_policy_version,risk_policy_version,"
+    "latest_prompt_version_id,teaching_mode,teaching_target,teaching_policy_version,"
+    "risk,risk_reason_key,risk_policy_version,risk_input_fingerprint,check_requirement,"
+    "help_context_key,support_level_disclosed,"
     "handoff_command_id,student_return_outcome,accepted_outcome_summary,"
     "unresolved_uncertainty_summary,"
     "version,created_at,updated_at,completed_at,cancelled_at,"
     "cancellation_command_id,cancellation_reason_key"
 )
+_LEARNER_EVIDENCE_SELECT = (
+    "id,competency_key,observed_behavior,elicitation,support_level,context_key,"
+    "source_current_change_id,observed_at,status"
+)
 _CHECK_SELECT = (
-    "id,project_id,owner_user_id,current_change_id,check_plan,status,result,"
+    "id,project_id,owner_user_id,current_change_id,check_plan,plan_source,status,result,"
     "student_observation,performed_at,version"
 )
 _PREFERENCE_SELECT = (
@@ -84,6 +95,11 @@ _GENERATION_ATTEMPT_SELECT = (
     "config_version,status,provider_key,model_key,input_sha256,"
     "safe_error_category,retryable,result_record_type,result_record_id,"
     "started_at,completed_at,version"
+)
+_TURN_PROGRESS_SELECT = "turn_kind,structured_payload,help_context_key,support_level"
+_CHECK_PLAN_COMMAND_SELECT = (
+    "id,project_id,current_change_id,turn_kind,speaker,content,structured_payload,"
+    "related_record_type,related_record_id,support_level"
 )
 
 
@@ -154,8 +170,16 @@ class _CurrentChangeRow(BaseModel):
     coding_agent_key: CodingAgentKey | None = None
     effort_category: EffortCategory | None = None
     latest_prompt_version_id: UUID | None = None
+    teaching_mode: TeachingMode = TeachingMode.SKIP
+    teaching_target: str | None = None
     teaching_policy_version: str = "unresolved-v0"
+    risk: RiskMode = RiskMode.NORMAL
+    risk_reason_key: str | None = None
     risk_policy_version: str = "unresolved-v0"
+    risk_input_fingerprint: str | None = None
+    check_requirement: str = "required"
+    help_context_key: str | None = None
+    support_level_disclosed: SupportLevel = SupportLevel.NONE
     handoff_command_id: UUID | None = None
     student_return_outcome: str | None = None
     accepted_outcome_summary: str | None = None
@@ -226,6 +250,7 @@ class _CheckRow(BaseModel):
     owner_user_id: UUID
     current_change_id: UUID
     check_plan: str
+    plan_source: str
     status: str
     result: CheckResult | None = None
     student_observation: str | None = None
@@ -239,6 +264,19 @@ class _PreferenceRow(BaseModel):
     dialogue_sound_enabled: bool
     motion_preference: str
     version: int = Field(gt=0)
+
+
+class _LearnerEvidenceRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: UUID
+    competency_key: str
+    observed_behavior: str
+    elicitation: str
+    support_level: SupportLevel
+    context_key: str
+    source_current_change_id: UUID | None
+    observed_at: datetime
+    status: str
 
 
 class V2Repository(Protocol):
@@ -312,6 +350,48 @@ class V2Repository(Protocol):
         expected_current_change_version: int, command_id: UUID,
     ) -> tuple[V2CurrentChange, bool]: ...
 
+    async def list_learner_evidence(
+        self, owner_user_id: str, competency_keys: list[str] | None = None,
+    ) -> list[V2LearnerEvidence]: ...
+
+    async def resolve_teaching_policy(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID,
+        decision: dict[str, Any],
+    ) -> tuple[V2CurrentChange, bool]: ...
+
+    async def get_teaching_progress(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2TeachingProgress: ...
+
+    async def disclose_teaching_help(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, context: str,
+    ) -> tuple[V2CurrentChange, bool]: ...
+
+    async def record_teaching_response(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, context: str,
+        response: str, elicitation: str, support_level: str,
+    ) -> tuple[V2CurrentChange, bool]: ...
+
+    async def record_effort_attempt(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, selected: str,
+        recommended: str, appropriate: bool,
+    ) -> tuple[V2CurrentChange, dict[str, Any], bool]: ...
+
+    async def get_student_check_plan_replay(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        command_id: UUID, check_id: UUID, check_plan: str,
+    ) -> tuple[V2CurrentChange, V2Check] | None: ...
+
+    async def create_student_check_plan(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, check_id: UUID,
+        check_plan: str, elicitation: str, support_level: str,
+    ) -> tuple[V2CurrentChange, V2Check, bool]: ...
+
     async def record_manual_return(
         self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
         expected_current_change_version: int, command_id: UUID,
@@ -384,6 +464,10 @@ class V2Repository(Protocol):
         prompt_text: str,
         done_condition: str | None,
         boundaries: list[str],
+        risk: str,
+        risk_reason_key: str | None,
+        risk_policy_version: str,
+        risk_input_fingerprint: str,
     ) -> V2CurrentChange: ...
 
     async def update_effort(
@@ -573,8 +657,16 @@ def _current_change_from_row(
         coding_agent_key=row.coding_agent_key,
         effort_category=row.effort_category,
         latest_prompt_version_id=row.latest_prompt_version_id,
+        teaching_mode=row.teaching_mode,
+        teaching_target=row.teaching_target,
         teaching_policy_version=row.teaching_policy_version,
+        risk=row.risk,
+        risk_reason_key=row.risk_reason_key,
         risk_policy_version=row.risk_policy_version,
+        risk_input_fingerprint=row.risk_input_fingerprint,
+        check_requirement=row.check_requirement,
+        help_context_key=row.help_context_key,
+        support_level_disclosed=row.support_level_disclosed,
         handoff_command_id=row.handoff_command_id,
         student_return_outcome=row.student_return_outcome,
         accepted_outcome_summary=row.accepted_outcome_summary,
@@ -591,7 +683,7 @@ def _check_from_row(raw: Any, *, expected_owner: str, expected_project_id: UUID)
         raise V2RepositoryError("database returned a Check outside the owned Project")
     return V2Check(
         id=row.id, project_id=row.project_id, current_change_id=row.current_change_id,
-        check_plan=row.check_plan, status=row.status, result=row.result,
+        check_plan=row.check_plan, plan_source=row.plan_source, status=row.status, result=row.result,
         student_observation=row.student_observation, performed_at=row.performed_at,
         version=row.version,
     )
@@ -608,6 +700,24 @@ def _preference_from_row(raw: Any, *, expected_owner: str) -> V2UserPreferences:
         dialogue_sound_enabled=row.dialogue_sound_enabled,
         motion_preference=row.motion_preference,
         version=row.version,
+    )
+
+
+def _learner_evidence_from_row(raw: Any) -> V2LearnerEvidence:
+    try:
+        row = _LearnerEvidenceRow.model_validate(raw)
+    except ValidationError as exc:
+        raise V2RepositoryError("malformed V2 Learner Evidence row") from exc
+    return V2LearnerEvidence(
+        id=row.id,
+        competency_key=row.competency_key,
+        observed_behavior=row.observed_behavior,
+        elicitation=row.elicitation,
+        support_level=row.support_level,
+        context_key=row.context_key,
+        source_current_change_id=row.source_current_change_id,
+        observed_at=row.observed_at,
+        status=row.status,
     )
 
 
@@ -1084,6 +1194,196 @@ class SupabaseV2Repository:
                 expected_owner=owner_user_id, expected_project_id=project_id),
                 bool(payload.get("replayed")))
 
+    async def list_learner_evidence(
+        self, owner_user_id: str, competency_keys: list[str] | None = None,
+    ) -> list[V2LearnerEvidence]:
+        params: dict[str, str] = {
+            "select": _LEARNER_EVIDENCE_SELECT,
+            "owner_user_id": f"eq.{owner_user_id}",
+            "status": "eq.active",
+            "order": "observed_at.asc,id.asc",
+        }
+        if competency_keys:
+            params["competency_key"] = f"in.({','.join(competency_keys)})"
+        rows = await self._request("GET", "/v2_learner_evidence", params=params)
+        if not isinstance(rows, list):
+            raise V2RepositoryError("V2 Learner Evidence read returned malformed rows")
+        return [_learner_evidence_from_row(row) for row in rows]
+
+    async def resolve_teaching_policy(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID,
+        decision: dict[str, Any],
+    ) -> tuple[V2CurrentChange, bool]:
+        payload = self._object(await self._rpc("resolve_v2_current_change_policy", {
+            "p_owner_user_id": owner_user_id,
+            "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id),
+            "p_teaching_mode": decision["mode"],
+            "p_teaching_target": decision.get("target"),
+            "p_teaching_reason_key": decision["reason_key"],
+            "p_teaching_policy_version": decision["teaching_policy_version"],
+            "p_risk": decision["risk"],
+            "p_risk_reason_key": decision.get("risk_reason_key"),
+            "p_risk_policy_version": decision["risk_policy_version"],
+            "p_check_requirement": decision["check_requirement"],
+            "p_check_waiver_reason_key": None,
+        }), "resolve_v2_current_change_policy")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                bool(payload.get("replayed")))
+
+    async def get_teaching_progress(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2TeachingProgress:
+        rows = await self._request("GET", "/v2_build_turns", params={
+            "select": _TURN_PROGRESS_SELECT,
+            "owner_user_id": f"eq.{owner_user_id}", "project_id": f"eq.{project_id}",
+            "current_change_id": f"eq.{current_change_id}",
+            "turn_kind": "in.(student_answer,student_decision,help_nudge,help_clue,help_teach)",
+            "order": "sequence_no.asc",
+        })
+        if not isinstance(rows, list):
+            raise V2RepositoryError("V2 teaching progress returned malformed rows")
+        attempts: list[str] = []
+        feedback = None
+        intervention_answered = check_answered = understanding_answered = False
+        hint = SupportLevel.NONE
+        for row in rows:
+            payload = row.get("structured_payload") or {}
+            context = payload.get("context")
+            if row.get("support_level"):
+                hint = SupportLevel(row["support_level"])
+            if row.get("turn_kind") == "student_answer":
+                intervention_answered |= context == "prebuild"
+                check_answered |= context == "verification"
+                understanding_answered |= context == "understanding"
+            if row.get("turn_kind") == "student_decision" and context == "effort":
+                attempts.append(str(payload.get("selected")))
+                feedback = payload.get("message")
+        return V2TeachingProgress(
+            hint_level=hint, intervention_answered=intervention_answered,
+            effort_attempts=tuple(attempts), effort_feedback=feedback,
+            check_plan_answered=check_answered,
+            understanding_answered=understanding_answered,
+        )
+
+    async def disclose_teaching_help(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, context: str,
+    ) -> tuple[V2CurrentChange, bool]:
+        payload = self._object(await self._rpc("disclose_v2_teaching_help", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id), "p_context": context,
+        }), "disclose_v2_teaching_help")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                bool(payload.get("replayed")))
+
+    async def record_teaching_response(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, context: str,
+        response: str, elicitation: str, support_level: str,
+    ) -> tuple[V2CurrentChange, bool]:
+        payload = self._object(await self._rpc("record_v2_teaching_response", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id), "p_context": context,
+            "p_response": response, "p_elicitation": elicitation,
+            "p_support_level": support_level,
+        }), "record_v2_teaching_response")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                bool(payload.get("replayed")))
+
+    async def record_effort_attempt(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, selected: str,
+        recommended: str, appropriate: bool,
+    ) -> tuple[V2CurrentChange, dict[str, Any], bool]:
+        payload = self._object(await self._rpc("record_v2_effort_attempt", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id), "p_selected": selected,
+            "p_recommended": recommended, "p_appropriate": appropriate,
+        }), "record_v2_effort_attempt")
+        feedback = payload.get("feedback")
+        if not isinstance(feedback, dict):
+            raise V2RepositoryError("effort attempt omitted feedback")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                feedback, bool(payload.get("replayed")))
+
+    async def create_student_check_plan(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        expected_current_change_version: int, command_id: UUID, check_id: UUID,
+        check_plan: str, elicitation: str, support_level: str,
+    ) -> tuple[V2CurrentChange, V2Check, bool]:
+        payload = self._object(await self._rpc("create_v2_student_check_plan", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id), "p_check_id": str(check_id),
+            "p_check_plan": check_plan, "p_elicitation": elicitation,
+            "p_support_level": support_level,
+        }), "create_v2_student_check_plan")
+        return (_current_change_from_row(payload.get("current_change"),
+                expected_owner=owner_user_id, expected_project_id=project_id),
+                _check_from_row(payload.get("check"), expected_owner=owner_user_id,
+                                expected_project_id=project_id),
+                bool(payload.get("replayed")))
+
+    async def get_student_check_plan_replay(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        command_id: UUID, check_id: UUID, check_plan: str,
+    ) -> tuple[V2CurrentChange, V2Check] | None:
+        rows = await self._request("GET", "/v2_build_turns", params={
+            "select": _CHECK_PLAN_COMMAND_SELECT,
+            "owner_user_id": f"eq.{owner_user_id}", "id": f"eq.{command_id}",
+            "limit": "1",
+        })
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise V2RepositoryError("student Check replay lookup returned malformed rows")
+        if not rows:
+            return None
+        turn = rows[0]
+        payload = turn.get("structured_payload")
+        if (
+            str(turn.get("project_id")) != str(project_id)
+            or str(turn.get("current_change_id")) != str(current_change_id)
+            or turn.get("turn_kind") != "student_answer"
+            or turn.get("speaker") != "student"
+            or turn.get("content") != check_plan.strip()
+            or not isinstance(payload, dict)
+            or payload.get("context") != "verification"
+            or turn.get("related_record_type") != "check"
+            or str(turn.get("related_record_id")) != str(check_id)
+        ):
+            raise V2RepositoryConflict("student Check command id already used")
+        check_rows = await self._request("GET", "/v2_checks", params={
+            "select": _CHECK_SELECT,
+            "owner_user_id": f"eq.{owner_user_id}", "project_id": f"eq.{project_id}",
+            "current_change_id": f"eq.{current_change_id}", "id": f"eq.{check_id}",
+            "limit": "1",
+        })
+        if not isinstance(check_rows, list) or len(check_rows) != 1:
+            raise V2RepositoryInvalidState("student Check replay source is missing")
+        change = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        if change is None:
+            raise V2RepositoryNotFound("owned V2 Current Change not found")
+        return change, _check_from_row(
+            check_rows[0], expected_owner=owner_user_id,
+            expected_project_id=project_id,
+        )
+
     async def record_manual_return(
         self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
         expected_current_change_version: int, command_id: UUID,
@@ -1152,6 +1452,25 @@ class SupabaseV2Repository:
         if change is None:
             raise V2RepositoryNotFound("owned V2 Current Change not found")
         observed_at = check.performed_at.isoformat() if check.performed_at else None
+        check_plan_evidence = next(
+            (
+                item for item in reversed(
+                    await self.list_learner_evidence(owner_user_id, ["testing"])
+                )
+                if item.source_current_change_id == current_change_id
+            ),
+            None,
+        )
+        if check.plan_source == "codize":
+            evidence_elicitation = "taught"
+            evidence_support = "teach"
+        else:
+            evidence_elicitation = (
+                check_plan_evidence.elicitation if check_plan_evidence else "spontaneous"
+            )
+            evidence_support = (
+                check_plan_evidence.support_level.value if check_plan_evidence else "none"
+            )
         result = await self._rpc("complete_v2_current_change", {
             "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
             "p_current_change_id": str(current_change_id),
@@ -1167,7 +1486,20 @@ class SupabaseV2Repository:
                 "value": check.student_observation, "source_kind": "student_observed",
                 "source_record_type": "check", "source_record_id": str(check.id),
                 "observed_at": observed_at}],
-            "p_learner_evidence_inputs": [],
+            "p_learner_evidence_inputs": [{
+                "competency_key": "testing",
+                "observed_behavior": (
+                    "Proposed and performed a contextual Check for the current change."
+                    if check.plan_source == "student"
+                    else "Performed a contextual Check and recorded a personal observation."
+                ),
+                "elicitation": evidence_elicitation,
+                "support_level": evidence_support,
+                "context_key": "build",
+                "source_record_type": "check", "source_record_id": str(check.id),
+                "observed_at": observed_at,
+                "evidence_policy_version": "phase5-beta-evidence-v1",
+            }],
         })
         if not isinstance(result, list) or len(result) != 1 or not isinstance(result[0].get("replayed"), bool):
             raise V2RepositoryError("manual completion returned malformed state")
@@ -1234,10 +1566,14 @@ class SupabaseV2Repository:
         prompt_text: str,
         done_condition: str | None,
         boundaries: list[str],
+        risk: str,
+        risk_reason_key: str | None,
+        risk_policy_version: str,
+        risk_input_fingerprint: str,
     ) -> V2CurrentChange:
         payload = self._object(
             await self._rpc(
-                "update_v2_prompt_draft",
+                "update_v2_prompt_draft_with_risk",
                 {
                     "p_owner_user_id": owner_user_id,
                     "p_project_id": str(project_id),
@@ -1247,9 +1583,13 @@ class SupabaseV2Repository:
                     "p_prompt_draft": prompt_text,
                     "p_done_condition_snapshot": done_condition,
                     "p_boundary_snapshots": boundaries,
+                    "p_risk": risk,
+                    "p_risk_reason_key": risk_reason_key,
+                    "p_risk_policy_version": risk_policy_version,
+                    "p_risk_input_fingerprint": risk_input_fingerprint,
                 },
             ),
-            "update_v2_prompt_draft",
+            "update_v2_prompt_draft_with_risk",
         )
         return _current_change_from_row(
             payload.get("current_change"),

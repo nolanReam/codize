@@ -15,9 +15,12 @@ describe("V2 Build foundation contract", () => {
       "ready_to_handoff",
       "waiting_for_return",
       "confirm_change",
+      "intervention",
       "perform_check",
+      "propose_check",
       "check_unsure",
       "check_failed",
+      "understand",
       "ready_to_complete",
     ]) {
       expect(source).toContain(`build_stage === "${stage}"`);
@@ -35,6 +38,26 @@ describe("V2 Build foundation contract", () => {
   it("keeps effort selection semantic and unselected by default", () => {
     expect(source).toContain('type="radio"');
     expect(source).toContain('useState<EffortCategory | "">("")');
+  });
+
+  it("renders one durable adaptive teaching task with progressive help", () => {
+    expect(source).toContain("data.build.teaching.mode");
+    expect(source).toContain('data.build.teaching.risk === "slowdown"');
+    expect(source).toContain('data.build.teaching.hint_level === "none" ? "Need help?" : "Show me more"');
+    expect(source).toContain("requestTeachingHelp(");
+    expect(source).toContain("respondToTeaching(");
+    expect(source).toContain("createStudentCheckPlan(");
+    expect(source).toContain("data.build.teaching.can_request_help &&");
+    expect(source).toContain('data.build.verification_plan_source === "codize"');
+    expect(source).not.toContain('data.build.learner_statuses.testing === "recently_independent"');
+    expect(source).not.toContain("mastery");
+  });
+
+  it("owns retry-stable teaching command identities at the interaction level", () => {
+    expect(source).toContain("const teachingCommands = useRef(new Map");
+    for (const operation of ["confirm-change", "effort", "teaching-help", "teaching-response", "check-plan"]) {
+      expect(source).toContain(`"${operation}",`);
+    }
   });
 
   it("keeps the approved companion, message, and single-column stage composition", () => {

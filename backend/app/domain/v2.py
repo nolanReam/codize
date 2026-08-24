@@ -124,6 +124,7 @@ class GenerationPurpose(StrEnum):
 
 class BuildStage(StrEnum):
     CONFIRM_CHANGE = "confirm_change"
+    INTERVENTION = "intervention"
     CHOOSE_AGENT = "choose_agent"
     EDIT_PROMPT = "edit_prompt"
     CHOOSE_EFFORT = "choose_effort"
@@ -132,8 +133,10 @@ class BuildStage(StrEnum):
     WAITING_FOR_RETURN = "waiting_for_return"
     REPORT_RETURN_OUTCOME = "report_return_outcome"
     PERFORM_CHECK = "perform_check"
+    PROPOSE_CHECK = "propose_check"
     CHECK_UNSURE = "check_unsure"
     CHECK_FAILED = "check_failed"
+    UNDERSTAND = "understand"
     READY_TO_COMPLETE = "ready_to_complete"
 
 
@@ -142,6 +145,25 @@ class CheckResult(StrEnum):
     PARTLY_WORKED = "partly_worked"
     DID_NOT_WORK = "did_not_work"
     UNSURE = "unsure"
+
+
+class TeachingMode(StrEnum):
+    SKIP = "skip"
+    ASK = "ask"
+    REMIND = "remind"
+    TEACH = "teach"
+
+
+class RiskMode(StrEnum):
+    NORMAL = "normal"
+    SLOWDOWN = "slowdown"
+
+
+class SupportLevel(StrEnum):
+    NONE = "none"
+    NUDGE = "nudge"
+    CLUE = "clue"
+    TEACH = "teach"
 
 
 NONTERMINAL_STATES = frozenset(
@@ -303,8 +325,16 @@ class V2CurrentChange:
     coding_agent_key: CodingAgentKey | None = None
     effort_category: EffortCategory | None = None
     latest_prompt_version_id: UUID | None = None
+    teaching_mode: TeachingMode = TeachingMode.SKIP
+    teaching_target: str | None = None
     teaching_policy_version: str = "unresolved-v0"
+    risk: RiskMode = RiskMode.NORMAL
+    risk_reason_key: str | None = None
     risk_policy_version: str = "unresolved-v0"
+    risk_input_fingerprint: str | None = None
+    check_requirement: str = "required"
+    help_context_key: str | None = None
+    support_level_disclosed: SupportLevel = SupportLevel.NONE
     handoff_command_id: UUID | None = None
     student_return_outcome: str | None = None
     accepted_outcome_summary: str | None = None
@@ -324,6 +354,7 @@ class V2Check:
     project_id: UUID
     current_change_id: UUID
     check_plan: str
+    plan_source: str
     status: str
     result: CheckResult | None
     student_observation: str | None
@@ -390,6 +421,29 @@ class V2GenerationAttempt:
     started_at: datetime
     completed_at: datetime | None
     version: int
+
+
+@dataclass(frozen=True, slots=True)
+class V2LearnerEvidence:
+    id: UUID
+    competency_key: str
+    observed_behavior: str
+    elicitation: str
+    support_level: SupportLevel
+    context_key: str
+    source_current_change_id: UUID | None
+    observed_at: datetime
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class V2TeachingProgress:
+    hint_level: SupportLevel = SupportLevel.NONE
+    intervention_answered: bool = False
+    effort_attempts: tuple[str, ...] = ()
+    effort_feedback: str | None = None
+    check_plan_answered: bool = False
+    understanding_answered: bool = False
 
 
 def allowed_transitions(state: CurrentChangeState) -> frozenset[CurrentChangeState]:

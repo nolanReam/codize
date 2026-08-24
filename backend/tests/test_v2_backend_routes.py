@@ -13,10 +13,10 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
 from app.core import security
-from app.domain.v2 import CurrentChangeState
+from app.domain.v2 import CurrentChangeState, SupportLevel
 from app.main import create_app
 from app.services.project_repository import get_project_repository
-from app.services.v2_repository import get_v2_repository
+from app.services.v2_repository import V2RepositoryConflict, get_v2_repository
 from tests.fakes import InMemoryProjectRepository, InMemoryV2Repository
 
 USER_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -204,6 +204,16 @@ def test_phase4_manual_loop_completes_only_after_student_check(client):
     change = confirmed.json()["current_change"]
     assert change["done_condition_snapshot"] == "Changing a point updates the visible score"
 
+    intervention = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/respond",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "context": "prebuild",
+            "response": "Keep the existing point controls working"},
+    )
+    assert intervention.status_code == 200, intervention.text
+    change = intervention.json()["current_change"]
+
     selected = select_agent(client, project, change)
     change["version"] = selected["current_change_version"]
     project["version"] = selected["project_version"]
@@ -217,13 +227,14 @@ def test_phase4_manual_loop_completes_only_after_student_check(client):
     )
     assert drafted.status_code == 200, drafted.text
     change = drafted.json()
-    effort = client.put(
-        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+    effort = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort-attempts",
         headers=auth_headers(), json={"workflow_version": "v2",
-            "expected_current_change_version": change["version"], "effort": "standard"},
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "effort": "quick"},
     )
     assert effort.status_code == 200, effort.text
-    change = effort.json()
+    change = effort.json()["current_change"]
     accepted = client.post(
         f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-versions",
         headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
@@ -242,6 +253,8 @@ def test_phase4_manual_loop_completes_only_after_student_check(client):
     assert handed.status_code == 200, handed.text
     change = handed.json()["current_change"]
 
+    # A New learner receives the concrete Check, but Codize still cannot claim
+    # or manufacture its result; the student must perform it below.
     check_id = str(uuid.uuid4())
     returned = client.post(
         f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
@@ -271,6 +284,15 @@ def test_phase4_manual_loop_completes_only_after_student_check(client):
     )
     assert checked.status_code == 200, checked.text
     change = checked.json()["current_change"]
+    understood = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/respond",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "context": "understanding",
+            "response": "Adding a point updates the score state, which redraws the visible score"},
+    )
+    assert understood.status_code == 200, understood.text
+    change = understood.json()["current_change"]
     completion_command = str(uuid.uuid4())
     completion_body = {"workflow_version": "v2", "command_id": completion_command,
         "expected_current_change_version": change["version"],
@@ -290,6 +312,45 @@ def test_phase4_manual_loop_completes_only_after_student_check(client):
     recent = client.get(f"/v2/projects/{project['project_id']}/recent-changes",
                         headers=auth_headers()).json()["recent_changes"]
     assert recent[0]["observation"] == "I added a point and saw the score change"
+
+    # A second real change receives less support for the same demonstrated
+    # boundary competency, while an unrelated competency remains New.
+    completed_project = completion.json()["project"]
+    second_item = str(uuid.uuid4())
+    expanded = client.post(
+        f"/v2/projects/{project['project_id']}/plan/mutations",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_project_version": completed_project["version"],
+            "expected_plan_version": completed_project["plan_version"],
+            "operations": [{"action": "add", "plan_item_id": second_item,
+                "label": "Show a set counter",
+                "intended_outcome": "Winning a set updates the visible set counter",
+                "scope_band": "later", "status": "ready", "order_key": 20}]},
+    )
+    assert expanded.status_code == 200, expanded.text
+    second_started = start_change(
+        client, project["project_id"], expanded.json()["project_version"],
+        plan_item_id=second_item,
+    )
+    assert second_started.status_code == 200, second_started.text
+    second_change = second_started.json()["current_change"]
+    second_confirmed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{second_change['id']}/confirm",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": second_change["version"]},
+    )
+    assert second_confirmed.status_code == 200, second_confirmed.text
+    second_change = second_confirmed.json()["current_change"]
+    assert second_change["teaching_target"] == "protect_working_behavior"
+    assert second_change["teaching_mode"] == "ask"
+    second_build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{second_change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert second_build["learner_statuses"]["protect_working_behavior"] == "guided"
+    assert second_build["learner_statuses"]["define_done"] == "new"
 
 
 @pytest.mark.parametrize("intent", ["new_idea", "already_building"])
@@ -364,6 +425,733 @@ def select_agent(client: TestClient, project: dict, change: dict, choice: str = 
     return result
 
 
+def test_phase5_policy_help_and_effort_resume_from_durable_state(client):
+    project = create_project(client)["project"]
+    started = start_change(client, project["project_id"], project["version"],
+                           goal="Add a score summary")
+    assert started.status_code == 200, started.text
+    change = started.json()["current_change"]
+
+    unresolved_bypass = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/coding-agent",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "expected_project_version": project["version"],
+            "expected_current_change_version": change["version"], "choice": "codex"},
+    )
+    assert unresolved_bypass.status_code == 409
+
+    confirmed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/confirm",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    change = confirmed.json()["current_change"]
+    assert change["policy_resolved"] is True
+    assert change["teaching_mode"] == "teach"
+    assert change["risk"] == "normal"
+    assert change["resume_step"] == "intervention"
+
+    blocked_bypass = select_agent_response = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/coding-agent",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "expected_project_version": project["version"],
+            "expected_current_change_version": change["version"], "choice": "codex"},
+    )
+    assert blocked_bypass.status_code == 409, select_agent_response.text
+
+    help_command = str(uuid.uuid4())
+    help_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/help"
+    first_help_body = {"workflow_version": "v2", "command_id": help_command,
+        "expected_current_change_version": change["version"], "context": "prebuild"}
+    first_help = client.post(help_path, headers=auth_headers(), json=first_help_body)
+    assert first_help.status_code == 200, first_help.text
+    change = first_help.json()["current_change"]
+    assert change["support_level_disclosed"] == "nudge"
+    replay = client.post(help_path, headers=auth_headers(), json=first_help_body)
+    assert replay.status_code == 200 and replay.json()["replayed"] is True
+
+    for expected in ("clue", "teach"):
+        response = client.post(help_path, headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "context": "prebuild"})
+        assert response.status_code == 200, response.text
+        change = response.json()["current_change"]
+        assert change["support_level_disclosed"] == expected
+
+    exhausted = client.post(help_path, headers=auth_headers(), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"], "context": "prebuild"})
+    assert exhausted.status_code == 409
+
+    resumed = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    )
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["build_stage"] == "intervention"
+    assert resumed.json()["teaching"]["hint_level"] == "teach"
+    assert "hint_text" in resumed.json()["teaching"]
+
+    cross_owner = client.post(help_path, headers=auth_headers(USER_B), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"], "context": "prebuild"})
+    assert cross_owner.status_code == 404
+
+    answered = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/respond",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"], "context": "prebuild",
+            "response": "Keep the existing scoring controls working"},
+    )
+    assert answered.status_code == 200, answered.text
+    change = answered.json()["current_change"]
+    assert change["resume_step"] == "choose_agent"
+
+    select_agent(client, project, change)
+    save_prompt(client, project, change, text="Add the score summary safely")
+    effort_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort-attempts"
+    first_effort = client.post(effort_path, headers=auth_headers(), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"], "effort": "quick"})
+    assert first_effort.status_code == 200, first_effort.text
+    assert first_effort.json()["feedback"] == {
+        "selected": "quick", "recommended": None, "appropriate": False,
+        "retry_allowed": True, "revealed": False,
+        "message": "Look at the connected pieces and risk, then try once more.",
+    }
+    change = first_effort.json()["current_change"]
+    assert change["effort_category"] is None
+    second_effort = client.post(effort_path, headers=auth_headers(), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"], "effort": "deep"})
+    assert second_effort.status_code == 200, second_effort.text
+    assert second_effort.json()["feedback"]["recommended"] == "standard"
+    assert second_effort.json()["feedback"]["revealed"] is True
+    assert second_effort.json()["current_change"]["effort_category"] == "standard"
+
+
+def prepare_phase5_draft(
+    client: TestClient,
+    *,
+    goal: str = "Add a profile settings panel",
+    prompt_text: str = "Add a focused profile settings panel",
+) -> tuple[dict, dict]:
+    project = create_project(client)["project"]
+    started = start_change(
+        client, project["project_id"], project["version"], goal=goal
+    )
+    assert started.status_code == 200, started.text
+    change = started.json()["current_change"]
+    confirmed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/confirm",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_current_change_version": change["version"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    change = confirmed.json()["current_change"]
+    answered = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/respond",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_current_change_version": change["version"], "context": "prebuild",
+              "response": "Click Save and see the updated profile settings"},
+    )
+    assert answered.status_code == 200, answered.text
+    change = answered.json()["current_change"]
+    select_agent(client, project, change)
+    save_prompt(
+        client, project, change, text=prompt_text,
+        done_condition="Click Save and see the updated profile settings",
+        boundaries=["Keep the existing profile page unchanged"],
+    )
+    return project, change
+
+
+def test_phase5_legacy_effort_bypass_is_rejected_and_attempt_replay_is_stable(client):
+    project, change = prepare_phase5_draft(client)
+    legacy = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+        headers=auth_headers(),
+        json={"workflow_version": "v2",
+              "expected_current_change_version": change["version"], "effort": "deep"},
+    )
+    assert legacy.status_code == 409
+    assert change["effort_category"] is None
+
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort-attempts"
+    command_id = str(uuid.uuid4())
+    body = {"workflow_version": "v2", "command_id": command_id,
+            "expected_current_change_version": change["version"], "effort": "standard"}
+    first = client.post(path, headers=auth_headers(), json=body)
+    replay = client.post(path, headers=auth_headers(), json=body)
+    assert first.status_code == replay.status_code == 200
+    assert first.json()["feedback"]["appropriate"] is True
+    assert replay.json()["replayed"] is True
+    evidence = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "effort_selection"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+    assert len(evidence) == 1
+    assert evidence[0].elicitation == "asked"
+    assert evidence[0].support_level.value == "none"
+
+
+def test_phase5_effort_hint_support_survives_second_attempt_and_replay(client):
+    project, change = prepare_phase5_draft(client)
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort-attempts"
+    first = client.post(path, headers=auth_headers(), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"], "effort": "quick",
+    })
+    assert first.status_code == 200, first.text
+    change = first.json()["current_change"]
+    second_command = str(uuid.uuid4())
+    second_body = {
+        "workflow_version": "v2", "command_id": second_command,
+        "expected_current_change_version": change["version"], "effort": "standard",
+    }
+    second = client.post(path, headers=auth_headers(), json=second_body)
+    replay = client.post(path, headers=auth_headers(), json=second_body)
+    assert second.status_code == replay.status_code == 200
+    assert second.json()["feedback"]["appropriate"] is True
+    assert replay.json()["feedback"] == second.json()["feedback"]
+    assert replay.json()["replayed"] is True
+    evidence = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "effort_selection"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+    assert len(evidence) == 2
+    assert evidence[-1].elicitation == "after_hint"
+    assert evidence[-1].support_level.value == "nudge"
+    build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert build["learner_statuses"]["effort_selection"] == "guided"
+
+
+def test_phase5_second_effort_mismatch_is_taught(client):
+    project, change = prepare_phase5_draft(client)
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort-attempts"
+    first = client.post(path, headers=auth_headers(), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"], "effort": "quick",
+    })
+    change = first.json()["current_change"]
+    second = client.post(path, headers=auth_headers(), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"], "effort": "deep",
+    })
+    assert second.status_code == 200, second.text
+    assert second.json()["feedback"]["revealed"] is True
+    evidence = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "effort_selection"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+    assert evidence[-1].elicitation == "taught"
+    assert evidence[-1].support_level.value == "teach"
+
+
+def test_phase5_prompt_edits_refresh_risk_before_acceptance_and_handoff(client):
+    project, change = prepare_phase5_draft(client)
+    assert change["risk"] == "normal"
+    effort = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort-attempts",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_current_change_version": change["version"], "effort": "standard"},
+    )
+    assert effort.status_code == 200, effort.text
+    change.update(effort.json()["current_change"])
+    accepted = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/prompt-versions",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_current_change_version": change["version"],
+              "expected_prompt_draft_version": change["prompt_draft_version"]},
+    )
+    assert accepted.status_code == 200, accepted.text
+    change.update(accepted.json()["current_change"])
+    old_prompt = accepted.json()["prompt_version"]
+
+    save_prompt(
+        client, project, change,
+        text="Change authentication logic and rotate login session tokens",
+        done_condition="Click Sign in and see the private profile",
+        boundaries=["Keep public profile styling unchanged"],
+    )
+    assert change["risk"] == "slowdown"
+    assert change["risk_reason_key"] == "authentication"
+    assert change["effort_category"] is None
+    stale_handoff = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/handoff",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "prompt_version_id": old_prompt["id"],
+              "expected_current_change_version": change["version"],
+              "expected_prompt_version": old_prompt["version"]},
+    )
+    assert stale_handoff.status_code == 409
+    legacy = client.put(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort",
+        headers=auth_headers(),
+        json={"workflow_version": "v2",
+              "expected_current_change_version": change["version"], "effort": "standard"},
+    )
+    assert legacy.status_code == 409
+
+    deep = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/effort-attempts",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_current_change_version": change["version"], "effort": "deep"},
+    )
+    assert deep.status_code == 200, deep.text
+    assert deep.json()["feedback"]["appropriate"] is True
+    change.update(deep.json()["current_change"])
+
+    save_prompt(
+        client, project, change,
+        text="Add a focused profile settings panel",
+        done_condition="Click Save and see the updated profile settings",
+        boundaries=["Keep the existing profile page unchanged"],
+    )
+    assert change["risk"] == "normal"
+    assert change["risk_reason_key"] is None
+    assert change["effort_category"] is None
+
+
+def test_phase5_trivial_open_text_is_saved_without_strong_evidence(client):
+    project = create_project(client)["project"]
+    started = start_change(
+        client, project["project_id"], project["version"], goal="Add profile settings"
+    )
+    change = started.json()["current_change"]
+    confirmed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/confirm",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_current_change_version": change["version"]},
+    )
+    change = confirmed.json()["current_change"]
+    before = len(client.app.state.test_v2_repo._learner_evidence)
+    response = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/respond",
+        headers=auth_headers(),
+        json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),
+              "expected_current_change_version": change["version"], "context": "prebuild",
+              "response": "Looks good"},
+    )
+    assert response.status_code == 200, response.text
+    assert len(client.app.state.test_v2_repo._learner_evidence) == before
+    progress = client.app.state.test_v2_repo._teaching_progress[uuid.UUID(change["id"])]
+    assert progress.intervention_answered is True
+
+
+def test_phase5_new_learner_receives_codize_check_without_manufactured_result(client):
+    project, change = prepare_handed_off_change(client, experienced_testing=False)
+    check_id = str(uuid.uuid4())
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "outcome": "worked", "check_id": check_id},
+    )
+    assert returned.status_code == 200, returned.text
+    change = returned.json()["current_change"]
+    check = returned.json()["check"]
+    assert check["id"] == check_id
+    assert check["plan_source"] == "codize"
+    assert check["status"] == "proposed" and check["result"] is None
+    build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert build["build_stage"] == "perform_check"
+    assert build["verification_plan_source"] == "codize"
+
+    agent_claim = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_check_version": check["version"], "result": "worked",
+            "observation": "The coding agent says it passed",
+            "performed_by_student": False, "next_check_id": None},
+    )
+    assert agent_claim.status_code == 422
+
+    performed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_check_version": check["version"], "result": "worked",
+            "observation": "I added one point and saw the score increase",
+            "performed_by_student": True, "next_check_id": None},
+    )
+    assert performed.status_code == 200, performed.text
+    change = performed.json()["current_change"]
+    build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    )
+    assert build.status_code == 200, build.text
+    assert build.json()["build_stage"] == "ready_to_complete"
+    assert build.json()["teaching"] is None
+
+
+def test_phase5_recently_independent_learner_originates_check(client):
+    project, change = prepare_handed_off_change(client, experienced_testing=True)
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={"workflow_version": "v2",
+            "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "outcome": "worked", "check_id": str(uuid.uuid4())},
+    )
+    assert returned.status_code == 200, returned.text
+    assert returned.json()["check"] is None
+    change = returned.json()["current_change"]
+    build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert build["verification_plan_source"] == "student"
+    assert build["build_stage"] == "propose_check"
+    assert build["teaching"]["mode"] == "skip"
+
+
+def test_phase5_remind_without_help_submits_honest_check_evidence_and_replays(client):
+    project, change = prepare_remind_verification_change(client)
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "outcome": "worked", "check_id": str(uuid.uuid4()),
+        },
+    )
+    assert returned.status_code == 200, returned.text
+    assert returned.json()["check"] is None
+    change = returned.json()["current_change"]
+    build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert build["learner_statuses"]["testing"] == "guided"
+    assert build["verification_plan_source"] == "student"
+    assert build["teaching"]["mode"] == "remind"
+    assert build["teaching"]["hint_level"] == "none"
+    assert build["teaching"]["can_request_help"] is True
+
+    check_id = str(uuid.uuid4())
+    command_id = str(uuid.uuid4())
+    body = {
+        "workflow_version": "v2", "command_id": command_id,
+        "check_id": check_id,
+        "expected_current_change_version": change["version"],
+        "check_plan": "Add one point and observe the visible score increase",
+    }
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks"
+    planned = client.post(path, headers=auth_headers(), json=body)
+    replay = client.post(path, headers=auth_headers(), json=body)
+    assert planned.status_code == replay.status_code == 200
+    assert replay.json()["replayed"] is True
+    assert replay.json()["check"] == planned.json()["check"]
+    assert replay.json()["current_change"]["version"] == planned.json()["current_change"]["version"]
+    mismatched = client.post(path, headers=auth_headers(), json={
+        **body, "check_plan": "Open a different page and observe another result",
+    })
+    assert mismatched.status_code == 409
+    new_command = client.post(path, headers=auth_headers(), json={
+        **body, "command_id": str(uuid.uuid4()), "check_id": str(uuid.uuid4()),
+    })
+    assert new_command.status_code == 409
+    evidence = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "testing"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+    assert len(evidence) == 1
+    assert evidence[0].elicitation == "asked"
+    assert evidence[0].support_level.value == "none"
+    matching_checks = [
+        item for owner, item in client.app.state.test_v2_repo._checks.values()
+        if owner == USER_A and str(item.id) == check_id
+    ]
+    assert len(matching_checks) == 1
+
+
+@pytest.mark.parametrize(
+    ("help_count", "hint_level", "elicitation", "support"),
+    [
+        (1, "nudge", "after_hint", "nudge"),
+        (2, "clue", "after_hint", "clue"),
+        (3, "teach", "taught", "teach"),
+    ],
+)
+def test_phase5_remind_preserves_actual_verification_help_depth(
+    client, help_count, hint_level, elicitation, support
+):
+    project, change = prepare_remind_verification_change(client)
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "outcome": "worked", "check_id": None,
+        },
+    )
+    assert returned.status_code == 200, returned.text
+    change = returned.json()["current_change"]
+    help_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/help"
+    for _ in range(help_count):
+        helped = client.post(help_path, headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "context": "verification",
+        })
+        assert helped.status_code == 200, helped.text
+        change = helped.json()["current_change"]
+    build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert build["teaching"]["mode"] == "remind"
+    assert build["teaching"]["hint_level"] == hint_level
+
+    evidence_before_plan = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "testing"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+
+    command_id = str(uuid.uuid4())
+    check_id = str(uuid.uuid4())
+    path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks"
+    body = {
+        "workflow_version": "v2", "command_id": command_id,
+        "check_id": check_id,
+        "expected_current_change_version": change["version"],
+        "check_plan": "Add one point and observe the visible score increase",
+    }
+    planned = client.post(path, headers=auth_headers(), json=body)
+    assert planned.status_code == 200, planned.text
+    # The Clue case is the response-loss reproduction: ignore the successful
+    # response and retry the exact command after support has been cleared.
+    replay = client.post(path, headers=auth_headers(), json=body)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["replayed"] is True
+    assert replay.json()["check"] == planned.json()["check"]
+    assert replay.json()["current_change"]["version"] == planned.json()["current_change"]["version"]
+    evidence = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "testing"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+    assert len(evidence) == len(evidence_before_plan) + 1
+    assert evidence[-1].elicitation == elicitation
+    assert evidence[-1].support_level.value == support
+    matching_checks = [
+        item for owner, item in client.app.state.test_v2_repo._checks.values()
+        if owner == USER_A and str(item.id) == check_id
+    ]
+    assert len(matching_checks) == 1
+
+
+def test_fake_check_replay_rejects_mutable_state_reclassification(client):
+    project, change = prepare_remind_verification_change(client)
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "outcome": "worked", "check_id": None,
+        },
+    )
+    change = returned.json()["current_change"]
+    help_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/help"
+    for _ in range(2):
+        helped = client.post(help_path, headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "context": "verification",
+        })
+        change = helped.json()["current_change"]
+    command_id = uuid.uuid4()
+    check_id = uuid.uuid4()
+    check_plan = "Add one point and observe the visible score increase"
+    planned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(command_id),
+            "check_id": str(check_id),
+            "expected_current_change_version": change["version"],
+            "check_plan": check_plan,
+        },
+    )
+    assert planned.status_code == 200, planned.text
+    repo = client.app.state.test_v2_repo
+    with pytest.raises(V2RepositoryConflict):
+        asyncio.run(repo.create_student_check_plan(
+            USER_A, uuid.UUID(project["project_id"]), uuid.UUID(change["id"]),
+            change["version"], command_id, check_id, check_plan,
+            "asked", "none",
+        ))
+
+
+def test_phase5_verification_and_understanding_support_are_isolated(client):
+    project, change = prepare_handed_off_change(client, experienced_testing=True)
+    return_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return"
+    returned = client.post(return_path, headers=auth_headers(), json={
+        "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+        "expected_current_change_version": change["version"],
+        "outcome": "unsure", "check_id": None,
+    })
+    assert returned.status_code == 200, returned.text
+    change = returned.json()["current_change"]
+
+    help_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/help"
+    for expected in ("nudge", "clue"):
+        helped = client.post(help_path, headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "context": "verification",
+        })
+        assert helped.status_code == 200, helped.text
+        change = helped.json()["current_change"]
+        assert change["support_level_disclosed"] == expected
+
+    check_id = str(uuid.uuid4())
+    planned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "check_id": check_id,
+            "expected_current_change_version": change["version"],
+            "check_plan": "Add one point and observe the visible score increase",
+        },
+    )
+    assert planned.status_code == 200, planned.text
+    change = planned.json()["current_change"]
+    check = planned.json()["check"]
+    verification_evidence = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "testing"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+    assert verification_evidence[-1].elicitation == "after_hint"
+    assert verification_evidence[-1].support_level.value == "clue"
+
+    performed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_check_version": check["version"], "result": "worked",
+            "observation": "I added one point and saw the score increase",
+            "performed_by_student": True, "next_check_id": None,
+        },
+    )
+    assert performed.status_code == 200, performed.text
+    change = performed.json()["current_change"]
+    refreshed = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    ).json()
+    assert refreshed["build_stage"] == "understand"
+    assert refreshed["teaching"]["hint_level"] == "none"
+
+    response_command = str(uuid.uuid4())
+    response_body = {
+        "workflow_version": "v2", "command_id": response_command,
+        "expected_current_change_version": change["version"],
+        "context": "understanding",
+        "response": "The save action updates the visible score",
+    }
+    responded = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/respond",
+        headers=auth_headers(), json=response_body,
+    )
+    replay = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/respond",
+        headers=auth_headers(), json=response_body,
+    )
+    assert responded.status_code == replay.status_code == 200
+    assert replay.json()["replayed"] is True
+    qualification = client.app.state.test_v2_repo._teaching_response_qualifications[
+        uuid.UUID(response_command)
+    ]
+    assert qualification[0] == "understanding"
+    assert qualification[1] != "after_hint"
+    assert qualification[2].value != "clue"
+    assert verification_evidence[-1].support_level.value == "clue"
+
+
+def test_phase5_understanding_help_does_not_rewrite_independent_verification(client):
+    project, change = prepare_handed_off_change(client, experienced_testing=True)
+    returned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/return",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "outcome": "unsure", "check_id": None,
+        },
+    )
+    change = returned.json()["current_change"]
+    check_id = str(uuid.uuid4())
+    planned = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "check_id": check_id,
+            "expected_current_change_version": change["version"],
+            "check_plan": "Add one point and observe the visible score increase",
+        },
+    )
+    change = planned.json()["current_change"]
+    check = planned.json()["check"]
+    testing_evidence = [
+        item for owner, item in client.app.state.test_v2_repo._learner_evidence.values()
+        if owner == USER_A and item.competency_key == "testing"
+        and str(item.source_current_change_id) == change["id"]
+    ]
+    assert testing_evidence[-1].support_level.value == "none"
+    performed = client.post(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/checks/{check_id}",
+        headers=auth_headers(), json={
+            "workflow_version": "v2", "command_id": str(uuid.uuid4()),
+            "expected_current_change_version": change["version"],
+            "expected_check_version": check["version"], "result": "worked",
+            "observation": "I added one point and saw the score increase",
+            "performed_by_student": True, "next_check_id": None,
+        },
+    )
+    change = performed.json()["current_change"]
+    help_command = str(uuid.uuid4())
+    help_body = {
+        "workflow_version": "v2", "command_id": help_command,
+        "expected_current_change_version": change["version"],
+        "context": "understanding",
+    }
+    help_path = f"/v2/projects/{project['project_id']}/current-change/{change['id']}/teaching/help"
+    helped = client.post(help_path, headers=auth_headers(), json=help_body)
+    replay = client.post(help_path, headers=auth_headers(), json=help_body)
+    assert helped.status_code == replay.status_code == 200
+    assert helped.json()["current_change"]["help_context_key"] == "causal_explanation"
+    assert replay.json()["replayed"] is True
+    assert testing_evidence[-1].support_level.value == "none"
+
+
 def save_prompt(
     client: TestClient,
     project: dict,
@@ -429,8 +1217,14 @@ def accept_ready_v23b_prompt(
     return result
 
 
-def prepare_handed_off_change(client: TestClient) -> tuple[dict, dict]:
+def prepare_handed_off_change(
+    client: TestClient, *, experienced_testing: bool = False
+) -> tuple[dict, dict]:
     project, change = prepare_v23b_change(client)
+    if experienced_testing:
+        repo = client.app.state.test_v2_repo
+        repo.seed_learner_evidence(USER_A, "testing", current_change_id=uuid.uuid4())
+        repo.seed_learner_evidence(USER_A, "testing", current_change_id=uuid.uuid4())
     accepted = accept_ready_v23b_prompt(client, project, change)
     prompt = accepted["prompt_version"]
     handed = client.post(
@@ -441,6 +1235,23 @@ def prepare_handed_off_change(client: TestClient) -> tuple[dict, dict]:
     )
     assert handed.status_code == 200, handed.text
     return project, handed.json()["current_change"]
+
+
+def prepare_remind_verification_change(client: TestClient) -> tuple[dict, dict]:
+    project, change = prepare_handed_off_change(client, experienced_testing=True)
+    repo = client.app.state.test_v2_repo
+    repo.seed_learner_evidence(
+        USER_A, "testing", elicitation="after_hint", support_level=SupportLevel.CLUE,
+        current_change_id=uuid.uuid4(),
+    )
+    build = client.get(
+        f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
+        headers=auth_headers(),
+    )
+    assert build.status_code == 200, build.text
+    assert build.json()["learner_statuses"]["testing"] == "guided"
+    assert build.json()["verification_plan_source"] == "student"
+    return project, change
 
 
 def test_phase4_unsure_check_creates_retry_and_duplicate_return_replays(client):

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import V2Character from "@/components/v2/V2Character";
 import V2Dialogue from "@/components/v2/V2Dialogue";
@@ -19,8 +19,11 @@ import {
   getPreferences,
   getRecentChanges,
   handoffPrompt,
+  createStudentCheckPlan,
   recordCheck,
   recordReturn,
+  requestTeachingHelp,
+  respondToTeaching,
   selectCodingAgent,
   selectEffort,
   updatePromptDraft,
@@ -55,6 +58,12 @@ interface BuildData {
   build: BuildResumeState;
 }
 
+interface LogicalCommandIdentity {
+  signature: string;
+  commandId: string;
+  relatedId?: string;
+}
+
 export default function BuildPage() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<BuildData | null>(null);
@@ -69,10 +78,32 @@ export default function BuildPage() {
   const [agentHelp, setAgentHelp] = useState(false);
   const [status, setStatus] = useState("");
   const [observation, setObservation] = useState("");
+  const [teachingResponse, setTeachingResponse] = useState("");
+  const [checkPlan, setCheckPlan] = useState("");
+  const [effortMessage, setEffortMessage] = useState("");
   const [returnReady, setReturnReady] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [planItem, setPlanItem] = useState<PlanItemView | null>(null);
   const [completed, setCompleted] = useState<{ observation: string; goal: string } | null>(null);
+  const teachingCommands = useRef(new Map<string, LogicalCommandIdentity>());
+
+  const commandFor = useCallback((operation: string, signature: string, related = false) => {
+    const current = teachingCommands.current.get(operation);
+    if (current?.signature === signature) return current;
+    const created = {
+      signature,
+      commandId: crypto.randomUUID(),
+      relatedId: related ? crypto.randomUUID() : undefined,
+    };
+    teachingCommands.current.set(operation, created);
+    return created;
+  }, []);
+
+  const resolveCommand = useCallback((operation: string, commandId: string) => {
+    if (teachingCommands.current.get(operation)?.commandId === commandId) {
+      teachingCommands.current.delete(operation);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -142,14 +173,21 @@ export default function BuildPage() {
 
   const confirm = () => {
     if (!data) return;
+    const identity = commandFor(
+      "confirm-change", `${data.change.id}:${data.build.current_change_version}`
+    );
     void runMutation(() => confirmCurrentChange(id, data.change.id,
-      data.build.current_change_version), "Current change confirmed.");
+      data.build.current_change_version, identity.commandId).then((result) => {
+        resolveCommand("confirm-change", identity.commandId);
+        return result;
+      }), "Current change confirmed.");
   };
 
   const reportReturn = (outcome: "worked" | "broken" | "unsure") => {
     if (!data) return;
     void runMutation(() => recordReturn(id, data.change.id, data.build.current_change_version,
-      outcome, outcome === "broken" ? null : crypto.randomUUID()), "Return saved.");
+      outcome, outcome !== "broken" && data.build.verification_plan_source === "codize"
+        ? crypto.randomUUID() : null), "Return saved.");
   };
 
   const submitCheck = (result: "worked" | "did_not_work" | "unsure") => {
@@ -202,14 +240,99 @@ export default function BuildPage() {
       setError("Choose an effort level before continuing.");
       return;
     }
+    const identity = commandFor(
+      "effort",
+      `${data.change.id}:${data.build.current_change_version}:${effort}`
+    );
+    setBusy(true);
+    setError(null);
+    setConflict(null);
+    void selectEffort(id, data.change.id, effort, data.build.current_change_version,
+      identity.commandId)
+      .then(async (result) => {
+        resolveCommand("effort", identity.commandId);
+        setEffortMessage(result.feedback.message);
+        setStatus(result.feedback.message);
+        await load();
+      })
+      .catch(async (reason) => {
+        if (reason instanceof ApiError && reason.status === 409) {
+          setConflict("This change was updated somewhere else. The latest state is now loaded.");
+          await load();
+        } else {
+          setError(reason instanceof ApiError ? reason.message : "That effort choice couldn't be saved.");
+        }
+      })
+      .finally(() => setBusy(false));
+  };
+
+  const askForHelp = () => {
+    if (!data?.build.teaching?.can_request_help) return;
+    const interaction = data.build.teaching;
+    const identity = commandFor(
+      "teaching-help",
+      `${data.change.id}:${data.build.current_change_version}:${interaction.context}:${interaction.hint_level}`
+    );
     void runMutation(
-      () => selectEffort(id, data.change.id, effort, data.build.current_change_version),
-      "Effort saved."
+      () => requestTeachingHelp(id, data.change.id, data.build.current_change_version,
+        interaction.context, identity.commandId).then((result) => {
+          resolveCommand("teaching-help", identity.commandId);
+          return result;
+        }),
+      "A little more help is shown."
+    );
+  };
+
+  const submitTeachingResponse = () => {
+    const interaction = data?.build.teaching;
+    if (!data || !interaction || interaction.context === "verification") return;
+    const context = interaction.context;
+    const response = interaction.mode === "remind" ? "continue" : teachingResponse.trim();
+    if (!response) {
+      setError("Write a short answer tied to this change before continuing.");
+      return;
+    }
+    const identity = commandFor(
+      "teaching-response",
+      `${data.change.id}:${data.build.current_change_version}:${context}:${response}`
+    );
+    void runMutation(
+      () => respondToTeaching(id, data.change.id, data.build.current_change_version,
+        context, response, identity.commandId).then((result) => {
+          resolveCommand("teaching-response", identity.commandId);
+          setTeachingResponse("");
+          return result;
+        }),
+      context === "understanding" ? "Understanding saved." : "Decision saved."
+    );
+  };
+
+  const submitCheckPlan = () => {
+    if (!data || !checkPlan.trim()) {
+      setError("Describe one thing you can personally try to check the result.");
+      return;
+    }
+    const plan = checkPlan.trim();
+    const identity = commandFor(
+      "check-plan",
+      `${data.change.id}:${data.build.current_change_version}:${plan}`,
+      true
+    );
+    void runMutation(
+      () => createStudentCheckPlan(id, data.change.id,
+        data.build.current_change_version, plan, identity.commandId,
+        identity.relatedId!).then((result) => {
+          resolveCommand("check-plan", identity.commandId);
+          setCheckPlan("");
+          return result;
+        }),
+      "Check plan saved."
     );
   };
 
   const approvePrompt = () => {
     if (!data) return;
+    setEffortMessage("");
     void runMutation(
       () =>
         acceptPrompt(
@@ -290,6 +413,9 @@ export default function BuildPage() {
 
           {conflict && <V2Notice>{conflict}</V2Notice>}
           {error && <V2Notice tone="error">{error}</V2Notice>}
+          {effortMessage && data.build.build_stage !== "choose_effort" && (
+            <V2Notice>{effortMessage}</V2Notice>
+          )}
           <p className="sr-only" role="status" aria-live="polite">{status}</p>
 
           <div className="v2-conversation">
@@ -300,6 +426,7 @@ export default function BuildPage() {
               <V2Character size="mini" />
               <div>
                 {data.build.build_stage === "confirm_change" && <V2Dialogue soundEnabled={soundEnabled} text="Let’s keep this focused. Confirm the one change and the result you’ll check." />}
+                {data.build.build_stage === "intervention" && data.build.teaching && <V2Dialogue soundEnabled={soundEnabled} text={data.build.teaching.title} />}
                 {data.build.build_stage === "choose_agent" && <V2Dialogue soundEnabled={soundEnabled} text="What coding AI are you using? I’ll tailor the handoff to the tool you actually use." />}
                 {data.build.build_stage === "edit_prompt" && <V2Dialogue soundEnabled={soundEnabled} text="Here’s a prompt built from your current change. Make any changes you want." />}
                 {data.build.build_stage === "choose_effort" && <V2Dialogue soundEnabled={soundEnabled} text={`What effort level does this prompt need in ${data.build.selected_agent?.display_name ?? "your coding AI"}?`} />}
@@ -307,6 +434,8 @@ export default function BuildPage() {
                 {data.build.build_stage === "ready_to_handoff" && <V2Dialogue soundEnabled={soundEnabled} text="Your prompt is ready." />}
                 {data.build.build_stage === "waiting_for_return" && <V2Dialogue soundEnabled={soundEnabled} text="Welcome back. What happened when your coding AI finished?" />}
                 {(data.build.build_stage === "perform_check" || data.build.build_stage === "check_unsure") && <V2Dialogue soundEnabled={soundEnabled} text="Try this yourself, then tell me exactly what you observed." />}
+                {data.build.build_stage === "propose_check" && <V2Dialogue soundEnabled={soundEnabled} text="Before checking, choose one thing you can personally try and observe." />}
+                {data.build.build_stage === "understand" && data.build.teaching && <V2Dialogue soundEnabled={soundEnabled} text="One useful thing to understand before you finish." />}
                 {data.build.build_stage === "ready_to_complete" && <V2Dialogue soundEnabled={soundEnabled} text="Your check worked. Save this result and finish the change." />}
                 {data.build.build_stage === "check_failed" && <V2Dialogue soundEnabled={soundEnabled} text="That result doesn’t support completion yet. Your work is saved; Recovery will continue this in Phase 6." />}
               </div>
@@ -317,6 +446,37 @@ export default function BuildPage() {
               <p><strong>Done when:</strong> {planItem?.intended_outcome}</p>
               <V2Button onClick={confirm} disabled={busy}>{busy ? "Starting…" : "Start"}</V2Button>
             </V2Card>}
+
+            {data.build.build_stage === "intervention" && data.build.teaching && (
+              <V2Card className="v2-stage-card">
+                <p className="v2-card-label">{data.build.teaching.mode}</p>
+                <h2>{data.build.teaching.title}</h2>
+                {data.build.teaching.risk === "slowdown" && (
+                  <V2Notice>We’re slowing down briefly because this change affects access, sensitive data, deployment, or another consequential boundary. Your experience still counts; the safeguard stays.</V2Notice>
+                )}
+                {data.build.teaching.explanation && <p>{data.build.teaching.explanation}</p>}
+                {data.build.teaching.example && <p className="v2-muted"><strong>For this project:</strong> {data.build.teaching.example}</p>}
+                {data.build.teaching.reminder && <p>{data.build.teaching.reminder}</p>}
+                {data.build.teaching.question && (
+                  <>
+                    <label className="v2-field-label" htmlFor="v2-teaching-response">{data.build.teaching.question}</label>
+                    <textarea id="v2-teaching-response" rows={4} value={teachingResponse}
+                      onChange={(event) => setTeachingResponse(event.target.value)} disabled={busy} />
+                  </>
+                )}
+                {data.build.teaching.hint_text && <V2Notice>{data.build.teaching.hint_text}</V2Notice>}
+                <div className="v2-action-row">
+                  {data.build.teaching.can_request_help && (
+                    <V2Button tone="secondary" onClick={askForHelp} disabled={busy}>
+                      {data.build.teaching.hint_level === "none" ? "Need help?" : "Show me more"}
+                    </V2Button>
+                  )}
+                  <V2Button onClick={submitTeachingResponse} disabled={busy}>
+                    {busy ? "Saving…" : data.build.teaching.mode === "remind" ? "Continue" : "Save & continue"}
+                  </V2Button>
+                </div>
+              </V2Card>
+            )}
 
             {data.build.build_stage === "choose_agent" && (
               <section className="v2-agent-stage" aria-label="Choose your coding AI">
@@ -345,6 +505,12 @@ export default function BuildPage() {
 
             {data.build.build_stage === "choose_effort" && (
               <V2Card className="v2-stage-card">
+                {data.change.risk === "slowdown" && (
+                  <V2Notice>
+                    This prompt now touches a consequential boundary. Choose deliberately;
+                    Codize will keep the required personal Check before completion.
+                  </V2Notice>
+                )}
                 <fieldset className="v2-effort-fieldset">
                   <legend>How much thinking does this prompt need?</legend>
                   {effortOptions.map((option) => (
@@ -354,6 +520,9 @@ export default function BuildPage() {
                     </label>
                   ))}
                 </fieldset>
+                {(data.build.effort_feedback?.message || effortMessage) && (
+                  <V2Notice>{data.build.effort_feedback?.message ?? effortMessage}</V2Notice>
+                )}
                 <div className="v2-action-row"><V2Button onClick={saveEffort} disabled={busy}>{busy ? "Saving…" : "Submit"}</V2Button></div>
               </V2Card>
             )}
@@ -418,6 +587,54 @@ export default function BuildPage() {
                 <V2Button tone="secondary" onClick={() => submitCheck("did_not_work")} disabled={busy}>Didn’t work</V2Button>
                 <V2Button tone="ghost" onClick={() => submitCheck("unsure")} disabled={busy}>Not sure</V2Button></div>
             </V2Card>}
+
+            {data.build.build_stage === "propose_check" && data.build.teaching && (
+              <V2Card className="v2-stage-card v2-check-card">
+                <p className="v2-card-label">{data.build.teaching.mode}</p>
+                <h2>{data.build.teaching.title}</h2>
+                {data.build.teaching.explanation && <p>{data.build.teaching.explanation}</p>}
+                {data.build.teaching.example && <p className="v2-muted"><strong>For this project:</strong> {data.build.teaching.example}</p>}
+                {data.build.teaching.reminder && <p>{data.build.teaching.reminder}</p>}
+                <label className="v2-field-label" htmlFor="v2-check-plan">
+                  {data.build.teaching.question ?? "What will you personally try and observe?"}
+                </label>
+                <textarea id="v2-check-plan" rows={4} value={checkPlan}
+                  onChange={(event) => setCheckPlan(event.target.value)} disabled={busy} />
+                {data.build.teaching.hint_text && <V2Notice>{data.build.teaching.hint_text}</V2Notice>}
+                <div className="v2-action-row">
+                  {data.build.teaching.can_request_help && (
+                    <V2Button tone="secondary" onClick={askForHelp} disabled={busy}>
+                      {data.build.teaching.hint_level === "none" ? "Need help?" : "Show me more"}
+                    </V2Button>
+                  )}
+                  <V2Button onClick={submitCheckPlan} disabled={busy}>{busy ? "Saving…" : "Use this check"}</V2Button>
+                </div>
+              </V2Card>
+            )}
+
+            {data.build.build_stage === "understand" && data.build.teaching && (
+              <V2Card className="v2-stage-card">
+                <p className="v2-card-label">{data.build.teaching.mode}</p>
+                <h2>{data.build.teaching.title}</h2>
+                {data.build.teaching.explanation && <p>{data.build.teaching.explanation}</p>}
+                {data.build.teaching.example && <p className="v2-muted"><strong>Keep it practical:</strong> {data.build.teaching.example}</p>}
+                {data.build.teaching.reminder && <p>{data.build.teaching.reminder}</p>}
+                <label className="v2-field-label" htmlFor="v2-understanding-response">
+                  {data.build.teaching.question ?? "What important cause-and-effect relationship did this change add?"}
+                </label>
+                <textarea id="v2-understanding-response" rows={4} value={teachingResponse}
+                  onChange={(event) => setTeachingResponse(event.target.value)} disabled={busy} />
+                {data.build.teaching.hint_text && <V2Notice>{data.build.teaching.hint_text}</V2Notice>}
+                <div className="v2-action-row">
+                  {data.build.teaching.can_request_help && (
+                    <V2Button tone="secondary" onClick={askForHelp} disabled={busy}>
+                      {data.build.teaching.hint_level === "none" ? "Need help?" : "Show me more"}
+                    </V2Button>
+                  )}
+                  <V2Button onClick={submitTeachingResponse} disabled={busy}>{busy ? "Saving…" : "Save & continue"}</V2Button>
+                </div>
+              </V2Card>
+            )}
 
             {data.build.build_stage === "ready_to_complete" && <V2Card className="v2-stage-card v2-complete-card">
               <p className="v2-card-label">Checked</p><h2>{data.build.active_check?.check_plan}</h2>

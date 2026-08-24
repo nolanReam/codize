@@ -70,21 +70,53 @@ Implemented routes:
 - `POST|GET /v2/projects/{project_id}/current-change`
 - `POST /v2/projects/{project_id}/current-change/{current_change_id}/cancel`
 
-This slice has no V2 frontend, provider/LLM calls, teaching policy, GitHub
-integration, or character progression. Project creation requires an explicit
+The V2 beta now includes the manual Build frontend and a deterministic adaptive
+teaching layer; it still has no GitHub integration or character progression.
+Project creation requires an explicit
 `new_idea`, `already_building`, or `recovery_first` intent. The first two begin
 in `draft` at their canonical setup step; Recovery-first requires bounded
 Recovery context and atomically creates a `temporary_recovery` Project plus an
 unresolved recovery Current Change.
 
 Current Change start persists explicit backend-only unevaluated policy markers
-required by the accepted non-null schema. PostgreSQL confines either unresolved
-policy version to `preparing / confirm_change` or cancellation and rejects
-prompt acceptance, handoff, later lifecycle states, and completion. A narrow
-backend-only atomic resolver exists for a future accepted policy implementation;
-it defines no thresholds. Temporary promotion requires completed Current Change
+required by the accepted non-null schema. Confirmation now resolves them
+atomically with the versioned `phase5-beta-teaching-v1` and
+`phase5-beta-risk-v1` deterministic policies before any intervention, prompt,
+or handoff can proceed. Temporary promotion requires completed Current Change
 and resolved Recovery Case evidence, records the exact promotion command, and
 resumes at `existing_project_context` rather than claiming setup is ready.
+
+## V2 Phase 5 teaching policy
+
+Phase 5 derives a status independently for each canonical competency; it never
+stores a percentage or global mastery label. The conservative beta thresholds
+are:
+
+- no active evidence → `new` → `teach`;
+- first supported evidence → `guided` → `ask`, creating an ordinary independent
+  opportunity; after prior independent evidence, later assistance returns a
+  brief `remind`;
+- any unsupported observation, or at least two relevant observations →
+  `practiced` → `ask`;
+- two unsupported observations from different Current Changes in the last 60
+  days, including one in the last 30 days → `recently_independent` → `skip`.
+
+A later assisted observation returns that competency to `guided`. Slowdown risk
+is derived separately from narrow contextual patterns across the goal, Done,
+boundaries, and current Prompt Draft. Its Current Change fingerprint refreshes
+atomically with prompt edits, and database guards reject stale acceptance or
+handoff. Slowdown turns a would-be skip into an ask; it never waives the
+student-performed Check. Help
+progresses `nudge → clue → teach`, is recorded without penalty, and preserves
+the support used on learner evidence. Build Turns, Current Change policy/help
+fields, Checks, and append-oriented Learner Evidence provide refresh durability;
+no chat-history table was added. Open-ended understanding prose remains a Build
+Turn but is not treated as semantically correct learner evidence. Strong
+evidence comes only from narrow structured decisions or objective behavior such
+as a fitting first effort choice and a personally performed Check. Policy, risk,
+evidence, effort fit, completion, and Check results are deterministic. The
+current teaching wording is also a deterministic fallback and uses no live
+provider.
 
 ## Setup & run
 

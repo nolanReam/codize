@@ -21,8 +21,11 @@ from app.domain.v2 import (
     PlanScopeBand,
     PromptPurpose,
     ProjectLifecycle,
+    RiskMode,
     ResumeStep,
     SetupResumeStep,
+    SupportLevel,
+    TeachingMode,
 )
 
 WorkflowV2 = Literal["v2"]
@@ -427,6 +430,14 @@ class CurrentChangeView(BaseModel):
     coding_agent_key: CodingAgentKey | None
     effort_category: EffortCategory | None
     latest_prompt_version_id: UUID | None
+    teaching_mode: TeachingMode
+    teaching_target: str | None
+    policy_resolved: bool
+    risk: RiskMode
+    risk_reason_key: str | None
+    check_requirement: Literal["required", "waived"]
+    help_context_key: str | None
+    support_level_disclosed: SupportLevel
     student_return_outcome: str | None
     version: int
     created_at: datetime
@@ -613,6 +624,101 @@ class BuildResumeStateView(BaseModel):
     current_change_version: int
     active_check: "CheckView | None" = None
     last_check_result: CheckResult | None = None
+    teaching: "TeachingInteractionView | None" = None
+    effort_feedback: "EffortFeedbackView | None" = None
+    learner_statuses: dict[str, Literal["new", "guided", "practiced", "recently_independent"]] = Field(default_factory=dict)
+    verification_plan_source: Literal["codize", "student"]
+
+
+class TeachingInteractionView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    context: Literal["prebuild", "verification", "understanding"]
+    competency_key: str
+    mode: TeachingMode
+    risk: RiskMode
+    risk_reason_key: str | None
+    title: str
+    explanation: str | None
+    example: str | None
+    question: str | None
+    reminder: str | None
+    hint_level: SupportLevel
+    hint_text: str | None
+    can_request_help: bool
+
+
+class TeachingHelpRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    context: Literal["prebuild", "verification", "understanding"]
+
+
+class TeachingResponseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    context: Literal["prebuild", "understanding"]
+    response: str
+
+    @field_validator("response")
+    @classmethod
+    def validate_response(cls, value: str) -> str:
+        value = _bounded_utf8(value, 8192, "response")
+        if value.lower() == "continue":
+            return value
+        if len(value) < 8 or len(value.split()) < 2 or value.lower() in {
+            "i don't know", "i dont know", "not sure", "no idea",
+        }:
+            raise ValueError("response must contain a short project-specific decision")
+        return value
+
+
+class TeachingCommandResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_change: CurrentChangeView
+    replayed: bool = False
+
+
+class EffortAttemptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    effort: EffortCategory
+
+
+class EffortFeedbackView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    selected: EffortCategory
+    recommended: EffortCategory | None
+    appropriate: bool
+    retry_allowed: bool
+    revealed: bool
+    message: str
+
+
+class EffortAttemptResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_change: CurrentChangeView
+    feedback: EffortFeedbackView
+    replayed: bool = False
+
+
+class CheckPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    check_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    check_plan: str
+
+    @field_validator("check_plan")
+    @classmethod
+    def validate_check_plan(cls, value: str) -> str:
+        return _bounded_utf8(value, 8192, "check_plan")
 
 
 class ConfirmManualChangeRequest(BaseModel):
@@ -632,8 +738,8 @@ class ManualReturnRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_check_identity(self) -> "ManualReturnRequest":
-        if (self.outcome in {"worked", "unsure"}) != (self.check_id is not None):
-            raise ValueError("worked and unsure returns require a check_id")
+        if self.outcome == "broken" and self.check_id is not None:
+            raise ValueError("a broken return cannot pre-create a Check")
         return self
 
 
@@ -642,6 +748,7 @@ class CheckView(BaseModel):
     id: UUID
     current_change_id: UUID
     check_plan: str
+    plan_source: Literal["codize", "student"]
     status: str
     result: CheckResult | None
     student_observation: str | None

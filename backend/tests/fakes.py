@@ -21,16 +21,21 @@ from app.domain.v2 import (
     ProjectLifecycle,
     ProjectRef,
     PromptPurpose,
+    RiskMode,
     ResumeStep,
     SetupResumeStep,
+    SupportLevel,
+    TeachingMode,
     V2CurrentChange,
     V2Check,
     V2GenerationAttempt,
+    V2LearnerEvidence,
     V2Plan,
     V2PlanItem,
     V2Project,
     V2RecentChange,
     V2PromptVersion,
+    V2TeachingProgress,
     V2UserPreferences,
     WorkflowVersion,
 )
@@ -40,6 +45,12 @@ from app.services.v2_repository import (
     V2RepositoryConflict,
     V2RepositoryInvalidState,
     V2RepositoryNotFound,
+)
+from app.services.v2_teaching_policy import (
+    RISK_POLICY_VERSION,
+    qualifies_check_plan,
+    qualifies_structured_response,
+    risk_input_fingerprint as compute_risk_input_fingerprint,
 )
 
 
@@ -281,10 +292,19 @@ class InMemoryV2Repository:
         self._recovery_case_statuses: dict[uuid.UUID, list[str]] = {}
         self._checks: dict[uuid.UUID, tuple[str, V2Check]] = {}
         self._manual_commands: dict[uuid.UUID, tuple[str, uuid.UUID]] = {}
+        self._effort_command_results: dict[uuid.UUID, tuple[uuid.UUID, str, bool, dict]] = {}
+        self._check_plan_command_payloads: dict[
+            uuid.UUID, tuple[uuid.UUID, uuid.UUID, str, str, str]
+        ] = {}
+        self._teaching_response_qualifications: dict[
+            uuid.UUID, tuple[str, str, SupportLevel]
+        ] = {}
         self._manual_setup_payloads: dict[
             uuid.UUID, tuple[str, str, str, uuid.UUID]
         ] = {}
         self._preferences: dict[str, V2UserPreferences] = {}
+        self._learner_evidence: dict[uuid.UUID, tuple[str, V2LearnerEvidence]] = {}
+        self._teaching_progress: dict[uuid.UUID, V2TeachingProgress] = {}
         self._tick = itertools.count()
 
     def _now(self) -> datetime:
@@ -373,13 +393,287 @@ class InMemoryV2Repository:
         resolved = replace(
             change,
             teaching_policy_version="test-teaching-v1",
-            risk_policy_version="test-risk-v1",
+            risk_policy_version=RISK_POLICY_VERSION,
+            risk_input_fingerprint=compute_risk_input_fingerprint(
+                change.goal_snapshot,
+                change.done_condition_snapshot,
+                change.boundary_snapshots,
+                change.prompt_draft,
+            ),
             resume_step=ResumeStep.CHOOSE_AGENT,
             version=change.version + 1,
             updated_at=self._now(),
         )
         self._changes[current_change_id] = (owner_user_id, resolved)
         return resolved
+
+    async def list_learner_evidence(
+        self, owner_user_id: str, competency_keys: list[str] | None = None,
+    ) -> list[V2LearnerEvidence]:
+        return [
+            item for owner, item in self._learner_evidence.values()
+            if owner == owner_user_id
+            and (not competency_keys or item.competency_key in competency_keys)
+        ]
+
+    def seed_learner_evidence(
+        self, owner_user_id: str, competency_key: str, *, elicitation: str = "asked",
+        support_level: SupportLevel = SupportLevel.NONE,
+        current_change_id: uuid.UUID | None = None,
+        observed_at: datetime | None = None,
+    ) -> V2LearnerEvidence:
+        item = V2LearnerEvidence(
+            id=uuid.uuid4(), competency_key=competency_key,
+            observed_behavior="Observed test behavior.", elicitation=elicitation,
+            support_level=support_level, context_key="build",
+            source_current_change_id=current_change_id,
+            observed_at=observed_at or self._now(), status="active",
+        )
+        self._learner_evidence[item.id] = (owner_user_id, item)
+        return item
+
+    async def resolve_teaching_policy(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, expected_current_change_version: int,
+        command_id: uuid.UUID, decision: dict,
+    ) -> tuple[V2CurrentChange, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        existing = self._manual_commands.get(command_id)
+        if existing:
+            if existing != ("policy", current_change_id):
+                raise V2RepositoryConflict("policy command reused")
+            return change, True
+        if change.version != expected_current_change_version or change.resume_step is not ResumeStep.CONFIRM_CHANGE:
+            raise V2RepositoryConflict("stale policy")
+        mode = TeachingMode(decision["mode"])
+        target = decision.get("target")
+        done = change.done_condition_snapshot
+        if change.plan_item_id and not (target == "define_done" and mode is not TeachingMode.SKIP):
+            done = self._plans[project_id][change.plan_item_id].intended_outcome
+        change = replace(
+            change, teaching_mode=mode, teaching_target=target,
+            teaching_policy_version=decision["teaching_policy_version"],
+            risk=RiskMode(decision["risk"]), risk_reason_key=decision.get("risk_reason_key"),
+            risk_policy_version=decision["risk_policy_version"],
+            risk_input_fingerprint=decision["risk_input_fingerprint"],
+            check_requirement=decision["check_requirement"],
+            done_condition_snapshot=done,
+            help_context_key=None if mode is TeachingMode.SKIP else target,
+            support_level_disclosed=SupportLevel.NONE,
+            resume_step=(ResumeStep.CHOOSE_AGENT if mode is TeachingMode.SKIP else ResumeStep.INTERVENTION),
+            version=change.version + 1, updated_at=self._now(),
+        )
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._manual_commands[command_id] = ("policy", current_change_id)
+        self._teaching_progress.setdefault(current_change_id, V2TeachingProgress())
+        return change, False
+
+    async def get_teaching_progress(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+    ) -> V2TeachingProgress:
+        self._owned_change(owner_user_id, project_id, current_change_id)
+        return self._teaching_progress.get(current_change_id, V2TeachingProgress())
+
+    async def disclose_teaching_help(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, expected_current_change_version: int,
+        command_id: uuid.UUID, context: str,
+    ) -> tuple[V2CurrentChange, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        if self._manual_commands.get(command_id):
+            return change, True
+        if change.version != expected_current_change_version:
+            raise V2RepositoryConflict("stale help")
+        target = change.teaching_target if context == "prebuild" else (
+            "testing" if context == "verification" else "causal_explanation")
+        current = (
+            change.support_level_disclosed
+            if change.help_context_key == target
+            else SupportLevel.NONE
+        )
+        if current is SupportLevel.TEACH:
+            raise V2RepositoryInvalidState("final help is already disclosed")
+        support = {SupportLevel.NONE: SupportLevel.NUDGE, SupportLevel.NUDGE: SupportLevel.CLUE,
+                   SupportLevel.CLUE: SupportLevel.TEACH, SupportLevel.TEACH: SupportLevel.TEACH}[current]
+        change = replace(change, help_context_key=target, support_level_disclosed=support,
+                         version=change.version + 1, updated_at=self._now())
+        self._changes[current_change_id] = (owner_user_id, change)
+        progress = self._teaching_progress.get(current_change_id, V2TeachingProgress())
+        self._teaching_progress[current_change_id] = replace(progress, hint_level=support)
+        self.seed_learner_evidence(owner_user_id, target or "define_done",
+            elicitation="after_hint", support_level=support,
+            current_change_id=current_change_id)
+        self._manual_commands[command_id] = ("help", current_change_id)
+        return change, False
+
+    async def record_teaching_response(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, expected_current_change_version: int,
+        command_id: uuid.UUID, context: str, response: str,
+        elicitation: str, support_level: str,
+    ) -> tuple[V2CurrentChange, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        if self._manual_commands.get(command_id):
+            return change, True
+        if change.version != expected_current_change_version or not response.strip():
+            raise V2RepositoryConflict("stale response")
+        target = change.teaching_target if context == "prebuild" else "causal_explanation"
+        active_support = (
+            change.support_level_disclosed
+            if change.help_context_key == target
+            else SupportLevel.NONE
+        )
+        if SupportLevel(support_level) is not active_support and elicitation == "after_hint":
+            raise V2RepositoryInvalidState("response support belongs to another interaction")
+        kwargs = {}
+        if context == "prebuild" and target == "define_done":
+            kwargs["done_condition_snapshot"] = response.strip()
+        if context == "prebuild" and target in {"protect_working_behavior", "data_ownership"}:
+            kwargs["boundary_snapshots"] = (response.strip(),)
+        change = replace(change, **kwargs,
+            resume_step=ResumeStep.CHOOSE_AGENT if context == "prebuild" else ResumeStep.UNDERSTAND,
+            help_context_key=None if context == "prebuild" else "understanding_complete",
+            support_level_disclosed=SupportLevel.NONE,
+            version=change.version + 1, updated_at=self._now())
+        self._changes[current_change_id] = (owner_user_id, change)
+        progress = self._teaching_progress.get(current_change_id, V2TeachingProgress())
+        self._teaching_progress[current_change_id] = replace(progress,
+            intervention_answered=progress.intervention_answered or context == "prebuild",
+            understanding_answered=progress.understanding_answered or context == "understanding")
+        if (not (context == "prebuild" and change.teaching_mode is TeachingMode.REMIND
+                and response == "continue")
+                and context == "prebuild"
+                and qualifies_structured_response(target or "", response)):
+            self.seed_learner_evidence(owner_user_id, target or "define_done",
+                elicitation=elicitation, support_level=SupportLevel(support_level),
+                current_change_id=current_change_id)
+        self._manual_commands[command_id] = ("teaching", current_change_id)
+        self._teaching_response_qualifications[command_id] = (
+            context, elicitation, SupportLevel(support_level)
+        )
+        return change, False
+
+    async def record_effort_attempt(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, expected_current_change_version: int,
+        command_id: uuid.UUID, selected: str, recommended: str, appropriate: bool,
+    ) -> tuple[V2CurrentChange, dict, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        if self._manual_commands.get(command_id):
+            stored = self._effort_command_results.get(command_id)
+            if (stored is None or stored[0] != current_change_id
+                    or stored[1] != selected or stored[2] is not appropriate):
+                raise V2RepositoryConflict("effort command reused")
+            return change, stored[3], True
+        if change.version != expected_current_change_version or change.resume_step is not ResumeStep.EFFORT:
+            raise V2RepositoryConflict("stale effort")
+        progress = self._teaching_progress.get(current_change_id, V2TeachingProgress())
+        second = len(progress.effort_attempts) >= 1
+        retry = not appropriate and not second
+        revealed = not appropriate and second
+        final_effort = EffortCategory(selected if appropriate else recommended) if (appropriate or revealed) else None
+        message = (f"{selected.title()} fits the size and consequence of this change."
+                   if appropriate else "Look at the connected pieces and risk, then try once more."
+                   if retry else f"{recommended.title()} is the recommended level for this change.")
+        support = (
+            SupportLevel.NONE if appropriate and not second
+            else SupportLevel.NUDGE if appropriate or retry
+            else SupportLevel.TEACH
+        )
+        elicitation = (
+            "asked" if appropriate and not second
+            else "after_hint" if appropriate or retry
+            else "taught"
+        )
+        change = replace(change, effort_category=final_effort,
+            resume_step=ResumeStep.PROMPT if final_effort else ResumeStep.EFFORT,
+            help_context_key="effort_selection",
+            support_level_disclosed=support,
+            version=change.version + 1, updated_at=self._now())
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._teaching_progress[current_change_id] = replace(progress,
+            effort_attempts=(*progress.effort_attempts, selected), effort_feedback=message)
+        self.seed_learner_evidence(owner_user_id, "effort_selection",
+            elicitation=elicitation, support_level=support,
+            current_change_id=current_change_id)
+        self._manual_commands[command_id] = ("effort", current_change_id)
+        feedback = {"selected": selected,
+            "recommended": recommended if (appropriate or revealed) else None,
+            "appropriate": appropriate, "retry_allowed": retry,
+            "revealed": revealed, "message": message}
+        self._effort_command_results[command_id] = (
+            current_change_id, selected, appropriate, feedback
+        )
+        return change, feedback, False
+
+    async def get_student_check_plan_replay(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, command_id: uuid.UUID,
+        check_id: uuid.UUID, check_plan: str,
+    ) -> tuple[V2CurrentChange, V2Check] | None:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        existing = self._manual_commands.get(command_id)
+        if existing is None:
+            return None
+        stored = self._check_plan_command_payloads.get(command_id)
+        if (
+            existing != ("check_plan", check_id)
+            or stored is None
+            or stored[0] != current_change_id
+            or stored[1] != check_id
+            or stored[2] != check_plan.strip()
+        ):
+            raise V2RepositoryConflict("student Check command id already used")
+        check_entry = self._checks.get(check_id)
+        if check_entry is None or check_entry[0] != owner_user_id:
+            raise V2RepositoryInvalidState("student Check replay source is missing")
+        return change, check_entry[1]
+
+    async def create_student_check_plan(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, expected_current_change_version: int,
+        command_id: uuid.UUID, check_id: uuid.UUID, check_plan: str,
+        elicitation: str, support_level: str,
+    ) -> tuple[V2CurrentChange, V2Check, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        existing = self._manual_commands.get(command_id)
+        if existing:
+            stored = self._check_plan_command_payloads.get(command_id)
+            if (
+                existing != ("check_plan", check_id)
+                or stored is None
+                or stored != (
+                    current_change_id, check_id, check_plan.strip(), elicitation, support_level
+                )
+            ):
+                raise V2RepositoryConflict("student Check replay classification changed")
+            return change, self._checks[check_id][1], True
+        if change.version != expected_current_change_version or change.resume_step is not ResumeStep.CHECK:
+            raise V2RepositoryConflict("stale Check plan")
+        if (elicitation == "after_hint"
+                and (change.help_context_key != "testing"
+                     or change.support_level_disclosed.value != support_level)):
+            raise V2RepositoryInvalidState("Check support belongs to another interaction")
+        check = V2Check(id=check_id, project_id=project_id,
+            current_change_id=current_change_id, check_plan=check_plan.strip(),
+            plan_source="student", status="proposed", result=None,
+            student_observation=None, performed_at=None, version=1)
+        self._checks[check_id] = (owner_user_id, check)
+        change = replace(change, help_context_key="testing_complete",
+            support_level_disclosed=SupportLevel.NONE, version=change.version + 1,
+            updated_at=self._now())
+        self._changes[current_change_id] = (owner_user_id, change)
+        progress = self._teaching_progress.get(current_change_id, V2TeachingProgress())
+        self._teaching_progress[current_change_id] = replace(progress, check_plan_answered=True)
+        if qualifies_check_plan(check_plan):
+            self.seed_learner_evidence(owner_user_id, "testing", elicitation=elicitation,
+                support_level=SupportLevel(support_level), current_change_id=current_change_id)
+        self._manual_commands[command_id] = ("check_plan", check_id)
+        self._check_plan_command_payloads[command_id] = (
+            current_change_id, check_id, check_plan.strip(), elicitation, support_level
+        )
+        return change, check, False
 
     def _owned_change(
         self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID
@@ -994,7 +1288,11 @@ class InMemoryV2Repository:
             raise V2RepositoryInvalidState("unsupported coding agent") from exc
         if not change.policy_is_resolved:
             raise V2RepositoryInvalidState("policy is unresolved")
-        if change.lifecycle_state is not CurrentChangeState.PREPARING or change.handoff_command_id:
+        if (change.lifecycle_state is not CurrentChangeState.PREPARING
+                or change.resume_step not in {
+                    ResumeStep.CHOOSE_AGENT, ResumeStep.PROMPT, ResumeStep.EFFORT
+                }
+                or change.handoff_command_id):
             raise V2RepositoryInvalidState("agent cannot change after handoff")
         if (
             project.version != expected_project_version
@@ -1030,6 +1328,10 @@ class InMemoryV2Repository:
         prompt_text: str,
         done_condition: str | None,
         boundaries: list[str],
+        risk: str,
+        risk_reason_key: str | None,
+        risk_policy_version: str,
+        risk_input_fingerprint: str,
     ) -> V2CurrentChange:
         change = self._owned_change(owner_user_id, project_id, current_change_id)
         if not change.policy_is_resolved:
@@ -1050,19 +1352,29 @@ class InMemoryV2Repository:
             or change.done_condition_snapshot != done_condition
             or change.boundary_snapshots != tuple(boundaries)
         )
+        expected_fingerprint = compute_risk_input_fingerprint(
+            change.goal_snapshot, done_condition, boundaries, prompt_text
+        )
+        if risk_input_fingerprint != expected_fingerprint:
+            raise V2RepositoryInvalidState("risk input fingerprint mismatch")
         if values_changed:
             text_changed = change.prompt_draft != prompt_text
+            risk_changed = (
+                change.risk.value != risk or change.risk_reason_key != risk_reason_key
+            )
             change = replace(
                 change,
                 prompt_draft=prompt_text,
                 prompt_draft_version=change.prompt_draft_version + (1 if text_changed else 0),
                 done_condition_snapshot=done_condition,
                 boundary_snapshots=tuple(boundaries),
-                resume_step=(
-                    ResumeStep.EFFORT
-                    if change.effort_category is None
-                    else ResumeStep.PROMPT
-                ),
+                risk=RiskMode(risk),
+                risk_reason_key=risk_reason_key,
+                risk_policy_version=risk_policy_version,
+                risk_input_fingerprint=risk_input_fingerprint,
+                effort_category=None if risk_changed else change.effort_category,
+                resume_step=(ResumeStep.EFFORT if risk_changed or change.effort_category is None
+                             else ResumeStep.PROMPT),
                 version=change.version + 1,
                 updated_at=self._now(),
             )
@@ -1082,6 +1394,8 @@ class InMemoryV2Repository:
             effort = EffortCategory(effort_category)
         except ValueError as exc:
             raise V2RepositoryInvalidState("unsupported effort") from exc
+        if change.teaching_policy_version.startswith("phase5-"):
+            raise V2RepositoryInvalidState("legacy effort mutation is disabled")
         if not change.policy_is_resolved:
             raise V2RepositoryInvalidState("policy is unresolved")
         if (
@@ -1138,6 +1452,12 @@ class InMemoryV2Repository:
             return change, prompt, True
         if (
             not change.policy_is_resolved
+            or change.risk_input_fingerprint != compute_risk_input_fingerprint(
+                change.goal_snapshot,
+                change.done_condition_snapshot,
+                change.boundary_snapshots,
+                change.prompt_draft,
+            )
             or change.lifecycle_state is not CurrentChangeState.PREPARING
             or change.handoff_command_id
             or change.prompt_draft is None
@@ -1197,7 +1517,13 @@ class InMemoryV2Repository:
         handoff_command_id: uuid.UUID,
     ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
         change = self._owned_change(owner_user_id, project_id, current_change_id)
-        if not change.policy_is_resolved:
+        if (not change.policy_is_resolved
+                or change.risk_input_fingerprint != compute_risk_input_fingerprint(
+                    change.goal_snapshot,
+                    change.done_condition_snapshot,
+                    change.boundary_snapshots,
+                    change.prompt_draft,
+                )):
             raise V2RepositoryInvalidState("policy is unresolved")
         command_key = (owner_user_id, handoff_command_id)
         existing_id = self._handoff_commands.get(command_key)
@@ -1280,15 +1606,19 @@ class InMemoryV2Repository:
             raise V2RepositoryConflict("stale return")
         check = None
         if outcome in {"worked", "unsure"}:
-            if check_id is None or not change.done_condition_snapshot:
-                raise V2RepositoryInvalidState("return requires check")
-            check = V2Check(id=check_id, project_id=project_id,
-                current_change_id=current_change_id, check_plan=change.done_condition_snapshot,
-                status="proposed", result=None, student_observation=None,
-                performed_at=None, version=1)
-            self._checks[check_id] = (owner_user_id, check)
+            if check_id is not None:
+                if not change.done_condition_snapshot:
+                    raise V2RepositoryInvalidState("return requires a done condition")
+                check = V2Check(id=check_id, project_id=project_id,
+                    current_change_id=current_change_id, check_plan=change.done_condition_snapshot,
+                    plan_source="codize",
+                    status="proposed", result=None, student_observation=None,
+                    performed_at=None, version=1)
+                self._checks[check_id] = (owner_user_id, check)
             change = replace(change, lifecycle_state=CurrentChangeState.REVIEWING,
                 resume_step=ResumeStep.CHECK, student_return_outcome=outcome,
+                help_context_key="testing",
+                support_level_disclosed=(SupportLevel.TEACH if check_id else SupportLevel.NONE),
                 unresolved_uncertainty_summary=("The student was unsure before checking." if outcome == "unsure" else None),
                 version=change.version + 1, updated_at=self._now())
         else:
@@ -1328,6 +1658,7 @@ class InMemoryV2Repository:
                 raise V2RepositoryInvalidState("unsure requires successor")
             next_check = V2Check(id=next_check_id, project_id=project_id,
                 current_change_id=current_change_id, check_plan=check.check_plan,
+                plan_source=check.plan_source,
                 status="proposed", result=None, student_observation=None,
                 performed_at=None, version=1)
             self._checks[next_check_id] = (owner_user_id, next_check)
@@ -1378,6 +1709,27 @@ class InMemoryV2Repository:
         self._store_project(owner_user_id, replace(project,
             plan_version=project.plan_version + 1, version=project.version + 1,
             first_version_completed_at=now, updated_at=now))
+        same_change_testing = [
+            item for evidence_owner, item in self._learner_evidence.values()
+            if evidence_owner == owner_user_id
+            and item.competency_key == "testing"
+            and item.source_current_change_id == current_change_id
+        ]
+        latest_support = same_change_testing[-1] if same_change_testing else None
+        if check.plan_source == "codize":
+            completion_elicitation = "taught"
+            completion_support = SupportLevel.TEACH
+        else:
+            completion_elicitation = latest_support.elicitation if latest_support else "spontaneous"
+            completion_support = latest_support.support_level if latest_support else SupportLevel.NONE
+        self.seed_learner_evidence(
+            owner_user_id,
+            "testing",
+            elicitation=completion_elicitation,
+            support_level=completion_support,
+            current_change_id=current_change_id,
+            observed_at=now,
+        )
         self._manual_commands[command_id] = ("complete", current_change_id)
         return False
 

@@ -52,7 +52,8 @@ def test_phase4_uses_existing_atomic_completion_and_preserves_provenance():
     assert '"complete_v2_current_change"' in repository
     assert '"source_kind": "student_observed"' in repository
     assert '"source_record_type": "check"' in repository
-    assert '"p_learner_evidence_inputs": []' in repository
+    assert '"competency_key": "testing"' in repository
+    assert '"source_record_type": "check"' in repository
 
 
 def test_phase4_routes_are_authenticated_and_explicitly_scoped():

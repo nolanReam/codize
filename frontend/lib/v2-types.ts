@@ -17,6 +17,7 @@ export type CodingAgentChoice = CodingAgentKey | "help_me_choose";
 export type EffortCategory = "quick" | "standard" | "deep";
 export type BuildStage =
   | "confirm_change"
+  | "intervention"
   | "choose_agent"
   | "edit_prompt"
   | "choose_effort"
@@ -25,8 +26,10 @@ export type BuildStage =
   | "waiting_for_return"
   | "report_return_outcome"
   | "perform_check"
+  | "propose_check"
   | "check_unsure"
   | "check_failed"
+  | "understand"
   | "ready_to_complete";
 export type CheckResult = "worked" | "partly_worked" | "did_not_work" | "unsure";
 
@@ -95,6 +98,14 @@ export interface CurrentChangeView {
   coding_agent_key: CodingAgentKey | null;
   effort_category: EffortCategory | null;
   latest_prompt_version_id: string | null;
+  teaching_mode: "skip" | "ask" | "remind" | "teach";
+  teaching_target: string | null;
+  policy_resolved: boolean;
+  risk: "normal" | "slowdown";
+  risk_reason_key: string | null;
+  check_requirement: "required" | "waived";
+  help_context_key: string | null;
+  support_level_disclosed: "none" | "nudge" | "clue" | "teach";
   student_return_outcome: "worked" | "broken" | "unsure" | null;
   version: number;
   created_at: string;
@@ -152,12 +163,42 @@ export interface BuildResumeState {
   current_change_version: number;
   active_check: CheckView | null;
   last_check_result: CheckResult | null;
+  teaching: TeachingInteractionView | null;
+  effort_feedback: EffortFeedbackView | null;
+  learner_statuses: Record<string, "new" | "guided" | "practiced" | "recently_independent">;
+  verification_plan_source: "codize" | "student";
+}
+
+export interface TeachingInteractionView {
+  context: "prebuild" | "verification" | "understanding";
+  competency_key: string;
+  mode: "skip" | "ask" | "remind" | "teach";
+  risk: "normal" | "slowdown";
+  risk_reason_key: string | null;
+  title: string;
+  explanation: string | null;
+  example: string | null;
+  question: string | null;
+  reminder: string | null;
+  hint_level: "none" | "nudge" | "clue" | "teach";
+  hint_text: string | null;
+  can_request_help: boolean;
+}
+
+export interface EffortFeedbackView {
+  selected: EffortCategory;
+  recommended: EffortCategory | null;
+  appropriate: boolean;
+  retry_allowed: boolean;
+  revealed: boolean;
+  message: string;
 }
 
 export interface CheckView {
   id: string;
   current_change_id: string;
   check_plan: string;
+  plan_source: "codize" | "student";
   status: "proposed" | "performed" | "not_run";
   result: CheckResult | null;
   student_observation: string | null;

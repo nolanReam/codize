@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./supabase", () => ({ getAccessToken: vi.fn(async () => "test-token") }));
 
-import { getBuildState, getProjectRefs, handoffPrompt, selectCodingAgent } from "./v2-api";
+import {
+  createStudentCheckPlan,
+  getBuildState,
+  getProjectRefs,
+  handoffPrompt,
+  requestTeachingHelp,
+  respondToTeaching,
+  selectCodingAgent,
+  selectEffort,
+} from "./v2-api";
 
 describe("V2 frontend API contract", () => {
   beforeEach(() => {
@@ -61,6 +70,35 @@ describe("V2 frontend API contract", () => {
       prompt_version_id: "prompt-3",
       expected_current_change_version: 11,
       expected_prompt_version: 4,
+    });
+  });
+
+  it("uses backend commands for teaching, effort, and student Check planning", async () => {
+    await requestTeachingHelp("project-1", "change-2", 4, "verification", "help-command");
+    await selectEffort("project-1", "change-2", "standard", 5, "effort-command");
+    await respondToTeaching(
+      "project-1", "change-2", 6, "prebuild", "Keep scoring unchanged", "answer-command"
+    );
+    await createStudentCheckPlan(
+      "project-1", "change-2", 7, "Try the visible result", "check-command", "check-id"
+    );
+
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls[0][0]).toBe("http://codize.test/v2/projects/project-1/current-change/change-2/teaching/help");
+    expect(calls[0][1]?.method).toBe("POST");
+    expect(calls[1][0]).toBe("http://codize.test/v2/projects/project-1/current-change/change-2/effort-attempts");
+    expect(calls[1][1]?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0][1]?.body))).toMatchObject({ command_id: "help-command" });
+    expect(JSON.parse(String(calls[1][1]?.body))).toMatchObject({ command_id: "effort-command" });
+    expect(JSON.parse(String(calls[2][1]?.body))).toMatchObject({ command_id: "answer-command" });
+    expect(calls[3][0]).toBe("http://codize.test/v2/projects/project-1/current-change/change-2/checks");
+    expect(calls[3][1]?.method).toBe("POST");
+    expect(JSON.parse(String(calls[3][1]?.body))).toMatchObject({
+      workflow_version: "v2",
+      command_id: "check-command",
+      check_id: "check-id",
+      expected_current_change_version: 7,
+      check_plan: "Try the visible result",
     });
   });
 });

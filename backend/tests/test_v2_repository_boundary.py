@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
 
 from app.services.v2_repository import (
+    SupabaseV2Repository,
+    V2RepositoryConflict,
     V2RepositoryError,
     _current_change_from_row,
     _project_from_row,
@@ -17,6 +21,8 @@ from app.services.v2_repository import (
 OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 PROJECT_ID = UUID("10000000-0000-4000-8000-000000000001")
 CHANGE_ID = UUID("20000000-0000-4000-8000-000000000001")
+COMMAND_ID = UUID("30000000-0000-4000-8000-000000000001")
+CHECK_ID = UUID("40000000-0000-4000-8000-000000000001")
 NOW = datetime(2026, 8, 13, tzinfo=UTC).isoformat()
 
 
@@ -89,3 +95,59 @@ def test_current_change_conversion_rejects_illegal_persisted_resume_state():
             expected_owner=OWNER,
             expected_project_id=PROJECT_ID,
         )
+
+
+def test_production_repository_returns_canonical_check_plan_replay_before_requalification():
+    row = current_change_row()
+    row.update({"lifecycle_state": "reviewing", "resume_step": "check", "version": 9})
+    canonical_change = _current_change_from_row(
+        row, expected_owner=OWNER, expected_project_id=PROJECT_ID,
+    )
+    plan = "Add one point and observe the visible score increase"
+    turn = {
+        "id": str(COMMAND_ID), "project_id": str(PROJECT_ID),
+        "current_change_id": str(CHANGE_ID), "turn_kind": "student_answer",
+        "speaker": "student", "content": plan,
+        "structured_payload": {"context": "verification", "competency_key": "testing"},
+        "related_record_type": "check", "related_record_id": str(CHECK_ID),
+        "support_level": "clue",
+    }
+    check = {
+        "id": str(CHECK_ID), "project_id": str(PROJECT_ID), "owner_user_id": OWNER,
+        "current_change_id": str(CHANGE_ID), "check_plan": plan,
+        "plan_source": "student", "status": "proposed", "result": None,
+        "student_observation": None, "performed_at": None, "version": 1,
+    }
+    repo = object.__new__(SupabaseV2Repository)
+    repo._request = AsyncMock(side_effect=[[turn], [check]])
+    repo.get_current_change_by_id = AsyncMock(return_value=canonical_change)
+
+    replay = asyncio.run(repo.get_student_check_plan_replay(
+        OWNER, PROJECT_ID, CHANGE_ID, COMMAND_ID, CHECK_ID, plan,
+    ))
+
+    assert replay is not None
+    assert replay[0] == canonical_change
+    assert replay[1].id == CHECK_ID
+    assert replay[1].check_plan == plan
+    assert repo._request.await_count == 2
+
+
+def test_production_repository_replay_rejects_material_payload_mismatch():
+    turn = {
+        "id": str(COMMAND_ID), "project_id": str(PROJECT_ID),
+        "current_change_id": str(CHANGE_ID), "turn_kind": "student_answer",
+        "speaker": "student", "content": "Original plan",
+        "structured_payload": {"context": "verification", "competency_key": "testing"},
+        "related_record_type": "check", "related_record_id": str(CHECK_ID),
+        "support_level": "clue",
+    }
+    repo = object.__new__(SupabaseV2Repository)
+    repo._request = AsyncMock(return_value=[turn])
+
+    with pytest.raises(V2RepositoryConflict, match="already used"):
+        asyncio.run(repo.get_student_check_plan_replay(
+            OWNER, PROJECT_ID, CHANGE_ID, COMMAND_ID, CHECK_ID, "Different plan",
+        ))
+
+    assert repo._request.await_count == 1

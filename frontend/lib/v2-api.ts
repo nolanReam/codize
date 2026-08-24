@@ -8,6 +8,7 @@ import type {
   CurrentChangeResponse,
   CurrentChangeView,
   EffortCategory,
+  EffortFeedbackView,
   PlanResponse,
   ProjectRefView,
   RecentChangeView,
@@ -41,7 +42,7 @@ export const startCurrentChange = (projectId: string, projectVersion: number,
       change_kind: "build", goal_snapshot: goal },
   });
 export const confirmCurrentChange = (projectId: string, changeId: string,
-  changeVersion: number, commandId = crypto.randomUUID()) =>
+  changeVersion: number, commandId: string) =>
   request<CurrentChangeResponse>(v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/confirm`), {
     method: "POST", body: { workflow_version: "v2", command_id: commandId,
       expected_current_change_version: changeVersion },
@@ -119,21 +120,51 @@ export const selectEffort = (
   projectId: string,
   changeId: string,
   effort: EffortCategory,
-  changeVersion: number
+  changeVersion: number,
+  commandId: string
 ) =>
-  request<CurrentChangeView>(
+  request<{ current_change: CurrentChangeView; feedback: EffortFeedbackView; replayed: boolean }>(
     v2(
-      `/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/effort`
+      `/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/effort-attempts`
     ),
     {
-      method: "PUT",
+      method: "POST",
       body: {
         workflow_version: "v2",
+        command_id: commandId,
         expected_current_change_version: changeVersion,
         effort,
       },
     }
   );
+
+export const requestTeachingHelp = (
+  projectId: string, changeId: string, changeVersion: number,
+  context: "prebuild" | "verification" | "understanding", commandId: string
+) => request<{ current_change: CurrentChangeView; replayed: boolean }>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/teaching/help`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    expected_current_change_version: changeVersion, context } }
+);
+
+export const respondToTeaching = (
+  projectId: string, changeId: string, changeVersion: number,
+  context: "prebuild" | "understanding", response: string, commandId: string
+) => request<{ current_change: CurrentChangeView; replayed: boolean }>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/teaching/respond`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    expected_current_change_version: changeVersion, context, response } }
+);
+
+export const createStudentCheckPlan = (
+  projectId: string, changeId: string, changeVersion: number, checkPlan: string,
+  commandId: string, checkId: string
+) => request<{ current_change: CurrentChangeView; check: CheckView; replayed: boolean }>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/checks`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    check_id: checkId, expected_current_change_version: changeVersion,
+    check_plan: checkPlan } }
+);
 
 export const acceptPrompt = (
   projectId: string,

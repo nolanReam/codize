@@ -19,6 +19,7 @@ from app.schemas.v2 import (
     PromptVersionView,
     PromptVersionsResponse,
     StructuredPromptDecisionsView,
+    EffortFeedbackView,
 )
 from app.services.v2_agent_guidance import get_agent_metadata
 from app.services.v2_current_change_service import current_change_view
@@ -29,6 +30,10 @@ from app.services.v2_repository import (
     V2RepositoryConflict,
     V2RepositoryInvalidState,
     V2RepositoryNotFound,
+)
+from app.services import v2_teaching_service
+from app.services.v2_teaching_policy import (
+    RiskMode, TeachingMode, recommend_effort,
 )
 
 
@@ -128,6 +133,26 @@ async def update_prompt_draft(
     current_change_id: UUID,
     request: PromptDraftUpdateRequest,
 ):
+    # The goal is part of risk state too; load the owned change rather than
+    # trusting any client-supplied identity or snapshot.
+    current = await repo.get_current_change_by_id(
+        owner_user_id, project_id, current_change_id
+    )
+    if current is None:
+        raise V2NotFoundError("V2 Current Change not found.")
+    risk_text = v2_teaching_service.risk_relevant_text(
+        current.goal_snapshot,
+        request.done_condition,
+        request.boundaries,
+        request.prompt_text,
+    )
+    risk = v2_teaching_service.classify_risk(risk_text)
+    fingerprint = v2_teaching_service.risk_input_fingerprint(
+        current.goal_snapshot,
+        request.done_condition,
+        request.boundaries,
+        request.prompt_text,
+    )
     try:
         change = await repo.update_prompt_draft(
             owner_user_id,
@@ -138,6 +163,10 @@ async def update_prompt_draft(
             request.prompt_text,
             request.done_condition,
             request.boundaries,
+            risk.mode.value,
+            risk.reason_key,
+            v2_teaching_service.RISK_POLICY_VERSION,
+            fingerprint,
         )
     except (V2RepositoryNotFound, V2RepositoryConflict, V2RepositoryInvalidState) as exc:
         raise _translate_write_error(
@@ -175,6 +204,15 @@ async def accept_prompt(
     current_change_id: UUID,
     request: PromptAcceptanceRequest,
 ) -> PromptAcceptanceResponse:
+    current = await repo.get_current_change_by_id(
+        owner_user_id, project_id, current_change_id
+    )
+    if current is None:
+        raise V2NotFoundError("V2 Current Change not found.")
+    if not v2_teaching_service.risk_is_fresh(current):
+        raise V2ConflictError(
+            "Risk changed with this prompt. Save the current draft before accepting it."
+        )
     try:
         change, prompt, replayed = await repo.accept_prompt_version(
             owner_user_id,
@@ -221,6 +259,15 @@ async def handoff_prompt(
     current_change_id: UUID,
     request: PromptHandoffRequest,
 ) -> PromptHandoffResponse:
+    current = await repo.get_current_change_by_id(
+        owner_user_id, project_id, current_change_id
+    )
+    if current is None:
+        raise V2NotFoundError("V2 Current Change not found.")
+    if not v2_teaching_service.risk_is_fresh(current):
+        raise V2ConflictError(
+            "Risk changed with this prompt. Re-save and review it before handoff."
+        )
     try:
         change, prompt, replayed = await repo.handoff_prompt_version(
             owner_user_id,
@@ -273,15 +320,48 @@ async def get_build_resume_state(
         and accepted.input_boundary_snapshots == change.boundary_snapshots
     )
     latest_check = await repo.get_latest_check(owner_user_id, project_id, current_change_id)
+    progress = await repo.get_teaching_progress(owner_user_id, project_id, current_change_id)
+    statuses = await v2_teaching_service.learner_statuses(
+        repo, owner_user_id,
+        ["define_done", "protect_working_behavior", "effort_selection", "testing", "causal_explanation", "data_ownership"],
+    )
+    teaching = None
+    effort_feedback = None
+    verification_mode = await v2_teaching_service.verification_mode_for(
+        repo, owner_user_id, change
+    )
+    verification_plan_source = v2_teaching_service.verification_plan_source(
+        verification_mode
+    )
 
     if change.lifecycle_state is CurrentChangeState.AWAITING_AGENT:
         stage = BuildStage.WAITING_FOR_RETURN
     elif change.lifecycle_state is CurrentChangeState.REVIEWING:
         if latest_check is not None and latest_check.status == "performed" and latest_check.result.value == "worked":
-            stage = BuildStage.READY_TO_COMPLETE
+            if (v2_teaching_service.understanding_is_required(change)
+                    and not progress.understanding_answered):
+                understanding_mode = await v2_teaching_service.teaching_mode_for(
+                    repo, owner_user_id, "causal_explanation"
+                )
+                if understanding_mode is TeachingMode.SKIP:
+                    stage = BuildStage.READY_TO_COMPLETE
+                else:
+                    stage = BuildStage.UNDERSTAND
+                    teaching = v2_teaching_service.intervention_view(
+                        change, progress, context="understanding",
+                        mode=understanding_mode, target="causal_explanation",
+                    )
+            else:
+                stage = BuildStage.READY_TO_COMPLETE
         elif latest_check is not None and latest_check.status == "proposed":
             stage = (BuildStage.CHECK_UNSURE if change.student_return_outcome == "unsure"
                      else BuildStage.PERFORM_CHECK)
+        elif change.resume_step is not None and change.resume_step.value == "check":
+            stage = BuildStage.PROPOSE_CHECK
+            teaching = v2_teaching_service.intervention_view(
+                change, progress, context="verification",
+                mode=verification_mode, target="testing",
+            )
         else:
             stage = BuildStage.REPORT_RETURN_OUTCOME
     elif change.lifecycle_state is CurrentChangeState.RECOVERING:
@@ -290,12 +370,34 @@ async def get_build_resume_state(
         raise V2ConflictError("This Current Change is no longer active.")
     elif change.resume_step.value == "confirm_change":
         stage = BuildStage.CONFIRM_CHANGE
+    elif change.resume_step.value == "intervention":
+        stage = BuildStage.INTERVENTION
+        teaching = v2_teaching_service.intervention_view(change, progress)
     elif change.coding_agent_key is None:
         stage = BuildStage.CHOOSE_AGENT
     elif change.prompt_draft is None:
         stage = BuildStage.EDIT_PROMPT
     elif change.effort_category is None:
         stage = BuildStage.CHOOSE_EFFORT
+        if progress.effort_attempts:
+            selected = progress.effort_attempts[-1]
+            recommended = recommend_effort(
+                v2_teaching_service.risk_relevant_text(
+                    change.goal_snapshot,
+                    change.done_condition_snapshot,
+                    change.boundary_snapshots,
+                    change.prompt_draft,
+                ),
+                RiskMode(change.risk.value),
+            )
+            effort_feedback = EffortFeedbackView(
+                selected=selected,
+                recommended=None,
+                appropriate=False,
+                retry_allowed=True,
+                revealed=False,
+                message=progress.effort_feedback or "Look at the change's complexity and consequence, then try once more.",
+            )
     elif accepted_matches:
         stage = BuildStage.READY_TO_HANDOFF
     else:
@@ -327,4 +429,8 @@ async def get_build_resume_state(
         current_change_version=change.version,
         active_check=check_view(latest_check),
         last_check_result=latest_check.result if latest_check else None,
+        teaching=teaching,
+        effort_feedback=effort_feedback,
+        learner_statuses=statuses,
+        verification_plan_source=verification_plan_source,
     )

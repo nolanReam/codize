@@ -17,6 +17,8 @@ from app.services.v2_repository import (
     V2Repository, V2RepositoryConflict, V2RepositoryInvalidState,
     V2RepositoryNotFound,
 )
+from app.services import v2_teaching_service
+from app.services.v2_teaching_policy import TeachingMode
 
 
 def check_view(check: V2Check | None) -> CheckView | None:
@@ -24,7 +26,8 @@ def check_view(check: V2Check | None) -> CheckView | None:
         return None
     return CheckView(
         id=check.id, current_change_id=check.current_change_id,
-        check_plan=check.check_plan, status=check.status, result=check.result,
+        check_plan=check.check_plan, plan_source=check.plan_source,
+        status=check.status, result=check.result,
         student_observation=check.student_observation,
         performed_at=check.performed_at, version=check.version,
     )
@@ -48,22 +51,32 @@ def _translate(exc: Exception, message: str) -> Exception:
 
 async def confirm_change(repo: V2Repository, owner: str, project_id: UUID,
                          change_id: UUID, request: ConfirmManualChangeRequest) -> CurrentChangeResponse:
-    try:
-        change, replayed = await repo.confirm_manual_current_change(
-            owner, project_id, change_id, request.expected_current_change_version,
-            request.command_id,
-        )
-    except (V2RepositoryNotFound, V2RepositoryConflict, V2RepositoryInvalidState) as exc:
-        raise _translate(exc, "The change was updated or cannot be confirmed.") from exc
+    change, replayed = await v2_teaching_service.resolve_policy(
+        repo, owner, project_id, change_id,
+        request.expected_current_change_version, request.command_id,
+    )
     return CurrentChangeResponse(current_change=current_change_view(change), replayed=replayed)
 
 
 async def record_return(repo: V2Repository, owner: str, project_id: UUID,
                         change_id: UUID, request: ManualReturnRequest) -> ManualLoopResponse:
+    effective_check_id = request.check_id
+    if request.outcome in {"worked", "unsure"}:
+        current = await repo.get_current_change_by_id(owner, project_id, change_id)
+        if current is None:
+            raise V2NotFoundError("V2 Current Change not found.")
+        mode = await v2_teaching_service.verification_mode_for(repo, owner, current)
+        # Check-plan support is a backend decision. New learners and slowdown
+        # receive a concrete Check; faded modes must originate the Check.
+        if mode is TeachingMode.TEACH:
+            if effective_check_id is None:
+                raise V2ConflictError("This verification step requires a Check identity.")
+        else:
+            effective_check_id = None
     try:
         change, check, replayed = await repo.record_manual_return(
             owner, project_id, change_id, request.expected_current_change_version,
-            request.command_id, request.outcome, request.check_id,
+            request.command_id, request.outcome, effective_check_id,
         )
     except (V2RepositoryNotFound, V2RepositoryConflict, V2RepositoryInvalidState) as exc:
         raise _translate(exc, "The return state changed or cannot accept this report.") from exc
@@ -94,6 +107,19 @@ async def complete_change(repo: V2Repository, owner: str, project_id: UUID,
     if (check is None or check.status != "performed" or check.result is not CheckResult.WORKED
             or not check.student_observation or check.performed_at is None):
         raise V2ConflictError("A student-performed successful check is required before completion.")
+    change_before = await repo.get_current_change_by_id(owner, project_id, change_id)
+    if change_before is None:
+        raise V2NotFoundError("V2 Current Change not found.")
+    progress = await repo.get_teaching_progress(owner, project_id, change_id)
+    if (v2_teaching_service.understanding_is_required(change_before)
+            and not progress.understanding_answered):
+        statuses = await v2_teaching_service.learner_statuses(
+            repo, owner, ["causal_explanation"]
+        )
+        if statuses["causal_explanation"] != LearnerStatus.RECENTLY_INDEPENDENT.value:
+            raise V2ConflictError(
+                "Answer the short understanding question before completing this change."
+            )
     try:
         replayed = await repo.complete_manual_change(
             owner, project_id, change_id, request.expected_current_change_version,

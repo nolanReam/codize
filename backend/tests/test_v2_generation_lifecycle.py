@@ -13,6 +13,7 @@ from app.schemas.v2 import (
 from app.services import v2_generation_service
 from app.services.v2_errors import V2ConflictError
 from app.services.v2_repository import V2RepositoryInvalidState
+from app.services.v2_teaching_policy import RISK_POLICY_VERSION, risk_input_fingerprint
 from tests.fakes import InMemoryV2Repository
 
 OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -149,6 +150,12 @@ def test_generation_success_is_superseded_when_referenced_state_changed():
             "Independent student edit",
             None,
             [],
+            "normal",
+            None,
+            RISK_POLICY_VERSION,
+            risk_input_fingerprint(
+                change.goal_snapshot, None, [], "Independent student edit"
+            ),
         )
         finished = await v2_generation_service.apply_prompt_draft(
             repo,
