@@ -84,7 +84,8 @@ def _support_for_context(change, *, context: str, target: str | None = None) -> 
     active_key = (
         (target or change.teaching_target or "define_done")
         if context == "prebuild"
-        else "testing" if context == "verification"
+        else "testing" if context in {"verification", "recovery_recheck"}
+        else "debugging" if context.startswith("recovery_")
         else "causal_explanation"
     )
     if change.help_context_key != active_key:
@@ -188,6 +189,13 @@ _TARGET_COPY = {
         "question": "What now causes this change's important behavior to happen?",
         "reminder": "Focus on what causes the behavior, not polished technical vocabulary.",
     },
+    "debugging": {
+        "title": "Investigate before changing more code",
+        "explanation": "A symptom is what you observed. A cause is still a hypothesis until evidence supports it.",
+        "example": "Name the first visible difference, then ask the coding AI to point to code or behavior that could explain it.",
+        "question": "What did you actually observe, without guessing at the cause?",
+        "reminder": "Keep observations separate from coding-agent suggestions and verified results.",
+    },
 }
 
 
@@ -201,7 +209,11 @@ def intervention_view(change, progress, *, context: str = "prebuild", mode=None,
     # not to leak a hint from one competency into another.
     hint = _support_for_context(change, context=context, target=selected_target)
     if hint is SupportLevel.NUDGE:
-        hint_text = "Think about one concrete action or result in this project."
+        hint_text = (
+            "Name the first visible thing that differed from what you expected."
+            if selected_target == "debugging"
+            else "Think about one concrete action or result in this project."
+        )
     elif hint is SupportLevel.CLUE:
         hint_text = copy["example"]
     elif hint is SupportLevel.TEACH:

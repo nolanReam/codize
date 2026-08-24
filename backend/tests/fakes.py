@@ -21,6 +21,7 @@ from app.domain.v2 import (
     ProjectLifecycle,
     ProjectRef,
     PromptPurpose,
+    RecoveryStatus,
     RiskMode,
     ResumeStep,
     SetupResumeStep,
@@ -35,6 +36,7 @@ from app.domain.v2 import (
     V2Project,
     V2RecentChange,
     V2PromptVersion,
+    V2RecoveryCase,
     V2TeachingProgress,
     V2UserPreferences,
     WorkflowVersion,
@@ -290,6 +292,8 @@ class InMemoryV2Repository:
         self._generation_attempts: dict[uuid.UUID, tuple[str, V2GenerationAttempt]] = {}
         self._generation_commands: dict[tuple[str, uuid.UUID], uuid.UUID] = {}
         self._recovery_case_statuses: dict[uuid.UUID, list[str]] = {}
+        self._recovery_cases: dict[uuid.UUID, tuple[str, V2RecoveryCase]] = {}
+        self._recovery_commands: dict[uuid.UUID, tuple[str, uuid.UUID]] = {}
         self._checks: dict[uuid.UUID, tuple[str, V2Check]] = {}
         self._manual_commands: dict[uuid.UUID, tuple[str, uuid.UUID]] = {}
         self._effort_command_results: dict[uuid.UUID, tuple[uuid.UUID, str, bool, dict]] = {}
@@ -486,7 +490,9 @@ class InMemoryV2Repository:
         if change.version != expected_current_change_version:
             raise V2RepositoryConflict("stale help")
         target = change.teaching_target if context == "prebuild" else (
-            "testing" if context == "verification" else "causal_explanation")
+            "testing" if context in {"verification", "recovery_recheck"}
+            else "debugging" if context.startswith("recovery_")
+            else "causal_explanation")
         current = (
             change.support_level_disclosed
             if change.help_context_key == target
@@ -1684,6 +1690,286 @@ class InMemoryV2Repository:
                   if owner == owner_user_id and check.current_change_id == current_change_id]
         return checks[-1] if checks else None
 
+    async def get_active_recovery_case(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+    ) -> V2RecoveryCase | None:
+        self._owned_change(owner_user_id, project_id, current_change_id)
+        active = {
+            RecoveryStatus.OPEN, RecoveryStatus.INVESTIGATING,
+            RecoveryStatus.CORRECTING, RecoveryStatus.RECHECKING,
+        }
+        rows = [case for owner, case in self._recovery_cases.values()
+                if owner == owner_user_id and case.project_id == project_id
+                and case.current_change_id == current_change_id and case.status in active]
+        return rows[0] if rows else None
+
+    async def record_recovery_symptom(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, recovery_case_id: uuid.UUID,
+        expected_current_change_version: int, command_id: uuid.UUID,
+        observed_symptom: str, last_known_working_statement: str | None,
+        last_known_working_certainty: str, investigation_prompt: str,
+        risk: str, risk_reason_key: str | None, risk_policy_version: str,
+        risk_input_fingerprint: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        existing = self._recovery_commands.get(command_id)
+        if existing:
+            if existing != ("symptom", recovery_case_id):
+                raise V2RepositoryConflict("Recovery command reused")
+            return change, self._recovery_cases[recovery_case_id][1], True
+        if await self.get_active_recovery_case(owner_user_id, project_id, current_change_id):
+            raise V2RepositoryConflict("active Recovery Case exists")
+        if (change.version != expected_current_change_version
+                or change.lifecycle_state is not CurrentChangeState.RECOVERING
+                or change.resume_step is not ResumeStep.RECOVERY_SYMPTOM):
+            raise V2RepositoryConflict("stale Recovery symptom")
+        now = self._now()
+        case = V2RecoveryCase(
+            id=recovery_case_id, project_id=project_id,
+            current_change_id=current_change_id, status=RecoveryStatus.INVESTIGATING,
+            intended_behavior=change.done_condition_snapshot or change.goal_snapshot,
+            observed_symptom=observed_symptom.strip(),
+            last_known_working_statement=(last_known_working_statement.strip()
+                                          if last_known_working_statement else None),
+            last_known_working_certainty=last_known_working_certainty,
+            candidate_change_summary=change.goal_snapshot, student_hypothesis=None,
+            proposed_first_check=None, investigation_finding=None, cause_summary=None,
+            correction_summary=None, resolution_summary=None, opened_at=now,
+            resolved_at=None, version=1,
+        )
+        change = replace(
+            change, resume_step=ResumeStep.RECOVERY_INVESTIGATE,
+            prompt_draft=investigation_prompt,
+            prompt_draft_version=change.prompt_draft_version + 1,
+            risk=RiskMode(risk), risk_reason_key=risk_reason_key,
+            risk_policy_version=risk_policy_version,
+            risk_input_fingerprint=risk_input_fingerprint,
+            help_context_key=None, support_level_disclosed=SupportLevel.NONE,
+            version=change.version + 1, updated_at=now,
+        )
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._recovery_cases[recovery_case_id] = (owner_user_id, case)
+        self._recovery_commands[command_id] = ("symptom", recovery_case_id)
+        return change, case, False
+
+    async def accept_recovery_prompt(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, recovery_case_id: uuid.UUID, purpose: str,
+        expected_current_change_version: int, expected_prompt_draft_version: int,
+        acceptance_command_id: uuid.UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        case = await self.get_active_recovery_case(owner_user_id, project_id, current_change_id)
+        if case is None or case.id != recovery_case_id:
+            raise V2RepositoryNotFound("Recovery Case not found")
+        existing_id = self._acceptance_commands.get((owner_user_id, acceptance_command_id))
+        if existing_id:
+            return change, self._prompt_versions[existing_id][1], True
+        parsed = PromptPurpose(purpose)
+        expected_status = (RecoveryStatus.INVESTIGATING if parsed is PromptPurpose.DIAGNOSTIC
+                           else RecoveryStatus.CORRECTING)
+        if (change.version != expected_current_change_version
+                or change.prompt_draft_version != expected_prompt_draft_version
+                or change.lifecycle_state is not CurrentChangeState.RECOVERING
+                or case.status is not expected_status or change.prompt_draft is None
+                or change.coding_agent_key is None):
+            raise V2RepositoryConflict("stale Recovery prompt")
+        prompt_id = uuid.uuid4()
+        now = self._now()
+        prior = await self.list_prompt_versions(owner_user_id, project_id, current_change_id)
+        prompt = V2PromptVersion(
+            id=prompt_id, project_ref=change.project_ref,
+            current_change_id=current_change_id, ordinal=len(prior)+1,
+            purpose=parsed, content=change.prompt_draft,
+            content_sha256=hashlib.sha256(change.prompt_draft.encode()).hexdigest(),
+            input_current_change_version=change.version,
+            # The accepted schema snapshots these columns only for feature
+            # prompts; Recovery freshness is purpose/content/current-state based.
+            input_goal_snapshot=None,
+            input_done_condition_snapshot=None,
+            input_boundary_snapshots=None,
+            generation_attempt_id=None, coding_agent_key=change.coding_agent_key,
+            effort_category=change.effort_category, provider_mapping_key=None,
+            provider_mapping_version=None, accepted_at=now, handed_off_at=None, version=1,
+        )
+        change = replace(change, latest_prompt_version_id=prompt_id,
+                         version=change.version+1, updated_at=now)
+        self._prompt_versions[prompt_id] = (owner_user_id, prompt)
+        self._acceptance_commands[(owner_user_id, acceptance_command_id)] = prompt_id
+        self._changes[current_change_id] = (owner_user_id, change)
+        return change, prompt, False
+
+    async def handoff_recovery_prompt(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, recovery_case_id: uuid.UUID,
+        prompt_version_id: uuid.UUID, expected_current_change_version: int,
+        expected_prompt_version: int, handoff_command_id: uuid.UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        case = await self.get_active_recovery_case(owner_user_id, project_id, current_change_id)
+        if case is None or case.id != recovery_case_id:
+            raise V2RepositoryNotFound("Recovery Case not found")
+        existing_id = self._handoff_commands.get((owner_user_id, handoff_command_id))
+        if existing_id:
+            return change, self._prompt_versions[existing_id][1], True
+        entry = self._prompt_versions.get(prompt_version_id)
+        if entry is None or entry[0] != owner_user_id:
+            raise V2RepositoryNotFound("Prompt Version not found")
+        prompt = entry[1]
+        expected_status = (RecoveryStatus.INVESTIGATING
+                           if prompt.purpose is PromptPurpose.DIAGNOSTIC
+                           else RecoveryStatus.CORRECTING)
+        if (change.version != expected_current_change_version
+                or prompt.version != expected_prompt_version
+                or change.lifecycle_state is not CurrentChangeState.RECOVERING
+                or case.status is not expected_status
+                or change.latest_prompt_version_id != prompt.id
+                or prompt.handed_off_at is not None):
+            raise V2RepositoryConflict("stale Recovery handoff")
+        now = self._now()
+        prompt = replace(prompt, handed_off_at=now, version=prompt.version+1)
+        change = replace(change, lifecycle_state=CurrentChangeState.AWAITING_AGENT,
+                         resume_step=ResumeStep.RETURN_OUTCOME,
+                         handoff_command_id=handoff_command_id,
+                         version=change.version+1, updated_at=now)
+        self._prompt_versions[prompt.id] = (owner_user_id, prompt)
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._handoff_commands[(owner_user_id, handoff_command_id)] = prompt.id
+        return change, prompt, False
+
+    async def record_recovery_investigation_return(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, recovery_case_id: uuid.UUID,
+        expected_current_change_version: int, command_id: uuid.UUID,
+        finding: str, correction_summary: str, correction_prompt: str,
+        risk: str, risk_reason_key: str | None, risk_policy_version: str,
+        risk_input_fingerprint: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        case = await self.get_active_recovery_case(owner_user_id, project_id, current_change_id)
+        existing = self._recovery_commands.get(command_id)
+        if existing:
+            return change, self._recovery_cases[recovery_case_id][1], True
+        prompt = self._prompt_versions[change.latest_prompt_version_id][1]
+        if (case is None or case.id != recovery_case_id
+                or change.version != expected_current_change_version
+                or change.lifecycle_state is not CurrentChangeState.AWAITING_AGENT
+                or case.status is not RecoveryStatus.INVESTIGATING
+                or prompt.purpose is not PromptPurpose.DIAGNOSTIC
+                or prompt.handed_off_at is None):
+            raise V2RepositoryConflict("stale investigation return")
+        now = self._now()
+        case = replace(case, status=RecoveryStatus.CORRECTING,
+                       investigation_finding=finding.strip(),
+                       correction_summary=correction_summary.strip(),
+                       version=case.version+1)
+        change = replace(change, lifecycle_state=CurrentChangeState.RECOVERING,
+            resume_step=ResumeStep.RECOVERY_CORRECT, prompt_draft=correction_prompt,
+            prompt_draft_version=change.prompt_draft_version+1, risk=RiskMode(risk),
+            risk_reason_key=risk_reason_key, risk_policy_version=risk_policy_version,
+            risk_input_fingerprint=risk_input_fingerprint, help_context_key=None,
+            support_level_disclosed=SupportLevel.NONE, version=change.version+1,
+            updated_at=now)
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._recovery_cases[recovery_case_id] = (owner_user_id, case)
+        self._recovery_commands[command_id] = ("investigation", recovery_case_id)
+        return change, case, False
+
+    async def record_recovery_correction_return(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, recovery_case_id: uuid.UUID,
+        expected_current_change_version: int, command_id: uuid.UUID,
+        check_id: uuid.UUID, check_plan: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, V2Check, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        case = await self.get_active_recovery_case(owner_user_id, project_id, current_change_id)
+        if self._recovery_commands.get(command_id):
+            return change, self._recovery_cases[recovery_case_id][1], self._checks[check_id][1], True
+        prompt = self._prompt_versions[change.latest_prompt_version_id][1]
+        if (case is None or case.id != recovery_case_id
+                or change.version != expected_current_change_version
+                or change.lifecycle_state is not CurrentChangeState.AWAITING_AGENT
+                or case.status is not RecoveryStatus.CORRECTING
+                or prompt.purpose is not PromptPurpose.CORRECTION
+                or prompt.handed_off_at is None):
+            raise V2RepositoryConflict("stale correction return")
+        check = V2Check(id=check_id, project_id=project_id,
+            current_change_id=current_change_id, check_plan=check_plan.strip(),
+            plan_source="codize", status="proposed", result=None,
+            student_observation=None, performed_at=None, version=1)
+        now = self._now()
+        case = replace(case, status=RecoveryStatus.RECHECKING, version=case.version+1)
+        change = replace(change, lifecycle_state=CurrentChangeState.RECOVERING,
+            resume_step=ResumeStep.RECOVERY_RECHECK, help_context_key=None,
+            support_level_disclosed=SupportLevel.NONE, version=change.version+1,
+            updated_at=now)
+        self._checks[check_id] = (owner_user_id, check)
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._recovery_cases[recovery_case_id] = (owner_user_id, case)
+        self._recovery_commands[command_id] = ("correction", recovery_case_id)
+        return change, case, check, False
+
+    async def record_recovery_check(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, recovery_case_id: uuid.UUID,
+        check_id: uuid.UUID, expected_current_change_version: int,
+        expected_check_version: int, command_id: uuid.UUID, result: str,
+        observation: str, performed_by_student: bool,
+        next_check_id: uuid.UUID | None, investigation_prompt: str | None,
+        risk: str | None, risk_reason_key: str | None,
+        risk_policy_version: str | None, risk_input_fingerprint: str | None,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, V2Check, V2Check | None, bool]:
+        change = self._owned_change(owner_user_id, project_id, current_change_id)
+        case = await self.get_active_recovery_case(owner_user_id, project_id, current_change_id)
+        check = self._checks.get(check_id, (None, None))[1]
+        if self._recovery_commands.get(command_id):
+            next_check = self._checks.get(next_check_id, (None, None))[1] if next_check_id else None
+            return change, case, check, next_check, True
+        if (case is None or case.id != recovery_case_id or check is None
+                or change.version != expected_current_change_version
+                or check.version != expected_check_version or check.status != "proposed"
+                or change.lifecycle_state is not CurrentChangeState.RECOVERING
+                or change.resume_step is not ResumeStep.RECOVERY_RECHECK
+                or case.status is not RecoveryStatus.RECHECKING
+                or not performed_by_student or not observation.strip()):
+            raise V2RepositoryConflict("stale Recovery recheck")
+        parsed = CheckResult(result)
+        now = self._now()
+        check = replace(check, status="performed", result=parsed,
+                        student_observation=observation.strip(), performed_at=now,
+                        version=check.version+1)
+        self._checks[check_id] = (owner_user_id, check)
+        next_check = None
+        if parsed is CheckResult.UNSURE:
+            next_check = V2Check(id=next_check_id, project_id=project_id,
+                current_change_id=current_change_id, check_plan=check.check_plan,
+                plan_source="codize", status="proposed", result=None,
+                student_observation=None, performed_at=None, version=1)
+            self._checks[next_check_id] = (owner_user_id, next_check)
+        failed = parsed in {CheckResult.DID_NOT_WORK, CheckResult.PARTLY_WORKED}
+        if failed:
+            case = replace(case, status=RecoveryStatus.INVESTIGATING,
+                           proposed_first_check=check.check_plan, version=case.version+1)
+        change = replace(change,
+            resume_step=(ResumeStep.RECOVERY_INVESTIGATE if failed
+                         else ResumeStep.RECOVERY_RECHECK),
+            prompt_draft=(investigation_prompt if failed else change.prompt_draft),
+            prompt_draft_version=change.prompt_draft_version+(1 if failed else 0),
+            risk=RiskMode(risk) if risk else change.risk,
+            risk_reason_key=risk_reason_key if failed else change.risk_reason_key,
+            risk_policy_version=risk_policy_version or change.risk_policy_version,
+            risk_input_fingerprint=risk_input_fingerprint or change.risk_input_fingerprint,
+            unresolved_uncertainty_summary=(
+                f"Student remains unsure after Recovery recheck {check.id}."
+                if parsed is CheckResult.UNSURE else change.unresolved_uncertainty_summary),
+            version=change.version+1, updated_at=now)
+        self._changes[current_change_id] = (owner_user_id, change)
+        self._recovery_cases[recovery_case_id] = (owner_user_id, case)
+        self._recovery_commands[command_id] = ("recheck", recovery_case_id)
+        return change, case, check, next_check, False
+
     async def complete_manual_change(
         self, owner_user_id: str, project_id: uuid.UUID, current_change_id: uuid.UUID,
         expected_current_change_version: int, expected_plan_version: int,
@@ -1706,6 +1992,17 @@ class InMemoryV2Repository:
             lifecycle_state=CurrentChangeState.COMPLETED, resume_step=None,
             accepted_outcome_summary=check.student_observation,
             completed_at=now, version=change.version + 1, updated_at=now))
+        recovery = await self.get_active_recovery_case(
+            owner_user_id, project_id, current_change_id
+        )
+        if recovery is not None:
+            if recovery.status is not RecoveryStatus.RECHECKING:
+                raise V2RepositoryInvalidState("Recovery is not ready for completion")
+            self._recovery_cases[recovery.id] = (owner_user_id, replace(
+                recovery, status=RecoveryStatus.RESOLVED,
+                resolution_summary=check.student_observation,
+                resolved_at=now, version=recovery.version + 1,
+            ))
         self._store_project(owner_user_id, replace(project,
             plan_version=project.plan_version + 1, version=project.version + 1,
             first_version_completed_at=now, updated_at=now))

@@ -1360,7 +1360,8 @@ def test_phase4_failed_check_never_completes_and_cross_owner_cannot_report(clien
     state = client.get(
         f"/v2/projects/{project['project_id']}/current-change/{change['id']}/build-state",
         headers=auth_headers()).json()
-    assert state["build_stage"] == "check_failed"
+    assert state["build_stage"] == "recovery_symptom"
+    assert state["recovery_case"] is None
     completion = client.post(
         f"/v2/projects/{project['project_id']}/current-change/{change['id']}/complete",
         headers=auth_headers(), json={"workflow_version": "v2", "command_id": str(uuid.uuid4()),

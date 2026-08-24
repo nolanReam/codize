@@ -70,8 +70,9 @@ Implemented routes:
 - `POST|GET /v2/projects/{project_id}/current-change`
 - `POST /v2/projects/{project_id}/current-change/{current_change_id}/cancel`
 
-The V2 beta now includes the manual Build frontend and a deterministic adaptive
-teaching layer; it still has no GitHub integration or character progression.
+The V2 beta now includes the manual Build frontend, deterministic adaptive
+teaching, and contextual Recovery for an active Current Change; it still has no
+GitHub integration or character progression.
 Project creation requires an explicit
 `new_idea`, `already_building`, or `recovery_first` intent. The first two begin
 in `draft` at their canonical setup step; Recovery-first requires bounded
@@ -85,6 +86,19 @@ atomically with the versioned `phase5-beta-teaching-v1` and
 or handoff can proceed. Temporary promotion requires completed Current Change
 and resolved Recovery Case evidence, records the exact promotion command, and
 resumes at `existing_project_context` rather than claiming setup is ready.
+
+## V2 Phase 6 contextual Recovery
+
+An active Build can enter `recovering` from an explicit broken return or a
+student-performed failed Check. Recovery resumes the same Current Change through
+`recovery_symptom → recovery_investigate → recovery_correct → recovery_recheck`.
+The backend stores one active `v2_recovery_cases` row, immutable student symptom
+context, versioned diagnostic/correction prompts, coding-agent findings with
+`agent_claimed` provenance, and every performed Check. `UNSURE` creates one
+successor Check; a failed recheck returns to investigation; only a
+student-performed `worked` Check enables the existing atomic Current Change +
+Plan Item + Recovery Case completion transaction. All writes remain
+service-role-only and owner scoped.
 
 ## V2 Phase 5 teaching policy
 

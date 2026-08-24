@@ -158,9 +158,19 @@ export default function ProjectPage() {
           <V2Card className="v2-recovery-link">
             <div>
               <h2>Something not working?</h2>
-              <p>Recovery is coming in a later slice. Your current work stays safe.</p>
+              <p>{state.currentChange
+                ? "Return to your current change and record what you personally observe."
+                : "Start one current change first. Recovery stays attached to that work."}</p>
             </div>
-            <button type="button" className="v2-button v2-button-ghost" disabled>Something broke</button>
+            {state.currentChange ? (
+              <Link href={`/app/project/${id}/build`} className="v2-button v2-button-ghost">
+                Something broke
+              </Link>
+            ) : (
+              <button type="button" className="v2-button v2-button-ghost" disabled>
+                Something broke
+              </button>
+            )}
           </V2Card>
             </>
           )}

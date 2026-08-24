@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from app.domain.v2 import CheckResult, V2Check, V2UserPreferences
+from app.domain.v2 import CheckResult, CurrentChangeState, V2Check, V2UserPreferences
 from app.schemas.v2 import (
     CheckView, CompleteManualChangeRequest, CompleteManualChangeResponse,
     ConfirmManualChangeRequest, CurrentChangeResponse, ManualCheckRequest,
@@ -18,7 +18,7 @@ from app.services.v2_repository import (
     V2RepositoryNotFound,
 )
 from app.services import v2_teaching_service
-from app.services.v2_teaching_policy import TeachingMode
+from app.services.v2_teaching_policy import LearnerStatus, TeachingMode
 
 
 def check_view(check: V2Check | None) -> CheckView | None:
@@ -111,7 +111,8 @@ async def complete_change(repo: V2Repository, owner: str, project_id: UUID,
     if change_before is None:
         raise V2NotFoundError("V2 Current Change not found.")
     progress = await repo.get_teaching_progress(owner, project_id, change_id)
-    if (v2_teaching_service.understanding_is_required(change_before)
+    if (change_before.lifecycle_state is CurrentChangeState.REVIEWING
+            and v2_teaching_service.understanding_is_required(change_before)
             and not progress.understanding_answered):
         statuses = await v2_teaching_service.learner_statuses(
             repo, owner, ["causal_explanation"]

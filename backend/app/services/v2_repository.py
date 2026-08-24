@@ -29,6 +29,7 @@ from app.domain.v2 import (
     ProjectLifecycle,
     ProjectRef,
     PromptPurpose,
+    RecoveryStatus,
     RiskMode,
     ResumeStep,
     SetupResumeStep,
@@ -43,6 +44,7 @@ from app.domain.v2 import (
     V2Project,
     V2RecentChange,
     V2PromptVersion,
+    V2RecoveryCase,
     V2TeachingProgress,
     V2UserPreferences,
     WorkflowVersion,
@@ -78,6 +80,13 @@ _LEARNER_EVIDENCE_SELECT = (
 _CHECK_SELECT = (
     "id,project_id,owner_user_id,current_change_id,check_plan,plan_source,status,result,"
     "student_observation,performed_at,version"
+)
+_RECOVERY_SELECT = (
+    "id,project_id,owner_user_id,current_change_id,status,intended_behavior,"
+    "observed_symptom,last_known_working_statement,last_known_working_certainty,"
+    "candidate_change_summary,student_hypothesis,proposed_first_check,"
+    "investigation_finding,cause_summary,correction_summary,resolution_summary,"
+    "opened_at,resolved_at,version"
 )
 _PREFERENCE_SELECT = (
     "owner_user_id,dialogue_sound_enabled,motion_preference,version"
@@ -258,6 +267,29 @@ class _CheckRow(BaseModel):
     version: int = Field(gt=0)
 
 
+class _RecoveryRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: UUID
+    project_id: UUID
+    owner_user_id: UUID
+    current_change_id: UUID
+    status: RecoveryStatus
+    intended_behavior: str
+    observed_symptom: str
+    last_known_working_statement: str | None = None
+    last_known_working_certainty: str
+    candidate_change_summary: str | None = None
+    student_hypothesis: str | None = None
+    proposed_first_check: str | None = None
+    investigation_finding: str | None = None
+    cause_summary: str | None = None
+    correction_summary: str | None = None
+    resolution_summary: str | None = None
+    opened_at: datetime
+    resolved_at: datetime | None = None
+    version: int = Field(gt=0)
+
+
 class _PreferenceRow(BaseModel):
     model_config = ConfigDict(extra="ignore")
     owner_user_id: UUID
@@ -408,6 +440,59 @@ class V2Repository(Protocol):
     async def get_latest_check(
         self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
     ) -> V2Check | None: ...
+
+    async def get_active_recovery_case(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2RecoveryCase | None: ...
+
+    async def record_recovery_symptom(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, expected_current_change_version: int,
+        command_id: UUID, observed_symptom: str,
+        last_known_working_statement: str | None,
+        last_known_working_certainty: str, investigation_prompt: str,
+        risk: str, risk_reason_key: str | None, risk_policy_version: str,
+        risk_input_fingerprint: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, bool]: ...
+
+    async def accept_recovery_prompt(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, purpose: str,
+        expected_current_change_version: int, expected_prompt_draft_version: int,
+        acceptance_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]: ...
+
+    async def handoff_recovery_prompt(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, prompt_version_id: UUID,
+        expected_current_change_version: int, expected_prompt_version: int,
+        handoff_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]: ...
+
+    async def record_recovery_investigation_return(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, expected_current_change_version: int,
+        command_id: UUID, finding: str, correction_summary: str,
+        correction_prompt: str, risk: str, risk_reason_key: str | None,
+        risk_policy_version: str, risk_input_fingerprint: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, bool]: ...
+
+    async def record_recovery_correction_return(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, expected_current_change_version: int,
+        command_id: UUID, check_id: UUID, check_plan: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, V2Check, bool]: ...
+
+    async def record_recovery_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, check_id: UUID,
+        expected_current_change_version: int, expected_check_version: int,
+        command_id: UUID, result: str, observation: str,
+        performed_by_student: bool, next_check_id: UUID | None,
+        investigation_prompt: str | None, risk: str | None,
+        risk_reason_key: str | None, risk_policy_version: str | None,
+        risk_input_fingerprint: str | None,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, V2Check, V2Check | None, bool]: ...
 
     async def complete_manual_change(
         self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
@@ -686,6 +771,36 @@ def _check_from_row(raw: Any, *, expected_owner: str, expected_project_id: UUID)
         check_plan=row.check_plan, plan_source=row.plan_source, status=row.status, result=row.result,
         student_observation=row.student_observation, performed_at=row.performed_at,
         version=row.version,
+    )
+
+
+def _recovery_from_row(
+    raw: Any, *, expected_owner: str, expected_project_id: UUID,
+    expected_current_change_id: UUID | None = None,
+) -> V2RecoveryCase:
+    try:
+        row = _RecoveryRow.model_validate(raw)
+    except ValidationError as exc:
+        raise V2RepositoryError("malformed V2 Recovery Case row") from exc
+    if str(row.owner_user_id) != expected_owner or row.project_id != expected_project_id:
+        raise V2RepositoryError("database returned a Recovery Case outside the owned Project")
+    if (expected_current_change_id is not None
+            and row.current_change_id != expected_current_change_id):
+        raise V2RepositoryError("database returned a Recovery Case for the wrong Current Change")
+    return V2RecoveryCase(
+        id=row.id, project_id=row.project_id, current_change_id=row.current_change_id,
+        status=row.status, intended_behavior=row.intended_behavior,
+        observed_symptom=row.observed_symptom,
+        last_known_working_statement=row.last_known_working_statement,
+        last_known_working_certainty=row.last_known_working_certainty,
+        candidate_change_summary=row.candidate_change_summary,
+        student_hypothesis=row.student_hypothesis,
+        proposed_first_check=row.proposed_first_check,
+        investigation_finding=row.investigation_finding,
+        cause_summary=row.cause_summary,
+        correction_summary=row.correction_summary,
+        resolution_summary=row.resolution_summary,
+        opened_at=row.opened_at, resolved_at=row.resolved_at, version=row.version,
     )
 
 
@@ -1440,6 +1555,222 @@ class SupabaseV2Repository:
             raise V2RepositoryError("latest V2 Check read returned malformed rows")
         return (_check_from_row(rows[0], expected_owner=owner_user_id,
                 expected_project_id=project_id) if rows else None)
+
+    async def get_active_recovery_case(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2RecoveryCase | None:
+        rows = await self._request("GET", "/v2_recovery_cases", params={
+            "select": _RECOVERY_SELECT,
+            "owner_user_id": f"eq.{owner_user_id}",
+            "project_id": f"eq.{project_id}",
+            "current_change_id": f"eq.{current_change_id}",
+            "status": "in.(open,investigating,correcting,rechecking)",
+            "limit": "1",
+        })
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise V2RepositoryError("active V2 Recovery read returned malformed rows")
+        return (_recovery_from_row(
+            rows[0], expected_owner=owner_user_id,
+            expected_project_id=project_id,
+            expected_current_change_id=current_change_id,
+        ) if rows else None)
+
+    def _recovery_payload(
+        self, payload: dict[str, Any], *, owner_user_id: str,
+        project_id: UUID, current_change_id: UUID,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, bool]:
+        replayed = payload.get("replayed")
+        if not isinstance(replayed, bool):
+            raise V2RepositoryError("Recovery command omitted replay state")
+        return (
+            _current_change_from_row(
+                payload.get("current_change"), expected_owner=owner_user_id,
+                expected_project_id=project_id,
+            ),
+            _recovery_from_row(
+                payload.get("recovery_case"), expected_owner=owner_user_id,
+                expected_project_id=project_id,
+                expected_current_change_id=current_change_id,
+            ),
+            replayed,
+        )
+
+    async def record_recovery_symptom(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, expected_current_change_version: int,
+        command_id: UUID, observed_symptom: str,
+        last_known_working_statement: str | None,
+        last_known_working_certainty: str, investigation_prompt: str,
+        risk: str, risk_reason_key: str | None, risk_policy_version: str,
+        risk_input_fingerprint: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, bool]:
+        payload = self._object(await self._rpc("record_v2_recovery_symptom", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_recovery_case_id": str(recovery_case_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id), "p_observed_symptom": observed_symptom,
+            "p_last_known_working_statement": last_known_working_statement,
+            "p_last_known_working_certainty": last_known_working_certainty,
+            "p_investigation_prompt": investigation_prompt, "p_risk": risk,
+            "p_risk_reason_key": risk_reason_key,
+            "p_risk_policy_version": risk_policy_version,
+            "p_risk_input_fingerprint": risk_input_fingerprint,
+        }), "record_v2_recovery_symptom")
+        return self._recovery_payload(
+            payload, owner_user_id=owner_user_id, project_id=project_id,
+            current_change_id=current_change_id,
+        )
+
+    async def accept_recovery_prompt(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, purpose: str,
+        expected_current_change_version: int, expected_prompt_draft_version: int,
+        acceptance_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        change = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        recovery = await self.get_active_recovery_case(
+            owner_user_id, project_id, current_change_id
+        )
+        if change is None or recovery is None or recovery.id != recovery_case_id:
+            raise V2RepositoryNotFound("owned active Recovery Case not found")
+        if change.prompt_draft is None or change.coding_agent_key is None:
+            raise V2RepositoryInvalidState("Recovery prompt prerequisites are missing")
+        content_hash = hashlib.sha256(change.prompt_draft.encode("utf-8")).hexdigest()
+        payload = self._object(await self._rpc("accept_v2_prompt_version", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_expected_prompt_draft_version": expected_prompt_draft_version,
+            "p_acceptance_command_id": str(acceptance_command_id),
+            "p_purpose": purpose, "p_recovery_case_id": str(recovery_case_id),
+            "p_content": change.prompt_draft, "p_content_sha256": content_hash,
+            "p_generation_attempt_id": None,
+            "p_coding_agent_key": change.coding_agent_key.value,
+            "p_effort_category": (change.effort_category.value
+                                   if change.effort_category else None),
+            "p_provider_mapping_key": None, "p_provider_mapping_version": None,
+        }), "accept_v2_prompt_version")
+        try:
+            prompt_version_id = UUID(str(payload["prompt_version_id"]))
+            replayed = payload["replayed"]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise V2RepositoryError("Recovery prompt acceptance returned malformed identity") from exc
+        current = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        prompt = await self._get_prompt_version(
+            owner_user_id, project_id, current_change_id, prompt_version_id
+        )
+        if current is None or prompt is None or not isinstance(replayed, bool):
+            raise V2RepositoryError("accepted Recovery prompt could not be reloaded")
+        return current, prompt, replayed
+
+    async def handoff_recovery_prompt(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, prompt_version_id: UUID,
+        expected_current_change_version: int, expected_prompt_version: int,
+        handoff_command_id: UUID,
+    ) -> tuple[V2CurrentChange, V2PromptVersion, bool]:
+        payload = self._object(await self._rpc("handoff_v2_prompt_version", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_prompt_version_id": str(prompt_version_id),
+            "p_recovery_case_id": str(recovery_case_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_expected_prompt_version": expected_prompt_version,
+            "p_handoff_command_id": str(handoff_command_id),
+        }), "handoff_v2_prompt_version")
+        replayed = payload.get("replayed")
+        current = await self.get_current_change_by_id(
+            owner_user_id, project_id, current_change_id
+        )
+        prompt = await self._get_prompt_version(
+            owner_user_id, project_id, current_change_id, prompt_version_id
+        )
+        if current is None or prompt is None or not isinstance(replayed, bool):
+            raise V2RepositoryError("handed-off Recovery prompt could not be reloaded")
+        return current, prompt, replayed
+
+    async def record_recovery_investigation_return(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, expected_current_change_version: int,
+        command_id: UUID, finding: str, correction_summary: str,
+        correction_prompt: str, risk: str, risk_reason_key: str | None,
+        risk_policy_version: str, risk_input_fingerprint: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, bool]:
+        payload = self._object(await self._rpc(
+            "record_v2_recovery_investigation_return", {
+                "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+                "p_current_change_id": str(current_change_id),
+                "p_recovery_case_id": str(recovery_case_id),
+                "p_expected_current_change_version": expected_current_change_version,
+                "p_command_id": str(command_id), "p_finding": finding,
+                "p_correction_summary": correction_summary,
+                "p_correction_prompt": correction_prompt, "p_risk": risk,
+                "p_risk_reason_key": risk_reason_key,
+                "p_risk_policy_version": risk_policy_version,
+                "p_risk_input_fingerprint": risk_input_fingerprint,
+            }), "record_v2_recovery_investigation_return")
+        return self._recovery_payload(payload, owner_user_id=owner_user_id,
+            project_id=project_id, current_change_id=current_change_id)
+
+    async def record_recovery_correction_return(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, expected_current_change_version: int,
+        command_id: UUID, check_id: UUID, check_plan: str,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, V2Check, bool]:
+        payload = self._object(await self._rpc("record_v2_recovery_correction_return", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_recovery_case_id": str(recovery_case_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_command_id": str(command_id), "p_check_id": str(check_id),
+            "p_check_plan": check_plan,
+        }), "record_v2_recovery_correction_return")
+        current, recovery, replayed = self._recovery_payload(
+            payload, owner_user_id=owner_user_id, project_id=project_id,
+            current_change_id=current_change_id)
+        return current, recovery, _check_from_row(
+            payload.get("check"), expected_owner=owner_user_id,
+            expected_project_id=project_id), replayed
+
+    async def record_recovery_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        recovery_case_id: UUID, check_id: UUID,
+        expected_current_change_version: int, expected_check_version: int,
+        command_id: UUID, result: str, observation: str,
+        performed_by_student: bool, next_check_id: UUID | None,
+        investigation_prompt: str | None, risk: str | None,
+        risk_reason_key: str | None, risk_policy_version: str | None,
+        risk_input_fingerprint: str | None,
+    ) -> tuple[V2CurrentChange, V2RecoveryCase, V2Check, V2Check | None, bool]:
+        payload = self._object(await self._rpc("record_v2_recovery_check", {
+            "p_owner_user_id": owner_user_id, "p_project_id": str(project_id),
+            "p_current_change_id": str(current_change_id),
+            "p_recovery_case_id": str(recovery_case_id), "p_check_id": str(check_id),
+            "p_expected_current_change_version": expected_current_change_version,
+            "p_expected_check_version": expected_check_version,
+            "p_command_id": str(command_id), "p_result": result,
+            "p_observation": observation,
+            "p_performed_by_student": performed_by_student,
+            "p_next_check_id": str(next_check_id) if next_check_id else None,
+            "p_investigation_prompt": investigation_prompt, "p_risk": risk,
+            "p_risk_reason_key": risk_reason_key,
+            "p_risk_policy_version": risk_policy_version,
+            "p_risk_input_fingerprint": risk_input_fingerprint,
+        }), "record_v2_recovery_check")
+        current, recovery, replayed = self._recovery_payload(
+            payload, owner_user_id=owner_user_id, project_id=project_id,
+            current_change_id=current_change_id)
+        raw_next = payload.get("next_check")
+        return current, recovery, _check_from_row(
+            payload.get("check"), expected_owner=owner_user_id,
+            expected_project_id=project_id), (_check_from_row(
+                raw_next, expected_owner=owner_user_id,
+                expected_project_id=project_id) if raw_next else None), replayed
 
     async def complete_manual_change(
         self, owner_user_id: str, project_id: UUID, current_change_id: UUID,

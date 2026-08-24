@@ -1,7 +1,11 @@
 # Codize frontend (M13C)
 
 > [!NOTE]
-> **Current implementation reference (V1).** This README documents the frontend that exists today. Its engineering-cockpit styling and visible Prompt → Import → Change Map → Review → Verification → Evidence → Defense → Report journey are not V2 UX authority. For future product behavior use `docs/context/context_authority.md` and the canonical V2 Exact UX Specification. V2 is not implemented yet.
+> **V1 reference plus a separate V2 beta.** Most of this README documents the
+> legacy frontend and its engineering-cockpit journey, which is not V2 UX
+> authority. A separate V2 beta exists under `/app/projects` and follows the
+> canonical V2 context documents. Do not reinterpret V1 workflow contracts as
+> V2 requirements.
 
 The Codize v3 **AI Workflow Workspace** — a Next.js (App Router) frontend that
 makes the Codize Build Loop visible and usable:
@@ -20,6 +24,13 @@ and the `ui-ux` skill).
 
 Strictly **Frontend → Backend → External services**. The frontend never talks to
 Supabase data tables or LLM providers directly.
+
+The V2 beta keeps Recovery contextual to
+`/app/project/{project_id}/build`: Observe → Investigate → Correct → Recheck.
+It resumes the same Current Change, labels student observations separately from
+coding-agent suggestions, and requires a personal Check before completion.
+Recovery-first project creation, GitHub behavior, and character progression
+remain outside this slice.
 
 - **Supabase is used for auth only** (`lib/supabase.ts`). The publishable/anon key
   is public by design; RLS and the FastAPI backend enforce all access.

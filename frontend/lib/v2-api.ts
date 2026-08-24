@@ -14,6 +14,7 @@ import type {
   RecentChangeView,
   PromptHandoffResponse,
   PromptVersionView,
+  RecoveryCommandResponse,
   V2ProjectView,
   UserPreferencesView,
 } from "./v2-types";
@@ -140,7 +141,8 @@ export const selectEffort = (
 
 export const requestTeachingHelp = (
   projectId: string, changeId: string, changeVersion: number,
-  context: "prebuild" | "verification" | "understanding", commandId: string
+  context: "prebuild" | "verification" | "understanding" | "recovery_symptom"
+    | "recovery_investigate" | "recovery_correct" | "recovery_recheck", commandId: string
 ) => request<{ current_change: CurrentChangeView; replayed: boolean }>(
   v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/teaching/help`),
   { method: "POST", body: { workflow_version: "v2", command_id: commandId,
@@ -235,6 +237,77 @@ export const completeCurrentChange = (projectId: string, changeId: string,
         expected_current_change_version: changeVersion, expected_plan_version: planVersion,
         expected_plan_item_version: planItemVersion },
     });
+
+export const recordRecoverySymptom = (
+  projectId: string, changeId: string, changeVersion: number,
+  recoveryCaseId: string, commandId: string, observedSymptom: string,
+  lastKnownWorkingStatement: string | null,
+  lastKnownWorkingCertainty: "yes" | "no" | "unsure"
+) => request<RecoveryCommandResponse>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/recovery/symptom`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    recovery_case_id: recoveryCaseId, expected_current_change_version: changeVersion,
+    observed_symptom: observedSymptom,
+    last_known_working_statement: lastKnownWorkingStatement,
+    last_known_working_certainty: lastKnownWorkingCertainty } }
+);
+
+export const acceptRecoveryPrompt = (
+  projectId: string, changeId: string, changeVersion: number,
+  promptDraftVersion: number, recoveryCaseId: string,
+  purpose: "diagnostic" | "correction", commandId: string
+) => request<RecoveryCommandResponse>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/recovery/prompt`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    recovery_case_id: recoveryCaseId, purpose,
+    expected_current_change_version: changeVersion,
+    expected_prompt_draft_version: promptDraftVersion } }
+);
+
+export const handoffRecoveryPrompt = (
+  projectId: string, changeId: string, changeVersion: number,
+  recoveryCaseId: string, promptVersionId: string, promptVersion: number,
+  commandId: string
+) => request<RecoveryCommandResponse>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/recovery/handoff`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    recovery_case_id: recoveryCaseId, prompt_version_id: promptVersionId,
+    expected_current_change_version: changeVersion,
+    expected_prompt_version: promptVersion } }
+);
+
+export const recordRecoveryInvestigationReturn = (
+  projectId: string, changeId: string, changeVersion: number,
+  recoveryCaseId: string, finding: string, commandId: string
+) => request<RecoveryCommandResponse>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/recovery/investigation-return`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    recovery_case_id: recoveryCaseId, expected_current_change_version: changeVersion,
+    finding } }
+);
+
+export const recordRecoveryCorrectionReturn = (
+  projectId: string, changeId: string, changeVersion: number,
+  recoveryCaseId: string, checkId: string, commandId: string
+) => request<RecoveryCommandResponse>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/recovery/correction-return`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    recovery_case_id: recoveryCaseId, check_id: checkId,
+    expected_current_change_version: changeVersion } }
+);
+
+export const recordRecoveryCheck = (
+  projectId: string, changeId: string, checkId: string,
+  changeVersion: number, checkVersion: number, recoveryCaseId: string,
+  result: CheckResult, observation: string, nextCheckId: string | null,
+  commandId: string
+) => request<RecoveryCommandResponse>(
+  v2(`/projects/${encodeURIComponent(projectId)}/current-change/${encodeURIComponent(changeId)}/recovery/checks/${encodeURIComponent(checkId)}`),
+  { method: "POST", body: { workflow_version: "v2", command_id: commandId,
+    recovery_case_id: recoveryCaseId, expected_current_change_version: changeVersion,
+    expected_check_version: checkVersion, result, observation,
+    performed_by_student: true, next_check_id: nextCheckId } }
+);
 export const getPreferences = () => request<UserPreferencesView>(v2("/preferences"));
 export const updateDialogueSound = (expectedVersion: number, enabled: boolean) =>
   request<UserPreferencesView>(v2("/preferences/dialogue-sound"), {

@@ -57,7 +57,7 @@ export default function ProjectsPage() {
           <div className="v2-setup-choices">
             <button type="button" onClick={() => setIntent("new_idea")}><strong>I have an idea</strong><small>Shape the first useful change.</small></button>
             <button type="button" onClick={() => setIntent("already_building")}><strong>I’m already building</strong><small>Continue from what exists.</small></button>
-            <button type="button" disabled><strong>Something broke</strong><small>Recovery arrives in Phase 6.</small></button>
+            <button type="button" disabled><strong>Something broke</strong><small>Recovery-first setup is deferred. Active changes recover inside Build.</small></button>
           </div></> : <form onSubmit={submit} className="v2-setup-form">
           <p className="v2-card-label">{intent === "new_idea" ? "New project" : "Existing project"}</p>
           <label>Project name<input name="name" maxLength={120} autoFocus /></label>

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.domain.v2 import BuildStage, CodingAgentKey, CurrentChangeState, V2PromptVersion
+from app.domain.v2 import (
+    BuildStage, CodingAgentKey, CurrentChangeState, PromptPurpose,
+    RecoveryStatus, V2PromptVersion,
+)
 from app.schemas.v2 import (
     AgentMetadataView,
     BuildResumeStateView,
@@ -296,6 +299,10 @@ async def get_build_resume_state(
     project_id: UUID,
     current_change_id: UUID,
 ) -> BuildResumeStateView:
+    # Local import avoids a module cycle: Recovery reuses prompt projections
+    # from this service while Build resume includes the Recovery projection.
+    from app.services.v2_recovery_service import recovery_view
+
     change = await repo.get_current_change_by_id(
         owner_user_id, project_id, current_change_id
     )
@@ -315,15 +322,24 @@ async def get_build_resume_state(
         and accepted.content == change.prompt_draft
         and accepted.coding_agent_key == change.coding_agent_key
         and accepted.effort_category == change.effort_category
-        and accepted.input_goal_snapshot == change.goal_snapshot
-        and accepted.input_done_condition_snapshot == change.done_condition_snapshot
-        and accepted.input_boundary_snapshots == change.boundary_snapshots
+        and (
+            accepted.purpose is not PromptPurpose.FEATURE
+            or (
+                accepted.input_goal_snapshot == change.goal_snapshot
+                and accepted.input_done_condition_snapshot == change.done_condition_snapshot
+                and accepted.input_boundary_snapshots == change.boundary_snapshots
+            )
+        )
     )
     latest_check = await repo.get_latest_check(owner_user_id, project_id, current_change_id)
+    recovery = await repo.get_active_recovery_case(
+        owner_user_id, project_id, current_change_id
+    )
     progress = await repo.get_teaching_progress(owner_user_id, project_id, current_change_id)
     statuses = await v2_teaching_service.learner_statuses(
         repo, owner_user_id,
-        ["define_done", "protect_working_behavior", "effort_selection", "testing", "causal_explanation", "data_ownership"],
+        ["define_done", "protect_working_behavior", "effort_selection", "testing",
+         "debugging", "causal_explanation", "data_ownership"],
     )
     teaching = None
     effort_feedback = None
@@ -335,7 +351,12 @@ async def get_build_resume_state(
     )
 
     if change.lifecycle_state is CurrentChangeState.AWAITING_AGENT:
-        stage = BuildStage.WAITING_FOR_RETURN
+        if recovery and accepted and accepted.purpose is PromptPurpose.DIAGNOSTIC:
+            stage = BuildStage.RECOVERY_INVESTIGATION_RETURN
+        elif recovery and accepted and accepted.purpose is PromptPurpose.CORRECTION:
+            stage = BuildStage.RECOVERY_CORRECTION_RETURN
+        else:
+            stage = BuildStage.WAITING_FOR_RETURN
     elif change.lifecycle_state is CurrentChangeState.REVIEWING:
         if latest_check is not None and latest_check.status == "performed" and latest_check.result.value == "worked":
             if (v2_teaching_service.understanding_is_required(change)
@@ -365,7 +386,47 @@ async def get_build_resume_state(
         else:
             stage = BuildStage.REPORT_RETURN_OUTCOME
     elif change.lifecycle_state is CurrentChangeState.RECOVERING:
-        stage = BuildStage.CHECK_FAILED
+        if recovery is None:
+            stage = BuildStage.RECOVERY_SYMPTOM
+        elif recovery.status is RecoveryStatus.INVESTIGATING:
+            if (accepted_matches and accepted
+                    and accepted.purpose is PromptPurpose.DIAGNOSTIC):
+                stage = BuildStage.RECOVERY_INVESTIGATION_HANDOFF
+            else:
+                stage = BuildStage.RECOVERY_INVESTIGATE
+        elif recovery.status is RecoveryStatus.CORRECTING:
+            if (accepted_matches and accepted
+                    and accepted.purpose is PromptPurpose.CORRECTION):
+                stage = BuildStage.RECOVERY_CORRECTION_HANDOFF
+            else:
+                stage = BuildStage.RECOVERY_CORRECT
+        elif recovery.status is RecoveryStatus.RECHECKING:
+            if (latest_check is not None and latest_check.status == "performed"
+                    and latest_check.result.value == "worked"):
+                stage = BuildStage.READY_TO_COMPLETE
+            else:
+                stage = BuildStage.RECOVERY_RECHECK
+        else:
+            raise V2ConflictError("This Recovery Case is no longer active.")
+
+        if stage in {
+            BuildStage.RECOVERY_SYMPTOM,
+            BuildStage.RECOVERY_INVESTIGATE,
+            BuildStage.RECOVERY_CORRECT,
+            BuildStage.RECOVERY_RECHECK,
+        }:
+            recovery_context = (
+                "recovery_recheck" if stage is BuildStage.RECOVERY_RECHECK
+                else stage.value
+            )
+            target = "testing" if recovery_context == "recovery_recheck" else "debugging"
+            recovery_mode = await v2_teaching_service.teaching_mode_for(
+                repo, owner_user_id, target
+            )
+            teaching = v2_teaching_service.intervention_view(
+                change, progress, context=recovery_context,
+                mode=recovery_mode, target=target,
+            )
     elif change.lifecycle_state is not CurrentChangeState.PREPARING:
         raise V2ConflictError("This Current Change is no longer active.")
     elif change.resume_step.value == "confirm_change":
@@ -420,10 +481,20 @@ async def get_build_resume_state(
             coding_agent_key=change.coding_agent_key,
         ),
         accepted_prompt_version=prompt_version_view(accepted) if accepted else None,
-        ready_to_handoff=(stage is BuildStage.READY_TO_HANDOFF),
+        ready_to_handoff=(stage in {
+            BuildStage.READY_TO_HANDOFF,
+            BuildStage.RECOVERY_INVESTIGATION_HANDOFF,
+            BuildStage.RECOVERY_CORRECTION_HANDOFF,
+        }),
         exact_handoff_prompt=(
             accepted.content
-            if stage in {BuildStage.READY_TO_HANDOFF, BuildStage.WAITING_FOR_RETURN} and accepted
+            if stage in {
+                BuildStage.READY_TO_HANDOFF, BuildStage.WAITING_FOR_RETURN,
+                BuildStage.RECOVERY_INVESTIGATION_HANDOFF,
+                BuildStage.RECOVERY_INVESTIGATION_RETURN,
+                BuildStage.RECOVERY_CORRECTION_HANDOFF,
+                BuildStage.RECOVERY_CORRECTION_RETURN,
+            } and accepted
             else None
         ),
         current_change_version=change.version,
@@ -433,4 +504,5 @@ async def get_build_resume_state(
         effort_feedback=effort_feedback,
         learner_statuses=statuses,
         verification_plan_source=verification_plan_source,
+        recovery_case=recovery_view(recovery) if recovery else None,
     )

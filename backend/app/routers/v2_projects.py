@@ -36,6 +36,13 @@ from app.schemas.v2 import (
     PromptHandoffResponse,
     PromptVersionsResponse,
     RecentChangesResponse,
+    RecoveryCheckRequest,
+    RecoveryCommandResponse,
+    RecoveryCorrectionReturnRequest,
+    RecoveryInvestigationReturnRequest,
+    RecoveryPromptAcceptanceRequest,
+    RecoveryPromptHandoffRequest,
+    RecoverySymptomRequest,
     PromoteProjectRequest,
     PurgeProjectResponse,
     PurgeTemporaryProjectRequest,
@@ -53,6 +60,7 @@ from app.services import (
     v2_manual_loop_service,
     v2_plan_service,
     v2_project_service,
+    v2_recovery_service,
     v2_teaching_service,
 )
 from app.services.project_repository import ProjectRepository, get_project_repository
@@ -323,6 +331,105 @@ async def record_manual_check(
     try:
         return await v2_manual_loop_service.record_check(
             repo, user.user_id, project_id, current_change_id, check_id, body)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/recovery/symptom",
+    response_model=RecoveryCommandResponse,
+)
+async def record_recovery_symptom(
+    project_id: UUID, current_change_id: UUID, body: RecoverySymptomRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> RecoveryCommandResponse:
+    try:
+        return await v2_recovery_service.record_symptom(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/recovery/prompt",
+    response_model=RecoveryCommandResponse,
+)
+async def accept_recovery_prompt(
+    project_id: UUID, current_change_id: UUID, body: RecoveryPromptAcceptanceRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> RecoveryCommandResponse:
+    try:
+        return await v2_recovery_service.accept_recovery_prompt(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/recovery/handoff",
+    response_model=RecoveryCommandResponse,
+)
+async def handoff_recovery_prompt(
+    project_id: UUID, current_change_id: UUID, body: RecoveryPromptHandoffRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> RecoveryCommandResponse:
+    try:
+        return await v2_recovery_service.handoff_recovery_prompt(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/recovery/investigation-return",
+    response_model=RecoveryCommandResponse,
+)
+async def record_recovery_investigation_return(
+    project_id: UUID, current_change_id: UUID,
+    body: RecoveryInvestigationReturnRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> RecoveryCommandResponse:
+    try:
+        return await v2_recovery_service.record_investigation_return(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/recovery/correction-return",
+    response_model=RecoveryCommandResponse,
+)
+async def record_recovery_correction_return(
+    project_id: UUID, current_change_id: UUID,
+    body: RecoveryCorrectionReturnRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> RecoveryCommandResponse:
+    try:
+        return await v2_recovery_service.record_correction_return(
+            repo, user.user_id, project_id, current_change_id, body
+        )
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/projects/{project_id}/current-change/{current_change_id}/recovery/checks/{check_id}",
+    response_model=RecoveryCommandResponse,
+)
+async def record_recovery_check(
+    project_id: UUID, current_change_id: UUID, check_id: UUID,
+    body: RecoveryCheckRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> RecoveryCommandResponse:
+    try:
+        return await v2_recovery_service.record_recheck(
+            repo, user.user_id, project_id, current_change_id, check_id, body
+        )
     except V2ApplicationError as exc:
         raise _http_error(exc) from exc
 

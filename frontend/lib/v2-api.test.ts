@@ -3,11 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("./supabase", () => ({ getAccessToken: vi.fn(async () => "test-token") }));
 
 import {
+  acceptRecoveryPrompt,
   createStudentCheckPlan,
   getBuildState,
   getProjectRefs,
   handoffPrompt,
   requestTeachingHelp,
+  recordRecoveryCheck,
+  recordRecoverySymptom,
   respondToTeaching,
   selectCodingAgent,
   selectEffort,
@@ -99,6 +102,38 @@ describe("V2 frontend API contract", () => {
       check_id: "check-id",
       expected_current_change_version: 7,
       check_plan: "Try the visible result",
+    });
+  });
+
+  it("sends explicit Recovery identity, optimistic versions, purpose, and student provenance", async () => {
+    await recordRecoverySymptom(
+      "project-1", "change-2", 9, "recovery-3", "symptom-command",
+      "The score remains zero", "It worked before the reducer edit", "yes"
+    );
+    await acceptRecoveryPrompt(
+      "project-1", "change-2", 10, 4, "recovery-3", "diagnostic", "accept-command"
+    );
+    await recordRecoveryCheck(
+      "project-1", "change-2", "check-4", 15, 1, "recovery-3",
+      "unsure", "I could not tell yet", "check-5", "recheck-command"
+    );
+
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls[0][0]).toContain("/recovery/symptom");
+    expect(JSON.parse(String(calls[0][1]?.body))).toMatchObject({
+      recovery_case_id: "recovery-3",
+      expected_current_change_version: 9,
+      observed_symptom: "The score remains zero",
+    });
+    expect(JSON.parse(String(calls[1][1]?.body))).toMatchObject({
+      purpose: "diagnostic",
+      expected_prompt_draft_version: 4,
+    });
+    expect(JSON.parse(String(calls[2][1]?.body))).toMatchObject({
+      result: "unsure",
+      observation: "I could not tell yet",
+      performed_by_student: true,
+      next_check_id: "check-5",
     });
   });
 });

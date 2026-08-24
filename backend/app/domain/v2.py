@@ -136,6 +136,14 @@ class BuildStage(StrEnum):
     PROPOSE_CHECK = "propose_check"
     CHECK_UNSURE = "check_unsure"
     CHECK_FAILED = "check_failed"
+    RECOVERY_SYMPTOM = "recovery_symptom"
+    RECOVERY_INVESTIGATE = "recovery_investigate"
+    RECOVERY_INVESTIGATION_HANDOFF = "recovery_investigation_handoff"
+    RECOVERY_INVESTIGATION_RETURN = "recovery_investigation_return"
+    RECOVERY_CORRECT = "recovery_correct"
+    RECOVERY_CORRECTION_HANDOFF = "recovery_correction_handoff"
+    RECOVERY_CORRECTION_RETURN = "recovery_correction_return"
+    RECOVERY_RECHECK = "recovery_recheck"
     UNDERSTAND = "understand"
     READY_TO_COMPLETE = "ready_to_complete"
 
@@ -164,6 +172,15 @@ class SupportLevel(StrEnum):
     NUDGE = "nudge"
     CLUE = "clue"
     TEACH = "teach"
+
+
+class RecoveryStatus(StrEnum):
+    OPEN = "open"
+    INVESTIGATING = "investigating"
+    CORRECTING = "correcting"
+    RECHECKING = "rechecking"
+    RESOLVED = "resolved"
+    ABANDONED = "abandoned"
 
 
 NONTERMINAL_STATES = frozenset(
@@ -359,6 +376,28 @@ class V2Check:
     result: CheckResult | None
     student_observation: str | None
     performed_at: datetime | None
+    version: int
+
+
+@dataclass(frozen=True, slots=True)
+class V2RecoveryCase:
+    id: UUID
+    project_id: UUID
+    current_change_id: UUID
+    status: RecoveryStatus
+    intended_behavior: str
+    observed_symptom: str
+    last_known_working_statement: str | None
+    last_known_working_certainty: str
+    candidate_change_summary: str | None
+    student_hypothesis: str | None
+    proposed_first_check: str | None
+    investigation_finding: str | None
+    cause_summary: str | None
+    correction_summary: str | None
+    resolution_summary: str | None
+    opened_at: datetime
+    resolved_at: datetime | None
     version: int
 
 

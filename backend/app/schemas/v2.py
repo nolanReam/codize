@@ -21,6 +21,7 @@ from app.domain.v2 import (
     PlanScopeBand,
     PromptPurpose,
     ProjectLifecycle,
+    RecoveryStatus,
     RiskMode,
     ResumeStep,
     SetupResumeStep,
@@ -628,11 +629,15 @@ class BuildResumeStateView(BaseModel):
     effort_feedback: "EffortFeedbackView | None" = None
     learner_statuses: dict[str, Literal["new", "guided", "practiced", "recently_independent"]] = Field(default_factory=dict)
     verification_plan_source: Literal["codize", "student"]
+    recovery_case: "RecoveryCaseView | None" = None
 
 
 class TeachingInteractionView(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    context: Literal["prebuild", "verification", "understanding"]
+    context: Literal[
+        "prebuild", "verification", "understanding", "recovery_symptom",
+        "recovery_investigate", "recovery_correct", "recovery_recheck",
+    ]
     competency_key: str
     mode: TeachingMode
     risk: RiskMode
@@ -652,7 +657,10 @@ class TeachingHelpRequest(BaseModel):
     workflow_version: WorkflowV2
     command_id: UUID
     expected_current_change_version: int = Field(gt=0)
-    context: Literal["prebuild", "verification", "understanding"]
+    context: Literal[
+        "prebuild", "verification", "understanding", "recovery_symptom",
+        "recovery_investigate", "recovery_correct", "recovery_recheck",
+    ]
 
 
 class TeachingResponseRequest(BaseModel):
@@ -754,6 +762,133 @@ class CheckView(BaseModel):
     student_observation: str | None
     performed_at: datetime | None
     version: int
+
+
+class RecoveryCaseView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    current_change_id: UUID
+    status: RecoveryStatus
+    intended_behavior: str
+    observed_symptom: str
+    last_known_working_statement: str | None
+    last_known_working_certainty: Literal["yes", "no", "unsure"]
+    candidate_change_summary: str | None
+    student_hypothesis: str | None
+    proposed_first_check: str | None
+    investigation_finding: str | None
+    investigation_finding_provenance: Literal["agent_claimed"] | None = None
+    cause_summary: str | None
+    correction_summary: str | None
+    resolution_summary: str | None
+    opened_at: datetime
+    resolved_at: datetime | None
+    version: int
+
+
+class RecoverySymptomRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: WorkflowV2
+    command_id: UUID
+    recovery_case_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    observed_symptom: str
+    last_known_working_statement: str | None = None
+    last_known_working_certainty: Literal["yes", "no", "unsure"] = "unsure"
+
+    @field_validator("observed_symptom")
+    @classmethod
+    def validate_symptom(cls, value: str) -> str:
+        return _bounded_utf8(value, 16384, "observed_symptom")
+
+    @field_validator("last_known_working_statement")
+    @classmethod
+    def validate_last_known(cls, value: str | None) -> str | None:
+        return None if value is None else _bounded_utf8(
+            value, 16384, "last_known_working_statement"
+        )
+
+
+class RecoveryPromptAcceptanceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    recovery_case_id: UUID
+    purpose: Literal["diagnostic", "correction"]
+    expected_current_change_version: int = Field(gt=0)
+    expected_prompt_draft_version: int = Field(gt=0)
+
+
+class RecoveryPromptHandoffRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    recovery_case_id: UUID
+    prompt_version_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    expected_prompt_version: int = Field(gt=0)
+
+
+class RecoveryInvestigationReturnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    recovery_case_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    finding: str
+
+    @field_validator("finding")
+    @classmethod
+    def validate_finding(cls, value: str) -> str:
+        return _bounded_utf8(value, 16384, "finding")
+
+
+class RecoveryCorrectionReturnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    recovery_case_id: UUID
+    check_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+
+
+class RecoveryCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    recovery_case_id: UUID
+    expected_current_change_version: int = Field(gt=0)
+    expected_check_version: int = Field(gt=0)
+    result: CheckResult
+    observation: str
+    performed_by_student: bool
+    next_check_id: UUID | None = None
+
+    @field_validator("observation")
+    @classmethod
+    def validate_recovery_observation(cls, value: str) -> str:
+        return _bounded_utf8(value, 16384, "observation")
+
+    @model_validator(mode="after")
+    def validate_recovery_check(self) -> "RecoveryCheckRequest":
+        if self.performed_by_student is not True:
+            raise ValueError("the student must perform the Recovery recheck")
+        if (self.result is CheckResult.UNSURE) != (self.next_check_id is not None):
+            raise ValueError("an unsure Recovery recheck requires next_check_id")
+        return self
+
+
+class RecoveryCommandResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_change: CurrentChangeView
+    recovery_case: RecoveryCaseView
+    check: CheckView | None = None
+    next_check: CheckView | None = None
+    prompt_version: PromptVersionView | None = None
+    exact_prompt: str | None = None
+    replayed: bool = False
 
 
 class ManualLoopResponse(BaseModel):

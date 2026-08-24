@@ -60,6 +60,31 @@ describe("V2 Build foundation contract", () => {
     }
   });
 
+  it("keeps contextual Recovery in Build as Observe, Investigate, Correct, Recheck", () => {
+    for (const stage of [
+      "recovery_symptom",
+      "recovery_investigate",
+      "recovery_investigation_handoff",
+      "recovery_investigation_return",
+      "recovery_correct",
+      "recovery_correction_handoff",
+      "recovery_correction_return",
+      "recovery_recheck",
+    ]) {
+      expect(source).toContain(`build_stage === "${stage}"`);
+    }
+    for (const label of ["Observe", "Investigate", "Correct", "Recheck"]) {
+      expect(source).toContain(label);
+    }
+    expect(source).toContain("Student observed:");
+    expect(source).toContain("Coding AI suggested:");
+    expect(source).toContain("not a verified root cause");
+    expect(source).toContain("personally observe");
+    expect(source).toContain('submitRecoveryRecheck("unsure")');
+    expect(css).toContain(".v2-recovery-progress");
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
   it("keeps the approved companion, message, and single-column stage composition", () => {
     expect(source).toContain('<div className="v2-build-character">');
     expect(source).toContain('<V2Character size="mini" />');

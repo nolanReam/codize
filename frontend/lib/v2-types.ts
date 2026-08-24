@@ -29,6 +29,14 @@ export type BuildStage =
   | "propose_check"
   | "check_unsure"
   | "check_failed"
+  | "recovery_symptom"
+  | "recovery_investigate"
+  | "recovery_investigation_handoff"
+  | "recovery_investigation_return"
+  | "recovery_correct"
+  | "recovery_correction_handoff"
+  | "recovery_correction_return"
+  | "recovery_recheck"
   | "understand"
   | "ready_to_complete";
 export type CheckResult = "worked" | "partly_worked" | "did_not_work" | "unsure";
@@ -167,10 +175,12 @@ export interface BuildResumeState {
   effort_feedback: EffortFeedbackView | null;
   learner_statuses: Record<string, "new" | "guided" | "practiced" | "recently_independent">;
   verification_plan_source: "codize" | "student";
+  recovery_case: RecoveryCaseView | null;
 }
 
 export interface TeachingInteractionView {
-  context: "prebuild" | "verification" | "understanding";
+  context: "prebuild" | "verification" | "understanding" | "recovery_symptom"
+    | "recovery_investigate" | "recovery_correct" | "recovery_recheck";
   competency_key: string;
   mode: "skip" | "ask" | "remind" | "teach";
   risk: "normal" | "slowdown";
@@ -204,6 +214,37 @@ export interface CheckView {
   student_observation: string | null;
   performed_at: string | null;
   version: number;
+}
+
+export interface RecoveryCaseView {
+  id: string;
+  current_change_id: string;
+  status: "open" | "investigating" | "correcting" | "rechecking" | "resolved" | "abandoned";
+  intended_behavior: string;
+  observed_symptom: string;
+  last_known_working_statement: string | null;
+  last_known_working_certainty: "yes" | "no" | "unsure";
+  candidate_change_summary: string | null;
+  student_hypothesis: string | null;
+  proposed_first_check: string | null;
+  investigation_finding: string | null;
+  investigation_finding_provenance: "agent_claimed" | null;
+  cause_summary: string | null;
+  correction_summary: string | null;
+  resolution_summary: string | null;
+  opened_at: string;
+  resolved_at: string | null;
+  version: number;
+}
+
+export interface RecoveryCommandResponse {
+  current_change: CurrentChangeView;
+  recovery_case: RecoveryCaseView;
+  check: CheckView | null;
+  next_check: CheckView | null;
+  prompt_version: PromptVersionView | null;
+  exact_prompt: string | null;
+  replayed: boolean;
 }
 
 export interface UserPreferencesView {

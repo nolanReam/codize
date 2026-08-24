@@ -347,6 +347,12 @@
 .v2-build-page { width: min(1124px, 100%); margin: 0; }
 .v2-build-header { display: flex; width: 100%; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .v2-build-header h1 { max-width: 900px; font-size: clamp(20px, 2.5vw, 26px); }
+.v2-build-header.is-recovery {
+  padding: 18px 20px;
+  border: 1px solid rgba(185, 120, 22, 0.48);
+  border-radius: var(--v2-radius-md);
+  background: linear-gradient(100deg, rgba(185, 120, 22, 0.13), transparent 68%);
+}
 .v2-agent-badge { width: 170px; padding: 10px 12px; border: 1px solid var(--v2-border-strong); border-radius: 6px; color: var(--v2-text-secondary); background: var(--v2-surface); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .v2-conversation { display: flex; width: min(820px, 100%); flex-direction: column; gap: 16px; margin: 0; }
 .v2-build-character { padding: 12px; }
@@ -415,7 +421,8 @@
 .v2-setup-choices small { color: var(--v2-text-secondary); }
 .v2-setup-form { display: grid; gap: 16px; }
 .v2-setup-form label { display: grid; gap: 7px; font-weight: 700; }
-.v2-setup-form input, .v2-setup-form textarea, .v2-check-card textarea {
+.v2-setup-form input, .v2-setup-form textarea, .v2-check-card textarea,
+.v2-recovery-card textarea {
   width: 100%; color: var(--v2-text); background: var(--v2-canvas);
   border: 1px solid var(--v2-border); border-radius: 12px; padding: 12px 14px;
   font: inherit; resize: vertical;
@@ -424,6 +431,42 @@
 .v2-dialogue p { min-height: 1.5em; }
 .v2-return-choices { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .v2-check-card, .v2-complete-card { display: grid; gap: 14px; }
+.v2-recovery-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(760px, 100%);
+  padding: 0;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius-sm);
+  overflow: hidden;
+  list-style: none;
+}
+.v2-recovery-progress li {
+  padding: 11px 9px;
+  border-right: 1px solid var(--v2-border);
+  color: var(--v2-text-secondary);
+  background: var(--v2-surface);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.v2-recovery-progress li:last-child { border-right: 0; }
+.v2-recovery-progress li[aria-current="step"] {
+  color: var(--v2-text);
+  background: rgba(185, 120, 22, 0.18);
+  box-shadow: inset 0 -3px 0 var(--v2-warning);
+}
+.v2-recovery-card { border-color: rgba(151, 115, 144, 0.6); }
+.v2-recovery-evidence {
+  width: min(760px, 100%);
+  border-color: var(--v2-border);
+  box-shadow: none;
+}
+.v2-recovery-evidence p { overflow-wrap: anywhere; }
+.v2-inline-fieldset { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; border: 0; }
+.v2-inline-fieldset legend { width: 100%; margin-bottom: 8px; color: var(--v2-text); font-weight: 750; }
+.v2-inline-fieldset label { display: flex; min-height: 44px; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--v2-border); border-radius: var(--v2-radius-sm); cursor: pointer; }
+.v2-inline-fieldset input { accent-color: var(--v2-accent); }
 .v2-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .v2-setting-row p { margin: 4px 0 0; }
 .v2-action-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
@@ -533,6 +576,11 @@
   .v2-action-row-split { align-items: stretch; flex-direction: column; }
   .v2-action-row-split > div { flex-wrap: wrap; }
   .v2-action-row-split > .v2-button { width: 100%; }
+  .v2-recovery-progress { grid-template-columns: 1fr 1fr; }
+  .v2-recovery-progress li:nth-child(2) { border-right: 0; }
+  .v2-recovery-progress li:nth-child(-n + 2) { border-bottom: 1px solid var(--v2-border); }
+  .v2-action-row { align-items: stretch; flex-direction: column-reverse; }
+  .v2-return-choices .v2-button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
