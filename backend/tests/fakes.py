@@ -430,6 +430,10 @@ class InMemoryV2Repository:
             id=uuid.uuid4(), competency_key=competency_key,
             observed_behavior="Observed test behavior.", elicitation=elicitation,
             support_level=support_level, context_key="build",
+            source_project_id=(
+                self._changes[current_change_id][1].project_ref.project_id
+                if current_change_id in self._changes else None
+            ),
             source_current_change_id=current_change_id,
             observed_at=observed_at or self._now(), status="active",
         )
@@ -664,7 +668,8 @@ class InMemoryV2Repository:
         check = V2Check(id=check_id, project_id=project_id,
             current_change_id=current_change_id, check_plan=check_plan.strip(),
             plan_source="student", status="proposed", result=None,
-            student_observation=None, performed_at=None, version=1)
+            student_observation=None, performed_at=None, not_run_at=None,
+            supersedes_check_id=None, created_at=self._now(), version=1)
         self._checks[check_id] = (owner_user_id, check)
         change = replace(change, help_context_key="testing_complete",
             support_level_disclosed=SupportLevel.NONE, version=change.version + 1,
@@ -1234,6 +1239,71 @@ class InMemoryV2Repository:
             return None
         return entry[1]
 
+    async def list_history_changes(
+        self, owner_user_id: str, project_id: uuid.UUID, *, limit: int, offset: int,
+    ) -> tuple[list[V2CurrentChange], bool]:
+        self._owned_project(owner_user_id, project_id)
+        rows = sorted(
+            (
+                change for owner, change in self._changes.values()
+                if owner == owner_user_id and change.project_ref.project_id == project_id
+            ),
+            key=lambda change: (change.created_at, change.id),
+            reverse=True,
+        )
+        page = rows[offset:offset + limit]
+        return page, len(rows) > offset + limit
+
+    async def list_history_checks(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, *, limit: int,
+    ) -> tuple[list[V2Check], bool]:
+        self._owned_change(owner_user_id, project_id, current_change_id)
+        rows = sorted(
+            (
+                check for owner, check in self._checks.values()
+                if owner == owner_user_id and check.project_id == project_id
+                and check.current_change_id == current_change_id
+            ),
+            key=lambda check: (check.created_at, check.id),
+        )
+        return rows[:limit], len(rows) > limit
+
+    async def get_latest_history_performed_check(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID,
+    ) -> V2Check | None:
+        self._owned_change(owner_user_id, project_id, current_change_id)
+        rows = [
+            check for owner, check in self._checks.values()
+            if owner == owner_user_id and check.project_id == project_id
+            and check.current_change_id == current_change_id
+            and check.status == "performed" and check.performed_at is not None
+        ]
+        return max(rows, key=lambda check: (check.performed_at, check.id), default=None)
+
+    async def list_history_prompt_versions(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, *, limit: int,
+    ) -> tuple[list[V2PromptVersion], bool]:
+        rows = await self.list_prompt_versions(owner_user_id, project_id, current_change_id)
+        return rows[:limit], len(rows) > limit
+
+    async def list_history_recovery_cases(
+        self, owner_user_id: str, project_id: uuid.UUID,
+        current_change_id: uuid.UUID, *, limit: int,
+    ) -> tuple[list[V2RecoveryCase], bool]:
+        self._owned_change(owner_user_id, project_id, current_change_id)
+        rows = sorted(
+            (
+                case for owner, case in self._recovery_cases.values()
+                if owner == owner_user_id and case.project_id == project_id
+                and case.current_change_id == current_change_id
+            ),
+            key=lambda case: (case.opened_at, case.id),
+        )
+        return rows[:limit], len(rows) > limit
+
     async def cancel_current_change(
         self,
         owner_user_id: str,
@@ -1619,7 +1689,8 @@ class InMemoryV2Repository:
                     current_change_id=current_change_id, check_plan=change.done_condition_snapshot,
                     plan_source="codize",
                     status="proposed", result=None, student_observation=None,
-                    performed_at=None, version=1)
+                    performed_at=None, not_run_at=None, supersedes_check_id=None,
+                    created_at=self._now(), version=1)
                 self._checks[check_id] = (owner_user_id, check)
             change = replace(change, lifecycle_state=CurrentChangeState.REVIEWING,
                 resume_step=ResumeStep.CHECK, student_return_outcome=outcome,
@@ -1666,7 +1737,8 @@ class InMemoryV2Repository:
                 current_change_id=current_change_id, check_plan=check.check_plan,
                 plan_source=check.plan_source,
                 status="proposed", result=None, student_observation=None,
-                performed_at=None, version=1)
+                performed_at=None, not_run_at=None, supersedes_check_id=check.id,
+                created_at=now, version=1)
             self._checks[next_check_id] = (owner_user_id, next_check)
         recovery = parsed in {CheckResult.DID_NOT_WORK, CheckResult.PARTLY_WORKED}
         change = replace(change,
@@ -1895,11 +1967,12 @@ class InMemoryV2Repository:
                 or prompt.purpose is not PromptPurpose.CORRECTION
                 or prompt.handed_off_at is None):
             raise V2RepositoryConflict("stale correction return")
+        now = self._now()
         check = V2Check(id=check_id, project_id=project_id,
             current_change_id=current_change_id, check_plan=check_plan.strip(),
             plan_source="codize", status="proposed", result=None,
-            student_observation=None, performed_at=None, version=1)
-        now = self._now()
+            student_observation=None, performed_at=None, not_run_at=None,
+            supersedes_check_id=None, created_at=now, version=1)
         case = replace(case, status=RecoveryStatus.RECHECKING, version=case.version+1)
         change = replace(change, lifecycle_state=CurrentChangeState.RECOVERING,
             resume_step=ResumeStep.RECOVERY_RECHECK, help_context_key=None,
@@ -1946,7 +2019,8 @@ class InMemoryV2Repository:
             next_check = V2Check(id=next_check_id, project_id=project_id,
                 current_change_id=current_change_id, check_plan=check.check_plan,
                 plan_source="codize", status="proposed", result=None,
-                student_observation=None, performed_at=None, version=1)
+                student_observation=None, performed_at=None, not_run_at=None,
+                supersedes_check_id=check.id, created_at=now, version=1)
             self._checks[next_check_id] = (owner_user_id, next_check)
         failed = parsed in {CheckResult.DID_NOT_WORK, CheckResult.PARTLY_WORKED}
         if failed:

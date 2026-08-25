@@ -75,11 +75,11 @@ _CURRENT_CHANGE_SELECT = (
 )
 _LEARNER_EVIDENCE_SELECT = (
     "id,competency_key,observed_behavior,elicitation,support_level,context_key,"
-    "source_current_change_id,observed_at,status"
+    "source_project_id,source_current_change_id,observed_at,status"
 )
 _CHECK_SELECT = (
     "id,project_id,owner_user_id,current_change_id,check_plan,plan_source,status,result,"
-    "student_observation,performed_at,version"
+    "student_observation,performed_at,not_run_at,supersedes_check_id,created_at,version"
 )
 _RECOVERY_SELECT = (
     "id,project_id,owner_user_id,current_change_id,status,intended_behavior,"
@@ -264,6 +264,9 @@ class _CheckRow(BaseModel):
     result: CheckResult | None = None
     student_observation: str | None = None
     performed_at: datetime | None = None
+    not_run_at: datetime | None = None
+    supersedes_check_id: UUID | None = None
+    created_at: datetime
     version: int = Field(gt=0)
 
 
@@ -306,6 +309,7 @@ class _LearnerEvidenceRow(BaseModel):
     elicitation: str
     support_level: SupportLevel
     context_key: str
+    source_project_id: UUID | None
     source_current_change_id: UUID | None
     observed_at: datetime
     status: str
@@ -518,6 +522,29 @@ class V2Repository(Protocol):
         project_id: UUID,
         current_change_id: UUID,
     ) -> V2CurrentChange | None: ...
+
+    async def list_history_changes(
+        self, owner_user_id: str, project_id: UUID, *, limit: int, offset: int,
+    ) -> tuple[list[V2CurrentChange], bool]: ...
+
+    async def list_history_checks(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        *, limit: int,
+    ) -> tuple[list[V2Check], bool]: ...
+
+    async def get_latest_history_performed_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2Check | None: ...
+
+    async def list_history_prompt_versions(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        *, limit: int,
+    ) -> tuple[list[V2PromptVersion], bool]: ...
+
+    async def list_history_recovery_cases(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        *, limit: int,
+    ) -> tuple[list[V2RecoveryCase], bool]: ...
 
     async def cancel_current_change(
         self,
@@ -770,6 +797,8 @@ def _check_from_row(raw: Any, *, expected_owner: str, expected_project_id: UUID)
         id=row.id, project_id=row.project_id, current_change_id=row.current_change_id,
         check_plan=row.check_plan, plan_source=row.plan_source, status=row.status, result=row.result,
         student_observation=row.student_observation, performed_at=row.performed_at,
+        not_run_at=row.not_run_at, supersedes_check_id=row.supersedes_check_id,
+        created_at=row.created_at,
         version=row.version,
     )
 
@@ -830,6 +859,7 @@ def _learner_evidence_from_row(raw: Any) -> V2LearnerEvidence:
         elicitation=row.elicitation,
         support_level=row.support_level,
         context_key=row.context_key,
+        source_project_id=row.source_project_id,
         source_current_change_id=row.source_current_change_id,
         observed_at=row.observed_at,
         status=row.status,
@@ -2276,6 +2306,136 @@ class SupabaseV2Repository:
             expected_owner=owner_user_id,
             expected_project_id=project_id,
         )
+
+    async def list_history_changes(
+        self, owner_user_id: str, project_id: UUID, *, limit: int, offset: int,
+    ) -> tuple[list[V2CurrentChange], bool]:
+        rows = await self._request(
+            "GET",
+            "/v2_current_changes",
+            params={
+                "select": _CURRENT_CHANGE_SELECT,
+                "project_id": f"eq.{project_id}",
+                "owner_user_id": f"eq.{owner_user_id}",
+                "order": "created_at.desc,id.desc",
+                "limit": str(limit + 1),
+                "offset": str(offset),
+            },
+        )
+        if not isinstance(rows, list):
+            raise V2RepositoryError("V2 History Current Change read returned malformed rows")
+        changes = [
+            _current_change_from_row(
+                row, expected_owner=owner_user_id, expected_project_id=project_id
+            )
+            for row in rows[:limit]
+        ]
+        return changes, len(rows) > limit
+
+    async def list_history_checks(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        *, limit: int,
+    ) -> tuple[list[V2Check], bool]:
+        rows = await self._request(
+            "GET",
+            "/v2_checks",
+            params={
+                "select": _CHECK_SELECT,
+                "project_id": f"eq.{project_id}",
+                "owner_user_id": f"eq.{owner_user_id}",
+                "current_change_id": f"eq.{current_change_id}",
+                "order": "created_at.asc,id.asc",
+                "limit": str(limit + 1),
+            },
+        )
+        if not isinstance(rows, list):
+            raise V2RepositoryError("V2 History Check read returned malformed rows")
+        checks = [
+            _check_from_row(row, expected_owner=owner_user_id, expected_project_id=project_id)
+            for row in rows[:limit]
+        ]
+        return checks, len(rows) > limit
+
+    async def get_latest_history_performed_check(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+    ) -> V2Check | None:
+        rows = await self._request(
+            "GET",
+            "/v2_checks",
+            params={
+                "select": _CHECK_SELECT,
+                "project_id": f"eq.{project_id}",
+                "owner_user_id": f"eq.{owner_user_id}",
+                "current_change_id": f"eq.{current_change_id}",
+                "status": "eq.performed",
+                "order": "performed_at.desc,id.desc",
+                "limit": "1",
+            },
+        )
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise V2RepositoryError(
+                "V2 History authoritative performed Check read returned malformed rows"
+            )
+        if not rows:
+            return None
+        return _check_from_row(
+            rows[0], expected_owner=owner_user_id, expected_project_id=project_id
+        )
+
+    async def list_history_prompt_versions(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        *, limit: int,
+    ) -> tuple[list[V2PromptVersion], bool]:
+        rows = await self._request(
+            "GET",
+            "/v2_prompt_versions",
+            params={
+                "select": _PROMPT_VERSION_SELECT,
+                "project_id": f"eq.{project_id}",
+                "owner_user_id": f"eq.{owner_user_id}",
+                "current_change_id": f"eq.{current_change_id}",
+                "order": "ordinal.asc,id.asc",
+                "limit": str(limit + 1),
+            },
+        )
+        if not isinstance(rows, list):
+            raise V2RepositoryError("V2 History Prompt Version read returned malformed rows")
+        prompts = [
+            _prompt_version_from_row(
+                row, expected_owner=owner_user_id, expected_project_id=project_id,
+                expected_current_change_id=current_change_id,
+            )
+            for row in rows[:limit]
+        ]
+        return prompts, len(rows) > limit
+
+    async def list_history_recovery_cases(
+        self, owner_user_id: str, project_id: UUID, current_change_id: UUID,
+        *, limit: int,
+    ) -> tuple[list[V2RecoveryCase], bool]:
+        rows = await self._request(
+            "GET",
+            "/v2_recovery_cases",
+            params={
+                "select": _RECOVERY_SELECT,
+                "project_id": f"eq.{project_id}",
+                "owner_user_id": f"eq.{owner_user_id}",
+                "current_change_id": f"eq.{current_change_id}",
+                "order": "opened_at.asc,id.asc",
+                "limit": str(limit + 1),
+            },
+        )
+        if not isinstance(rows, list):
+            raise V2RepositoryError("V2 History Recovery Case read returned malformed rows")
+        recoveries = [
+            _recovery_from_row(
+                row, expected_owner=owner_user_id,
+                expected_project_id=project_id,
+                expected_current_change_id=current_change_id,
+            )
+            for row in rows[:limit]
+        ]
+        return recoveries, len(rows) > limit
 
     async def cancel_current_change(
         self,

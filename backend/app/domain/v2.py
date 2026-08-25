@@ -376,6 +376,9 @@ class V2Check:
     result: CheckResult | None
     student_observation: str | None
     performed_at: datetime | None
+    not_run_at: datetime | None
+    supersedes_check_id: UUID | None
+    created_at: datetime
     version: int
 
 
@@ -470,6 +473,7 @@ class V2LearnerEvidence:
     elicitation: str
     support_level: SupportLevel
     context_key: str
+    source_project_id: UUID | None
     source_current_change_id: UUID | None
     observed_at: datetime
     status: str

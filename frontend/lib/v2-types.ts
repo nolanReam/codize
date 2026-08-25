@@ -261,6 +261,102 @@ export interface RecentChangeView {
   observation: string;
 }
 
+export type LearnerStatus = "new" | "guided" | "practiced" | "recently_independent";
+
+export interface LearningEvidenceView {
+  observed_behavior: string;
+  support_explanation: string;
+  observed_at: string;
+  project_name: string | null;
+  current_change_goal: string | null;
+}
+
+export interface LearningCompetencyView {
+  key: string;
+  name: string;
+  description: string;
+  status: LearnerStatus;
+  status_explanation: string;
+  support_direction: "more" | "less";
+  recent_evidence: LearningEvidenceView[];
+}
+
+export interface LearningResponse {
+  workflow_version: "v2";
+  project_id: string;
+  competencies: LearningCompetencyView[];
+  recent_evidence_limit: number;
+}
+
+export interface HistoryPromptView {
+  id: string;
+  ordinal: number;
+  purpose: "feature" | "diagnostic" | "correction";
+  content: string;
+  coding_agent_key: CodingAgentKey;
+  effort_category: EffortCategory | null;
+  accepted_at: string;
+  handed_off_at: string | null;
+}
+
+export interface HistoryCheckView {
+  sequence: number;
+  relationship: "initial" | "retry_after_unsure" | "follow_up";
+  supersedes_sequence: number | null;
+  check_plan: string;
+  plan_source: "codize" | "student";
+  status: "proposed" | "performed" | "not_run";
+  result: CheckResult | null;
+  student_observation: string | null;
+  created_at: string;
+  performed_at: string | null;
+  not_run_at: string | null;
+}
+
+export interface HistoryRecoveryView {
+  episode_number: number;
+  status: "open" | "investigating" | "correcting" | "rechecking" | "resolved" | "abandoned";
+  observed_symptom: string;
+  opened_at: string;
+  investigation_finding: string | null;
+  investigation_finding_provenance: "agent_claimed" | null;
+  correction_summary: string | null;
+  resolution_summary: string | null;
+  resolved_at: string | null;
+  recheck_state: "pending" | "completed" | null;
+}
+
+export interface HistoryChangeView {
+  id: string;
+  goal: string;
+  done_condition: string | null;
+  status: "active" | "recovering" | "completed" | "completed_after_recovery" | "cancelled";
+  lifecycle_state: string;
+  started_at: string;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  completion_summary: string;
+  prompts: HistoryPromptView[];
+  prompts_truncated: boolean;
+  checks: HistoryCheckView[];
+  checks_truncated: boolean;
+  recoveries: HistoryRecoveryView[];
+  recoveries_truncated: boolean;
+}
+
+export interface HistoryResponse {
+  workflow_version: "v2";
+  project_id: string;
+  project_name: string;
+  project_created_at: string;
+  changes: HistoryChangeView[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  next_offset: number | null;
+  transfer_question: string | null;
+}
+
 export interface CodingAgentSelectionResponse {
   workflow_version: "v2";
   project_id: string;

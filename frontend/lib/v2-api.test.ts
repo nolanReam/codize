@@ -6,6 +6,8 @@ import {
   acceptRecoveryPrompt,
   createStudentCheckPlan,
   getBuildState,
+  getHistory,
+  getLearning,
   getProjectRefs,
   handoffPrompt,
   requestTeachingHelp,
@@ -48,6 +50,16 @@ describe("V2 frontend API contract", () => {
     expect(url).toBe(
       "http://codize.test/v2/projects/project-1/current-change/change-2/build-state"
     );
+  });
+
+  it("loads bounded read-only Learning and History projections", async () => {
+    await getLearning("project/with space");
+    await getHistory("project/with space", 10, 20);
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls[0][0]).toBe("http://codize.test/v2/projects/project%2Fwith%20space/learning");
+    expect(calls[1][0]).toBe("http://codize.test/v2/projects/project%2Fwith%20space/history?limit=10&offset=20");
+    expect(calls[0][1]?.method).toBe("GET");
+    expect(calls[1][1]?.method).toBe("GET");
   });
 
   it("sends optimistic versions when choosing a coding agent", async () => {

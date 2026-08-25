@@ -92,6 +92,119 @@ class RecentChangesResponse(BaseModel):
     recent_changes: list[RecentChangeView]
 
 
+LearnerStatusValue = Literal["new", "guided", "practiced", "recently_independent"]
+
+
+class LearningEvidenceView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observed_behavior: str
+    support_explanation: str
+    observed_at: datetime
+    project_name: str | None
+    current_change_goal: str | None
+
+
+class LearningCompetencyView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    name: str
+    description: str
+    status: LearnerStatusValue
+    status_explanation: str
+    support_direction: Literal["more", "less"]
+    recent_evidence: list[LearningEvidenceView]
+
+
+class LearningResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: Literal["v2"] = "v2"
+    project_id: UUID
+    competencies: list[LearningCompetencyView]
+    recent_evidence_limit: int
+
+
+class HistoryPromptView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    ordinal: int
+    purpose: PromptPurpose
+    content: str
+    coding_agent_key: CodingAgentKey
+    effort_category: EffortCategory | None
+    accepted_at: datetime
+    handed_off_at: datetime | None
+
+
+class HistoryCheckView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sequence: int
+    relationship: Literal["initial", "retry_after_unsure", "follow_up"]
+    supersedes_sequence: int | None
+    check_plan: str
+    plan_source: Literal["codize", "student"]
+    status: Literal["proposed", "performed", "not_run"]
+    result: CheckResult | None
+    student_observation: str | None
+    created_at: datetime
+    performed_at: datetime | None
+    not_run_at: datetime | None
+
+
+class HistoryRecoveryView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    episode_number: int
+    status: RecoveryStatus
+    observed_symptom: str
+    opened_at: datetime
+    investigation_finding: str | None
+    investigation_finding_provenance: Literal["agent_claimed"] | None
+    correction_summary: str | None
+    resolution_summary: str | None
+    resolved_at: datetime | None
+    recheck_state: Literal["pending", "completed"] | None
+
+
+class HistoryChangeView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    goal: str
+    done_condition: str | None
+    status: Literal["active", "recovering", "completed", "completed_after_recovery", "cancelled"]
+    lifecycle_state: CurrentChangeState
+    started_at: datetime
+    completed_at: datetime | None
+    cancelled_at: datetime | None
+    completion_summary: str
+    prompts: list[HistoryPromptView]
+    prompts_truncated: bool
+    checks: list[HistoryCheckView]
+    checks_truncated: bool
+    recoveries: list[HistoryRecoveryView]
+    recoveries_truncated: bool
+
+
+class HistoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_version: Literal["v2"] = "v2"
+    project_id: UUID
+    project_name: str
+    project_created_at: datetime
+    changes: list[HistoryChangeView]
+    limit: int
+    offset: int
+    has_more: bool
+    next_offset: int | None
+    transfer_question: str | None
+
+
 class V2ProjectView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

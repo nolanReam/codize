@@ -9,6 +9,8 @@ import type {
   CurrentChangeView,
   EffortCategory,
   EffortFeedbackView,
+  HistoryResponse,
+  LearningResponse,
   PlanResponse,
   ProjectRefView,
   RecentChangeView,
@@ -58,6 +60,12 @@ export const getV2Plan = (projectId: string) =>
 export const getRecentChanges = (projectId: string) =>
   request<{ recent_changes: RecentChangeView[] }>(
     v2(`/projects/${encodeURIComponent(projectId)}/recent-changes`));
+export const getLearning = (projectId: string) =>
+  request<LearningResponse>(v2(`/projects/${encodeURIComponent(projectId)}/learning`));
+export const getHistory = (projectId: string, limit = 10, offset = 0) =>
+  request<HistoryResponse>(v2(
+    `/projects/${encodeURIComponent(projectId)}/history?limit=${limit}&offset=${offset}`
+  ));
 export const getCurrentChange = (projectId: string) =>
   request<CurrentChangeResponse>(
     v2(`/projects/${encodeURIComponent(projectId)}/current-change`)

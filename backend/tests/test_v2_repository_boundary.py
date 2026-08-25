@@ -116,7 +116,9 @@ def test_production_repository_returns_canonical_check_plan_replay_before_requal
         "id": str(CHECK_ID), "project_id": str(PROJECT_ID), "owner_user_id": OWNER,
         "current_change_id": str(CHANGE_ID), "check_plan": plan,
         "plan_source": "student", "status": "proposed", "result": None,
-        "student_observation": None, "performed_at": None, "version": 1,
+        "student_observation": None, "performed_at": None, "not_run_at": None,
+        "supersedes_check_id": None, "created_at": "2026-08-23T12:00:00Z",
+        "version": 1,
     }
     repo = object.__new__(SupabaseV2Repository)
     repo._request = AsyncMock(side_effect=[[turn], [check]])
@@ -151,3 +153,29 @@ def test_production_repository_replay_rejects_material_payload_mismatch():
         ))
 
     assert repo._request.await_count == 1
+
+
+def test_history_repository_reads_checks_and_recoveries_in_canonical_bounded_order():
+    repo = object.__new__(SupabaseV2Repository)
+    repo._request = AsyncMock(side_effect=[[], [], []])
+
+    assert asyncio.run(repo.list_history_checks(
+        OWNER, PROJECT_ID, CHANGE_ID, limit=50,
+    )) == ([], False)
+    assert asyncio.run(repo.list_history_recovery_cases(
+        OWNER, PROJECT_ID, CHANGE_ID, limit=10,
+    )) == ([], False)
+    assert asyncio.run(repo.get_latest_history_performed_check(
+        OWNER, PROJECT_ID, CHANGE_ID,
+    )) is None
+
+    check_params = repo._request.await_args_list[0].kwargs["params"]
+    recovery_params = repo._request.await_args_list[1].kwargs["params"]
+    final_check_params = repo._request.await_args_list[2].kwargs["params"]
+    assert check_params["order"] == "created_at.asc,id.asc"
+    assert check_params["limit"] == "51"
+    assert recovery_params["order"] == "opened_at.asc,id.asc"
+    assert recovery_params["limit"] == "11"
+    assert final_check_params["status"] == "eq.performed"
+    assert final_check_params["order"] == "performed_at.desc,id.desc"
+    assert final_check_params["limit"] == "1"

@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps.auth import CurrentUser, require_user
 from app.schemas.v2 import (
@@ -24,6 +24,8 @@ from app.schemas.v2 import (
     ManualCheckRequest,
     ManualLoopResponse,
     ManualReturnRequest,
+    HistoryResponse,
+    LearningResponse,
     CheckPlanRequest,
     PlanMutationRequest,
     PlanResponse,
@@ -61,6 +63,7 @@ from app.services import (
     v2_plan_service,
     v2_project_service,
     v2_recovery_service,
+    v2_reflection_service,
     v2_teaching_service,
 )
 from app.services.project_repository import ProjectRepository, get_project_repository
@@ -142,6 +145,34 @@ async def list_recent_changes(
 ) -> RecentChangesResponse:
     try:
         return await v2_project_service.list_recent_changes(repo, user.user_id, project_id)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/projects/{project_id}/learning", response_model=LearningResponse)
+async def get_learning(
+    project_id: UUID,
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> LearningResponse:
+    try:
+        return await v2_reflection_service.get_learning(repo, user.user_id, project_id)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/projects/{project_id}/history", response_model=HistoryResponse)
+async def get_history(
+    project_id: UUID,
+    limit: int = Query(default=10, ge=1, le=20),
+    offset: int = Query(default=0, ge=0, le=10000),
+    user: CurrentUser = Depends(require_user),
+    repo: V2Repository = Depends(get_v2_repository),
+) -> HistoryResponse:
+    try:
+        return await v2_reflection_service.get_history(
+            repo, user.user_id, project_id, limit=limit, offset=offset
+        )
     except V2ApplicationError as exc:
         raise _http_error(exc) from exc
 
