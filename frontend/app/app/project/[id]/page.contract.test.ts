@@ -19,6 +19,14 @@ describe("V2 draft setup resumability contract", () => {
     expect(home).toContain("<V2ProjectSetupForm project={state.project} onComplete={load} />");
     expect(setup).toContain("Project ID:");
     expect(setup).toContain("project.version");
+    expect(setup).toContain("project.setup_draft?.project_context");
+    expect(setup).toContain("project.setup_draft?.initial_change_label");
+    expect(setup).toContain("project.setup_draft?.done_condition");
+    expect(setup).toContain("saveSetupDraft(");
+    expect(setup).toContain("Save progress");
+    expect(setup).toContain("draftCommand.current?.signature");
+    expect(setup).toContain("reason.status === 409");
     expect(setup).toContain("await onComplete()");
+    expect(setup).not.toContain("localStorage");
   });
 });

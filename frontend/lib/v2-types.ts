@@ -56,6 +56,11 @@ export interface V2ProjectView {
   display_name: string;
   lifecycle_state: V2LifecycleState;
   setup_resume_step: string;
+  setup_draft: {
+    project_context: string;
+    initial_change_label: string;
+    done_condition: string;
+  } | null;
   coding_agent_key: string | null;
   plan_version: number;
   version: number;

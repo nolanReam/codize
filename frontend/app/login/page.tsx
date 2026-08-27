@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { POST_AUTH_DESTINATION } from "@/lib/auth-navigation";
 import { getSupabase } from "@/lib/supabase";
 
 export default function LoginPage() {
@@ -14,7 +15,19 @@ export default function LoginPage() {
   // scroll into, but reset explicitly as well.
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    const supabase = getSupabase();
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active && data.session) router.replace(POST_AUTH_DESTINATION);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (active && session) router.replace(POST_AUTH_DESTINATION);
+    });
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [router]);
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -50,9 +63,7 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      // Spec: signup goes straight into the app — the cockpit forwards new
-      // users to intake question 1.
-      router.replace("/app");
+      router.replace(POST_AUTH_DESTINATION);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed. Try again.");
     } finally {
@@ -72,7 +83,7 @@ export default function LoginPage() {
         <p className="muted" style={{ marginBottom: 18 }}>
           {mode === "signin"
             ? "Back to the workspace."
-            : "You'll go straight into project intake — no dashboard detours."}
+            : "You'll go straight to your projects — no dashboard detours."}
         </p>
 
         {error && <div className="notice error">{error}</div>}

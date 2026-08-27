@@ -1691,6 +1691,109 @@ def test_display_name_creation_stays_in_canonical_setup(client, intent, expected
     assert created["setup_resume_step"] == expected_step
 
 
+@pytest.mark.parametrize("intent", ["new_idea", "already_building"])
+def test_partial_setup_resumes_rejects_stale_writes_and_finishes_once(client, intent):
+    project = create_project(client, intent=intent, activate=False)["project"]
+    path = f"/v2/projects/{project['project_id']}/setup-draft"
+    command_id = str(uuid.uuid4())
+    draft = {
+        "workflow_version": "v2",
+        "command_id": command_id,
+        "expected_project_version": project["version"],
+        "project_context": "A student-owned score tracker",
+        "initial_change_label": "",
+        "done_condition": "",
+    }
+
+    saved = client.put(path, headers=auth_headers(), json=draft)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["replayed"] is False
+    assert saved.json()["project"]["version"] == project["version"] + 1
+
+    resumed = client.get(
+        f"/v2/projects/{project['project_id']}", headers=auth_headers()
+    )
+    assert resumed.status_code == 200
+    assert resumed.json()["setup_draft"] == {
+        "project_context": "A student-owned score tracker",
+        "initial_change_label": "",
+        "done_condition": "",
+    }
+    assert client.get(
+        f"/v2/projects/{project['project_id']}", headers=auth_headers(USER_B)
+    ).status_code == 404
+
+    retry = client.put(path, headers=auth_headers(), json=draft)
+    assert retry.status_code == 200
+    assert retry.json()["replayed"] is True
+    assert retry.json()["project"]["version"] == project["version"] + 1
+
+    stale = client.put(path, headers=auth_headers(), json={
+        **draft,
+        "command_id": str(uuid.uuid4()),
+        "project_context": "Stale overwrite",
+    })
+    assert stale.status_code == 409
+    preserved = client.get(
+        f"/v2/projects/{project['project_id']}", headers=auth_headers()
+    ).json()
+    assert preserved["setup_draft"]["project_context"] == "A student-owned score tracker"
+
+    progressed = client.put(path, headers=auth_headers(), json={
+        **draft,
+        "command_id": str(uuid.uuid4()),
+        "expected_project_version": preserved["version"],
+        "initial_change_label": "Show the first score",
+    })
+    assert progressed.status_code == 200, progressed.text
+    preserved = client.get(
+        f"/v2/projects/{project['project_id']}", headers=auth_headers()
+    ).json()
+    assert preserved["setup_draft"]["initial_change_label"] == "Show the first score"
+    assert preserved["setup_draft"]["done_condition"] == ""
+
+    setup_command = str(uuid.uuid4())
+    item_id = str(uuid.uuid4())
+    setup_body = {
+        "workflow_version": "v2",
+        "command_id": setup_command,
+        "expected_project_version": preserved["version"],
+        "project_context": "A student-owned score tracker",
+        "plan_item_id": item_id,
+        "change_label": "Show the first score",
+        "done_condition": "The score changes visibly",
+    }
+    established = client.post(
+        f"/v2/projects/{project['project_id']}/manual-setup",
+        headers=auth_headers(), json=setup_body,
+    )
+    assert established.status_code == 200, established.text
+    assert established.json()["replayed"] is False
+
+    exact_retry = client.post(
+        f"/v2/projects/{project['project_id']}/manual-setup",
+        headers=auth_headers(), json=setup_body,
+    )
+    assert exact_retry.status_code == 200
+    assert exact_retry.json()["replayed"] is True
+
+    fresh_session_retry = client.post(
+        f"/v2/projects/{project['project_id']}/manual-setup",
+        headers=auth_headers(), json={
+            **setup_body,
+            "command_id": str(uuid.uuid4()),
+            "plan_item_id": str(uuid.uuid4()),
+        },
+    )
+    assert fresh_session_retry.status_code == 200
+    assert fresh_session_retry.json()["replayed"] is True
+    assert fresh_session_retry.json()["plan_item"]["id"] == item_id
+    plan = client.get(
+        f"/v2/projects/{project['project_id']}/plan", headers=auth_headers()
+    ).json()
+    assert len(plan["items"]) == 1
+
+
 def test_recovery_first_requires_context_and_starts_unresolved_recovery_work(client):
     denied = client.post(
         "/v2/projects",

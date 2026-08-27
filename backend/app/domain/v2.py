@@ -283,6 +283,13 @@ class ProjectRef:
 
 
 @dataclass(frozen=True, slots=True)
+class V2SetupDraft:
+    project_context: str
+    initial_change_label: str
+    done_condition: str
+
+
+@dataclass(frozen=True, slots=True)
 class V2Project:
     ref: ProjectRef
     display_name: str
@@ -294,6 +301,7 @@ class V2Project:
     first_version_completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    setup_draft: V2SetupDraft | None = None
 
 
 @dataclass(frozen=True, slots=True)

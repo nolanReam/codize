@@ -37,6 +37,15 @@ export const establishManualProject = (
     project_context: projectContext, plan_item_id: planItemId, change_label: changeLabel,
     done_condition: doneCondition,
   }});
+export const saveSetupDraft = (
+  projectId: string, projectVersion: number, commandId: string,
+  projectContext: string, initialChangeLabel: string, doneCondition: string
+) => request<{ project: V2ProjectView; replayed: boolean }>(
+  v2(`/projects/${encodeURIComponent(projectId)}/setup-draft`), { method: "PUT", body: {
+    workflow_version: "v2", command_id: commandId,
+    expected_project_version: projectVersion, project_context: projectContext,
+    initial_change_label: initialChangeLabel, done_condition: doneCondition,
+  }});
 export const startCurrentChange = (projectId: string, projectVersion: number,
   planItemId: string, goal: string, commandId = crypto.randomUUID()) =>
   request<CurrentChangeResponse>(v2(`/projects/${encodeURIComponent(projectId)}/current-change`), {

@@ -6,6 +6,14 @@ const source = readFileSync(resolve(process.cwd(), "app/app/project/[id]/build/p
 const css = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
 
 describe("V2 Build foundation contract", () => {
+  it("resolves completed refresh, active work, empty projects, and request errors explicitly", () => {
+    expect(source).toContain("resolveLoadedBuildStatus(false, Boolean(latest))");
+    expect(source).toContain("resolveLoadedBuildStatus(true, false)");
+    expect(source).toContain('setLoadStatus("error")');
+    expect(source).toContain('loadStatus === "error"');
+    expect(source).toContain("Build couldn’t load");
+    expect(source).not.toContain("!data && !empty && !error");
+  });
   it("renders the backend-owned manual loop from confirmation through completion", () => {
     for (const stage of [
       "choose_agent",

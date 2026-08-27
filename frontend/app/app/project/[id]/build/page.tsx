@@ -8,6 +8,7 @@ import V2Character from "@/components/v2/V2Character";
 import V2Dialogue from "@/components/v2/V2Dialogue";
 import { V2Button, V2Card, V2Notice, V2Skeleton } from "@/components/v2/V2Primitives";
 import { ApiError } from "@/lib/api";
+import { resolveLoadedBuildStatus, type BuildPageLoadStatus } from "@/lib/v2-build-view";
 import {
   acceptPrompt,
   completeCurrentChange,
@@ -73,7 +74,7 @@ interface LogicalCommandIdentity {
 export default function BuildPage() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<BuildData | null>(null);
-  const [empty, setEmpty] = useState(false);
+  const [loadStatus, setLoadStatus] = useState<BuildPageLoadStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,7 +83,7 @@ export default function BuildPage() {
   const [editingReview, setEditingReview] = useState(false);
   const [showWhy, setShowWhy] = useState(false);
   const [agentHelp, setAgentHelp] = useState(false);
-  const [status, setStatus] = useState("");
+  const [announcement, setAnnouncement] = useState("");
   const [observation, setObservation] = useState("");
   const [recoverySymptom, setRecoverySymptom] = useState("");
   const [lastKnownWorking, setLastKnownWorking] = useState("");
@@ -116,6 +117,8 @@ export default function BuildPage() {
   }, []);
 
   const load = useCallback(async () => {
+    setLoadStatus("loading");
+    setData(null);
     setError(null);
     try {
       const [project, current, plan, preferences, recent] = await Promise.all([
@@ -124,9 +127,8 @@ export default function BuildPage() {
       setSoundEnabled(preferences.dialogue_sound_enabled);
       if (!current.current_change) {
         const latest = recent.recent_changes[0];
-        if (latest) setCompleted({ observation: latest.observation, goal: latest.goal });
-        setEmpty(!latest);
-        setData(null);
+        setCompleted(latest ? { observation: latest.observation, goal: latest.goal } : null);
+        setLoadStatus(resolveLoadedBuildStatus(false, Boolean(latest)));
         return;
       }
       const build = await getBuildState(id, current.current_change.id);
@@ -139,9 +141,11 @@ export default function BuildPage() {
         "Make only this focused change. Preserve existing working behavior and report what changed.",
       ].join("\n\n"));
       setEffort(build.effort_category ?? "");
-      setEmpty(false);
+      setCompleted(null);
+      setLoadStatus(resolveLoadedBuildStatus(true, false));
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : "Couldn't load this build.");
+      setLoadStatus("error");
     }
   }, [id]);
 
@@ -156,7 +160,7 @@ export default function BuildPage() {
       setConflict(null);
       try {
         await action();
-        if (successMessage) setStatus(successMessage);
+        if (successMessage) setAnnouncement(successMessage);
         await load();
       } catch (reason) {
         if (reason instanceof ApiError && reason.status === 409) {
@@ -326,6 +330,8 @@ export default function BuildPage() {
         data.build.current_change_version, data.project.plan_version, planItem.version);
       setCompleted({ observation: result.check.student_observation ?? "Check completed.",
         goal: data.change.goal_snapshot });
+      setData(null);
+      setLoadStatus("completed");
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 409) { setConflict("The completion state changed. Reloading the latest version."); await load(); }
       else setError(reason instanceof ApiError ? reason.message : "Couldn't complete this change.");
@@ -370,7 +376,7 @@ export default function BuildPage() {
       .then(async (result) => {
         resolveCommand("effort", identity.commandId);
         setEffortMessage(result.feedback.message);
-        setStatus(result.feedback.message);
+        setAnnouncement(result.feedback.message);
         await load();
       })
       .catch(async (reason) => {
@@ -489,17 +495,32 @@ export default function BuildPage() {
     if (!data?.build.exact_handoff_prompt) return;
     try {
       await navigator.clipboard.writeText(data.build.exact_handoff_prompt);
-      setStatus("Prompt copied.");
+      setAnnouncement("Prompt copied.");
     } catch {
       setError("Clipboard access is unavailable. You can select the prompt and copy it manually.");
     }
   };
 
-  if (!data && !empty && !error) {
+  if (loadStatus === "loading") {
     return <div className="v2-page v2-build-page"><V2Card><V2Skeleton lines={7} /></V2Card></div>;
   }
 
-  if (empty) {
+  if (loadStatus === "error") {
+    return (
+      <div className="v2-page v2-page-narrow">
+        <V2Card>
+          <h1>Build couldn’t load</h1>
+          <V2Notice tone="error">{error ?? "Couldn't load this build."}</V2Notice>
+          <div className="v2-action-row">
+            <V2Button type="button" onClick={() => void load()}>Try again</V2Button>
+            <Link className="v2-button v2-button-secondary" href={`/app/project/${id}`}>Back to Project</Link>
+          </div>
+        </V2Card>
+      </div>
+    );
+  }
+
+  if (loadStatus === "empty") {
     return (
       <div className="v2-page v2-page-narrow">
         <V2Card>
@@ -511,7 +532,7 @@ export default function BuildPage() {
     );
   }
 
-  if (completed) return <div className="v2-page v2-page-narrow"><V2Card className="v2-complete-card">
+  if (loadStatus === "completed" && completed) return <div className="v2-page v2-page-narrow"><V2Card className="v2-complete-card">
     <p className="v2-card-label">Done</p><h1>{completed.goal}</h1>
     <p><span aria-hidden="true">✓</span> Checked: {completed.observation}</p>
     <div className="v2-action-row"><Link className="v2-button v2-button-primary" href={`/app/project/${id}`}>Back to Project</Link>
@@ -540,7 +561,7 @@ export default function BuildPage() {
           {effortMessage && data.build.build_stage !== "choose_effort" && (
             <V2Notice>{effortMessage}</V2Notice>
           )}
-          <p className="sr-only" role="status" aria-live="polite">{status}</p>
+          <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
 
           <div className="v2-conversation">
             {recoveryActive && (

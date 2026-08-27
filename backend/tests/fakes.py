@@ -34,6 +34,7 @@ from app.domain.v2 import (
     V2Plan,
     V2PlanItem,
     V2Project,
+    V2SetupDraft,
     V2RecentChange,
     V2PromptVersion,
     V2RecoveryCase,
@@ -306,6 +307,9 @@ class InMemoryV2Repository:
         self._manual_setup_payloads: dict[
             uuid.UUID, tuple[str, str, str, uuid.UUID]
         ] = {}
+        self._setup_draft_commands: dict[
+            tuple[str, uuid.UUID], tuple[uuid.UUID, str, str, str]
+        ] = {}
         self._preferences: dict[str, V2UserPreferences] = {}
         self._learner_evidence: dict[uuid.UUID, tuple[str, V2LearnerEvidence]] = {}
         self._teaching_progress: dict[uuid.UUID, V2TeachingProgress] = {}
@@ -322,6 +326,42 @@ class InMemoryV2Repository:
 
     def _store_project(self, owner_user_id: str, project: V2Project) -> None:
         self._projects[project.ref.project_id] = (owner_user_id, project)
+
+    async def save_setup_draft(
+        self, owner_user_id: str, project_id: uuid.UUID, expected_project_version: int,
+        command_id: uuid.UUID, project_context: str, initial_change_label: str,
+        done_condition: str,
+    ) -> tuple[V2Project, bool]:
+        project = self._owned_project(owner_user_id, project_id)
+        values = (
+            project_context.strip(), initial_change_label.strip(), done_condition.strip()
+        )
+        if any(len(value.encode("utf-8")) > maximum for value, maximum in zip(
+            values, (8192, 200, 4096), strict=True
+        )):
+            raise V2RepositoryInvalidState("setup draft is too large")
+        command_key = (owner_user_id, command_id)
+        prior = self._setup_draft_commands.get(command_key)
+        expected = (project_id, *values)
+        if prior is not None:
+            if prior != expected or project.setup_draft != V2SetupDraft(*values):
+                raise V2RepositoryConflict("setup draft command reused")
+            return project, True
+        if (
+            project.version != expected_project_version
+            or project.lifecycle_state is not ProjectLifecycle.DRAFT
+            or project.setup_resume_step not in {
+                SetupResumeStep.IDEA_CAPTURE, SetupResumeStep.EXISTING_PROJECT_CONTEXT
+            }
+        ):
+            raise V2RepositoryConflict("stale setup draft")
+        project = replace(
+            project, setup_draft=V2SetupDraft(*values),
+            version=project.version + 1, updated_at=self._now(),
+        )
+        self._store_project(owner_user_id, project)
+        self._setup_draft_commands[command_key] = expected
+        return project, False
 
     async def establish_manual_project(
         self, owner_user_id: str, project_id: uuid.UUID, expected_project_version: int,
@@ -345,7 +385,7 @@ class InMemoryV2Repository:
         if (
             project.lifecycle_state is ProjectLifecycle.ACTIVE
             and project.setup_resume_step is SetupResumeStep.READY
-            and project.version == 2
+            and project.version >= 2
             and project.plan_version == 2
             and prior_setup is not None
             and prior_setup[:3] == (
@@ -366,7 +406,8 @@ class InMemoryV2Repository:
         )
         project = replace(project, lifecycle_state=ProjectLifecycle.ACTIVE,
             setup_resume_step=SetupResumeStep.READY, plan_version=project.plan_version + 1,
-            version=project.version + 1, updated_at=self._now())
+            version=project.version + 1, updated_at=self._now(),
+            setup_draft=V2SetupDraft(project_context.strip(), "", ""))
         self._plans[project_id] = {plan_item_id: item}
         self._store_project(owner_user_id, project)
         self._manual_commands[command_id] = ("setup", plan_item_id)
@@ -1738,7 +1779,7 @@ class InMemoryV2Repository:
                 plan_source=check.plan_source,
                 status="proposed", result=None, student_observation=None,
                 performed_at=None, not_run_at=None, supersedes_check_id=check.id,
-                created_at=now, version=1)
+                created_at=self._now(), version=1)
             self._checks[next_check_id] = (owner_user_id, next_check)
         recovery = parsed in {CheckResult.DID_NOT_WORK, CheckResult.PARTLY_WORKED}
         change = replace(change,

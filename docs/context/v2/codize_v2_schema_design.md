@@ -233,6 +233,7 @@ Every table is backend-only at the database boundary. `v2_generation_attempts` s
 | `lifecycle_state` | `varchar(32)` | no | controlled project lifecycle |
 | `setup_resume_step` | `varchar(40)` | no | bounded setup position; `ready` after setup |
 | `setup_draft` | `jsonb` | yes | object only, at most 16 KiB, schema selected by `setup_resume_step`; never accepted truth |
+| `setup_draft_command_id` | `uuid` | yes | scopes the latest retryable partial-setup save; backend-only provenance, never exposed in Project views |
 | `coding_agent_key` | `varchar(64)` | yes | maintained configuration key, not a provider label invented by a model |
 | `plan_version` | `bigint` | no | starts at 1; increments on any accepted plan mutation |
 | `last_plan_command_id` | `uuid` | yes | makes a retried plan mutation recognizable under PostgREST |
@@ -244,7 +245,7 @@ Every table is backend-only at the database boundary. `v2_generation_attempts` s
 | `version` | `bigint` | no | optimistic aggregate version |
 | `created_at`, `updated_at` | `timestamptz` | no | server-authored |
 
-Constraints tie deletion timestamps to `deletion_pending`; `temporary_recovery` cannot have a First Version completion timestamp; `setup_draft`, when present, must be a JSON object. Unique indexes cover `(owner_user_id, create_command_id)`, nonnull `(owner_user_id, deletion_command_id)`, and nonnull `(owner_user_id, last_plan_command_id)`. The last of these scopes a latest-plan command ID to one current owner/project slot; it is not a historical receipt ledger.
+Constraints tie deletion timestamps to `deletion_pending`; `temporary_recovery` cannot have a First Version completion timestamp; `setup_draft`, when present, must be a JSON object. Unique indexes cover `(owner_user_id, create_command_id)`, nonnull `(owner_user_id, deletion_command_id)`, nonnull `(owner_user_id, setup_draft_command_id)`, and nonnull `(owner_user_id, last_plan_command_id)`. The last two scope latest-operation command IDs to one current owner/project slot; neither is a historical receipt ledger.
 
 **Delete:** Physical delete cascades to project-scoped rows after the deletion orchestrator handles preferences and Learner Evidence. Auth-user deletion is restricted until V2 roots are purged.
 
@@ -658,6 +659,7 @@ V2.2 DDL must include and test at least the following.
 | idempotent project/change/check/recovery creation | unique owner + operation command ID |
 | idempotent prompt acceptance/handoff/completion/cancellation | partial unique owner + relevant command ID |
 | latest plan-command scope | partial unique `(owner_user_id, last_plan_command_id)` where the command ID is nonnull |
+| latest setup-draft-command scope | partial unique `(owner_user_id, setup_draft_command_id)` where the command ID is nonnull |
 | plan ordering and ordinary plan read | deferrable unique `(project_id, scope_band, order_key)` plus `(owner_user_id, project_id, scope_band, order_key)` where status is not `removed` |
 | project list/switcher | `(owner_user_id, lifecycle_state, updated_at desc)` |
 | explicit Current Change lookup/history | `(owner_user_id, project_id, created_at desc)` |

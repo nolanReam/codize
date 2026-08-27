@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.domain.v2 import ProjectRef, V2Project
+from app.domain.v2 import ProjectLifecycle, ProjectRef, V2Project
 from app.schemas.v2 import (
     CreateProjectRequest,
     EstablishManualProjectRequest,
@@ -16,6 +16,8 @@ from app.schemas.v2 import (
     ProjectRefView,
     RecentChangeView,
     RecentChangesResponse,
+    SaveSetupDraftRequest,
+    SetupDraftView,
     PurgeProjectResponse,
     V2ProjectView,
 )
@@ -36,6 +38,15 @@ def project_view(project: V2Project) -> V2ProjectView:
         display_name=project.display_name,
         lifecycle_state=project.lifecycle_state,
         setup_resume_step=project.setup_resume_step,
+        setup_draft=(
+            SetupDraftView(
+                project_context=project.setup_draft.project_context,
+                initial_change_label=project.setup_draft.initial_change_label,
+                done_condition=project.setup_draft.done_condition,
+            )
+            if project.lifecycle_state is ProjectLifecycle.DRAFT and project.setup_draft
+            else None
+        ),
         coding_agent_key=project.coding_agent_key,
         plan_version=project.plan_version,
         version=project.version,
@@ -100,6 +111,23 @@ async def establish_manual_project(
             terminal_current_change_id=item.terminal_current_change_id,
         ), replayed=replayed,
     )
+
+
+async def save_setup_draft(
+    repo: V2Repository, owner_user_id: str, project_id: UUID,
+    request: SaveSetupDraftRequest,
+) -> ProjectCommandResponse:
+    try:
+        project, replayed = await repo.save_setup_draft(
+            owner_user_id, project_id, request.expected_project_version,
+            request.command_id, request.project_context,
+            request.initial_change_label, request.done_condition,
+        )
+    except V2RepositoryNotFound as exc:
+        raise V2NotFoundError("V2 Project not found.") from exc
+    except (V2RepositoryConflict, V2RepositoryInvalidState) as exc:
+        raise V2ConflictError("The Project setup draft changed or cannot be saved.") from exc
+    return ProjectCommandResponse(project=project_view(project), replayed=replayed)
 
 
 async def get_project(

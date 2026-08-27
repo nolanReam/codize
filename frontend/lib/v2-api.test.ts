@@ -16,6 +16,7 @@ import {
   respondToTeaching,
   selectCodingAgent,
   selectEffort,
+  saveSetupDraft,
 } from "./v2-api";
 
 describe("V2 frontend API contract", () => {
@@ -50,6 +51,23 @@ describe("V2 frontend API contract", () => {
     expect(url).toBe(
       "http://codize.test/v2/projects/project-1/current-change/change-2/build-state"
     );
+  });
+
+  it("saves a bounded setup draft against an explicit Project version and command", async () => {
+    await saveSetupDraft(
+      "project/one", 4, "draft-command", "A score app", "Show a score", ""
+    );
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("http://codize.test/v2/projects/project%2Fone/setup-draft");
+    expect(init?.method).toBe("PUT");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      workflow_version: "v2",
+      command_id: "draft-command",
+      expected_project_version: 4,
+      project_context: "A score app",
+      initial_change_label: "Show a score",
+      done_condition: "",
+    });
   });
 
   it("loads bounded read-only Learning and History projections", async () => {

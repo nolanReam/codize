@@ -42,6 +42,7 @@ from app.domain.v2 import (
     V2Plan,
     V2PlanItem,
     V2Project,
+    V2SetupDraft,
     V2RecentChange,
     V2PromptVersion,
     V2RecoveryCase,
@@ -54,7 +55,7 @@ from app.domain.v2 import (
 _TIMEOUT = 10.0
 _PROJECT_SELECT = (
     "id,owner_user_id,workflow_version,display_name,lifecycle_state,"
-    "setup_resume_step,coding_agent_key,plan_version,first_version_completed_at,"
+    "setup_resume_step,setup_draft,coding_agent_key,plan_version,first_version_completed_at,"
     "version,created_at,updated_at"
 )
 _PLAN_ITEM_SELECT = (
@@ -137,6 +138,7 @@ class _ProjectRow(BaseModel):
     display_name: str
     lifecycle_state: ProjectLifecycle
     setup_resume_step: SetupResumeStep
+    setup_draft: dict[str, Any] | None = None
     coding_agent_key: str | None
     plan_version: int = Field(gt=0)
     first_version_completed_at: datetime | None
@@ -316,6 +318,12 @@ class _LearnerEvidenceRow(BaseModel):
 
 
 class V2Repository(Protocol):
+    async def save_setup_draft(
+        self, owner_user_id: str, project_id: UUID, expected_project_version: int,
+        command_id: UUID, project_context: str, initial_change_label: str,
+        done_condition: str,
+    ) -> tuple[V2Project, bool]: ...
+
     async def establish_manual_project(
         self, owner_user_id: str, project_id: UUID, expected_project_version: int,
         command_id: UUID, project_context: str, plan_item_id: UUID,
@@ -659,6 +667,20 @@ def _project_from_row(raw: Any, *, expected_owner: str | None = None) -> V2Proje
         raise V2RepositoryError("database returned a V2 Project for the wrong owner")
     if not row.display_name.strip():
         raise V2RepositoryError("database returned a blank V2 Project name")
+    setup_draft = None
+    if row.setup_draft is not None:
+        draft_values: list[str] = []
+        for key, maximum in (
+            ("project_context", 8192),
+            ("initial_change_label", 200),
+            ("done_condition", 4096),
+        ):
+            value = row.setup_draft.get(key, "")
+            if not isinstance(value, str) or len(value.encode("utf-8")) > maximum:
+                raise V2RepositoryError("database returned a malformed V2 setup draft")
+            draft_values.append(value)
+        if any(draft_values):
+            setup_draft = V2SetupDraft(*draft_values)
     return V2Project(
         ref=ProjectRef(WorkflowVersion.V2, row.id),
         display_name=row.display_name,
@@ -670,6 +692,7 @@ def _project_from_row(raw: Any, *, expected_owner: str | None = None) -> V2Proje
         first_version_completed_at=row.first_version_completed_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        setup_draft=setup_draft,
     )
 
 
@@ -1009,6 +1032,27 @@ class SupabaseV2Repository:
         if not isinstance(value, dict):
             raise V2RepositoryError(f"{context} returned a malformed object")
         return value
+
+    async def save_setup_draft(
+        self, owner_user_id: str, project_id: UUID, expected_project_version: int,
+        command_id: UUID, project_context: str, initial_change_label: str,
+        done_condition: str,
+    ) -> tuple[V2Project, bool]:
+        payload = self._object(await self._rpc("save_v2_setup_draft", {
+            "p_owner_user_id": owner_user_id,
+            "p_project_id": str(project_id),
+            "p_expected_project_version": expected_project_version,
+            "p_command_id": str(command_id),
+            "p_project_context": project_context,
+            "p_initial_change_label": initial_change_label,
+            "p_done_condition": done_condition,
+        }), "save_v2_setup_draft")
+        replayed = payload.get("replayed")
+        if not isinstance(replayed, bool):
+            raise V2RepositoryError("setup draft save omitted replay state")
+        return _project_from_row(
+            payload.get("project"), expected_owner=owner_user_id
+        ), replayed
 
     async def establish_manual_project(
         self, owner_user_id: str, project_id: UUID, expected_project_version: int,

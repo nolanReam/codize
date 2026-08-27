@@ -54,6 +54,13 @@ def _bounded_utf8_preserving(value: str, maximum: int, field_name: str) -> str:
     return value
 
 
+def _bounded_utf8_allow_empty(value: str, maximum: int, field_name: str) -> str:
+    value = value.strip()
+    if len(value.encode("utf-8")) > maximum:
+        raise ValueError(f"{field_name} is too long")
+    return value
+
+
 class ProjectRefView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -205,6 +212,14 @@ class HistoryResponse(BaseModel):
     transfer_question: str | None
 
 
+class SetupDraftView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_context: str
+    initial_change_label: str
+    done_condition: str
+
+
 class V2ProjectView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -213,6 +228,7 @@ class V2ProjectView(BaseModel):
     display_name: str
     lifecycle_state: ProjectLifecycle
     setup_resume_step: SetupResumeStep
+    setup_draft: SetupDraftView | None
     coding_agent_key: str | None
     plan_version: int
     version: int
@@ -226,6 +242,31 @@ class ProjectCommandResponse(BaseModel):
 
     project: V2ProjectView
     replayed: bool
+
+
+class SaveSetupDraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    workflow_version: WorkflowV2
+    command_id: UUID
+    expected_project_version: int = Field(gt=0)
+    project_context: str = ""
+    initial_change_label: str = ""
+    done_condition: str = ""
+
+    @field_validator("project_context")
+    @classmethod
+    def validate_context(cls, value: str) -> str:
+        return _bounded_utf8_allow_empty(value, 8192, "project_context")
+
+    @field_validator("initial_change_label")
+    @classmethod
+    def validate_change(cls, value: str) -> str:
+        return _bounded_utf8_allow_empty(value, 200, "initial_change_label")
+
+    @field_validator("done_condition")
+    @classmethod
+    def validate_done(cls, value: str) -> str:
+        return _bounded_utf8_allow_empty(value, 4096, "done_condition")
 
 
 class EstablishManualProjectRequest(BaseModel):

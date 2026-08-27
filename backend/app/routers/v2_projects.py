@@ -38,6 +38,7 @@ from app.schemas.v2 import (
     PromptHandoffResponse,
     PromptVersionsResponse,
     RecentChangesResponse,
+    SaveSetupDraftRequest,
     RecoveryCheckRequest,
     RecoveryCommandResponse,
     RecoveryCorrectionReturnRequest,
@@ -109,6 +110,17 @@ async def establish_manual_project(
 ) -> EstablishManualProjectResponse:
     try:
         return await v2_project_service.establish_manual_project(repo, user.user_id, project_id, body)
+    except V2ApplicationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.put("/projects/{project_id}/setup-draft", response_model=ProjectCommandResponse)
+async def save_setup_draft(
+    project_id: UUID, body: SaveSetupDraftRequest,
+    user: CurrentUser = Depends(require_user), repo: V2Repository = Depends(get_v2_repository),
+) -> ProjectCommandResponse:
+    try:
+        return await v2_project_service.save_setup_draft(repo, user.user_id, project_id, body)
     except V2ApplicationError as exc:
         raise _http_error(exc) from exc
 
