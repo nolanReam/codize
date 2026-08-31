@@ -3,6 +3,11 @@
 
 begin;
 
+-- Existing private routines are owned by the NOLOGIN executor role. Retain
+-- temporary ownership authority through the complete privilege setup below.
+grant codize_v2_executor to current_user with set true;
+grant create on schema codize_v2_internal to codize_v2_executor;
+
 create function codize_v2_internal.record_v2_recovery_symptom(
   p_owner_user_id uuid, p_project_id uuid, p_current_change_id uuid,
   p_recovery_case_id uuid, p_expected_current_change_version bigint,
@@ -607,5 +612,8 @@ begin
   return pg_catalog.jsonb_build_object('current_change',pg_catalog.to_jsonb(v_change),'replayed',false);
 end;
 $$;
+
+revoke create on schema codize_v2_internal from codize_v2_executor;
+revoke codize_v2_executor from current_user;
 
 commit;

@@ -2,6 +2,11 @@
 -- No new tables: durable interaction state uses Current Change, Build Turns,
 -- Checks, and append-oriented Learner Evidence.
 
+-- Existing private routines are owned by the NOLOGIN executor role. Retain
+-- temporary ownership authority through the complete privilege setup below.
+grant codize_v2_executor to current_user with set true;
+grant create on schema codize_v2_internal to codize_v2_executor;
+
 alter table public.v2_current_changes
   add column risk_input_fingerprint text;
 alter table public.v2_current_changes
@@ -911,6 +916,9 @@ grant execute on function
   public.v2_qualifies_structured_response(text,text),
   public.v2_qualifies_check_plan(text)
 to codize_v2_executor;
+
+revoke create on schema codize_v2_internal from codize_v2_executor;
+revoke codize_v2_executor from current_user;
 
 comment on function public.resolve_v2_current_change_policy(uuid,uuid,uuid,bigint,uuid,text,text,text,text,text,text,text,text,text)
   is 'Atomically persists Phase 5 deterministic teaching/risk/check policy and the next durable resume step.';

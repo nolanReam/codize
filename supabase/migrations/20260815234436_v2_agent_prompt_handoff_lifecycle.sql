@@ -98,6 +98,7 @@ create trigger v2_09_feature_prompt_snapshot
   for each row execute function public.v2_guard_feature_prompt_snapshot();
 
 grant codize_v2_executor to current_user with set true;
+grant create on schema codize_v2_internal to codize_v2_executor;
 
 create function codize_v2_internal.update_v2_coding_agent(
   p_owner_user_id uuid,
@@ -630,4 +631,5 @@ grant execute on function
   public.apply_v2_generated_prompt_draft(uuid, uuid, uuid, bigint, bigint, bigint, text, text, text[])
 to service_role;
 
+revoke create on schema codize_v2_internal from codize_v2_executor;
 revoke codize_v2_executor from current_user;

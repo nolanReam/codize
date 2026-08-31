@@ -128,8 +128,13 @@ def test_transaction_functions_use_private_definers_and_public_invoker_wrappers(
     membership_revoke = sql.index("revoke codize_v2_executor from current_user;")
     assert membership_grant < ownership_transfer < membership_revoke
     assert (
-        "alter default privileges\n"
+        "alter default privileges for role postgres in schema public\n"
         "  revoke execute on functions from public, anon, authenticated, service_role;"
+        in sql
+    )
+    assert (
+        "alter default privileges for role postgres\n"
+        "  revoke execute on functions from public;"
         in sql
     )
     assert (
@@ -222,6 +227,10 @@ def test_verifier_exercises_behavior_and_rolls_back_all_fixtures():
         "multibyte reason exceeded the 256-byte bound",
         "pg_default_acl permits a forbidden future-object grant",
         "global function default acl hardening is missing for an execution role",
+        "future public function inherited a forbidden execute grant",
+        "explicit backend-only future-function grant was ineffective",
+        "explicit backend-only future-function grant reached a browser role",
+        "drop function public.codize_v2_default_acl_verification_probe()",
         "private v2 executor role attributes or membership are unsafe",
         "rollback;",
     ):

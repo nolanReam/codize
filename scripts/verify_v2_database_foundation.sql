@@ -129,15 +129,40 @@ begin
       and not r.rolcanlogin and not r.rolinherit and not r.rolsuper
       and not r.rolcreatedb and not r.rolcreaterole and not r.rolreplication
       and r.rolbypassrls
-  ) or exists (
-    select 1 from pg_catalog.pg_auth_members as m
-    where m.roleid = (
-      select oid from pg_catalog.pg_roles where rolname = 'codize_v2_executor'
-    )
   ) or pg_catalog.has_schema_privilege('codize_v2_executor', 'public', 'CREATE')
      or pg_catalog.has_schema_privilege(
        'codize_v2_executor', 'codize_v2_internal', 'CREATE'
      ) then
+    raise exception 'private V2 executor role attributes or membership are unsafe';
+  end if;
+  -- PostgreSQL 17 gives a non-superuser CREATEROLE creator an administrative
+  -- membership in each role it creates. Hosted Supabase records that bootstrap
+  -- grant as postgres <- codize_v2_executor, granted by supabase_admin, with
+  -- ADMIN only: INHERIT and SET are both false. That exact row lets the
+  -- migration/owner role administer the role but exposes no executor runtime
+  -- privilege. Zero rows (for a superuser-created disposable role) is also safe.
+  if (
+    select count(*)
+    from pg_catalog.pg_auth_members as m
+    where m.roleid = (
+      select oid from pg_catalog.pg_roles where rolname = 'codize_v2_executor'
+    )
+  ) > 1 or exists (
+    select 1
+    from pg_catalog.pg_auth_members as m
+    join pg_catalog.pg_roles as member_role on member_role.oid = m.member
+    join pg_catalog.pg_roles as grantor_role on grantor_role.oid = m.grantor
+    where m.roleid = (
+      select oid from pg_catalog.pg_roles where rolname = 'codize_v2_executor'
+    )
+      and not (
+        member_role.rolname = 'postgres'
+        and grantor_role.rolname = 'supabase_admin'
+        and m.admin_option
+        and not m.inherit_option
+        and not m.set_option
+      )
+  ) then
     raise exception 'private V2 executor role attributes or membership are unsafe';
   end if;
   if exists (
@@ -201,6 +226,66 @@ begin
   end if;
 end
 $$;
+
+-- Prove the hardened defaults on a future public function, then prove that an
+-- explicit backend-only grant remains possible. This object is removed here
+-- and the enclosing verification transaction is rolled back as a second guard.
+create function public.codize_v2_default_acl_verification_probe()
+returns integer
+language sql
+security invoker
+set search_path = ''
+as 'select 1';
+
+do $$
+begin
+  if exists (
+    select 1
+    from pg_catalog.pg_proc as p
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))
+    ) as acl
+    where p.oid = 'public.codize_v2_default_acl_verification_probe()'::regprocedure
+      and acl.privilege_type = 'EXECUTE'
+      and (
+        acl.grantee = 0
+        or pg_catalog.pg_get_userbyid(acl.grantee) in (
+          'anon', 'authenticated', 'service_role'
+        )
+      )
+  ) then
+    raise exception 'future public function inherited a forbidden EXECUTE grant';
+  end if;
+end
+$$;
+
+grant execute on function public.codize_v2_default_acl_verification_probe()
+  to service_role;
+
+do $$
+begin
+  if not pg_catalog.has_function_privilege(
+    'service_role',
+    'public.codize_v2_default_acl_verification_probe()',
+    'EXECUTE'
+  ) then
+    raise exception 'explicit backend-only future-function grant was ineffective';
+  end if;
+  if pg_catalog.has_function_privilege(
+    'anon',
+    'public.codize_v2_default_acl_verification_probe()',
+    'EXECUTE'
+  ) or pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.codize_v2_default_acl_verification_probe()',
+    'EXECUTE'
+  ) then
+    raise exception 'explicit backend-only future-function grant reached a browser role';
+  end if;
+end
+$$;
+
+drop function public.codize_v2_default_acl_verification_probe();
 
 -- Data/API roles must fail at the privilege layer, independent of RLS.
 set local role anon;

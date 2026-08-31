@@ -4345,10 +4345,14 @@ alter default privileges in schema public
   revoke all privileges on tables from public, anon, authenticated, service_role;
 alter default privileges in schema public
   revoke all privileges on sequences from public, anon, authenticated, service_role;
--- Function EXECUTE is granted to PUBLIC by PostgreSQL's global defaults.
--- Revoke it globally: a schema-scoped revoke cannot subtract a global default.
-alter default privileges
+-- Hosted Supabase projects add schema-scoped EXECUTE defaults for the Data API
+-- roles. Remove those separately because per-schema defaults are additive.
+alter default privileges for role postgres in schema public
   revoke execute on functions from public, anon, authenticated, service_role;
+-- PostgreSQL also grants EXECUTE to PUBLIC in its ordinary global defaults. A
+-- schema-scoped revoke cannot subtract that global privilege.
+alter default privileges for role postgres
+  revoke execute on functions from public;
 alter default privileges for role codize_v2_executor
   revoke execute on functions from public, anon, authenticated, service_role;
 
@@ -4433,7 +4437,6 @@ alter function codize_v2_internal.purge_v2_project(uuid, uuid, bigint, text, jso
 
 revoke create on schema public from codize_v2_executor;
 revoke create on schema codize_v2_internal from codize_v2_executor;
-revoke codize_v2_executor from current_user;
 grant execute on function
   public.v2_valid_text_array(text[], integer, integer, integer, boolean),
   public.v2_system_fact_source_matches(uuid, uuid, text, text, text, text, boolean, numeric, text[], text, uuid),
@@ -4461,6 +4464,10 @@ grant execute on function
   public.complete_v2_current_change(uuid, uuid, uuid, bigint, bigint, bigint, uuid, boolean, text, text, jsonb, jsonb),
   public.purge_v2_project(uuid, uuid, bigint, text, jsonb)
 to service_role;
+
+-- Drop migration-time ownership authority only after every executor-owned
+-- function privilege has been configured.
+revoke codize_v2_executor from current_user;
 
 comment on table public.v2_projects is
   'Codize V2 project root. Separate from and does not reinterpret public.projects.';

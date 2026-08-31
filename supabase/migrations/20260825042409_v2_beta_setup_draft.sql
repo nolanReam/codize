@@ -1,6 +1,11 @@
 -- Beta-critical resumable Project setup. Partial answers remain bounded,
 -- structured Project state; command provenance is backend-only.
 
+-- Existing private routines are owned by the NOLOGIN executor role. Retain
+-- temporary ownership authority through the complete privilege setup below.
+grant codize_v2_executor to current_user with set true;
+grant create on schema codize_v2_internal to codize_v2_executor;
+
 alter table public.v2_projects
   add column setup_draft_command_id uuid;
 
@@ -219,6 +224,9 @@ to service_role;
 grant execute on function
   public.save_v2_setup_draft(uuid,uuid,bigint,uuid,text,text,text)
 to service_role;
+
+revoke create on schema codize_v2_internal from codize_v2_executor;
+revoke codize_v2_executor from current_user;
 
 comment on function public.save_v2_setup_draft(uuid,uuid,bigint,uuid,text,text,text)
   is 'Backend-only partial V2 Project setup persistence with optimistic concurrency and replay identity.';

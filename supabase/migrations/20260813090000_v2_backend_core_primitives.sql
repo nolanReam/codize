@@ -201,6 +201,7 @@ revoke execute on function
 from public, anon, authenticated, service_role;
 
 grant codize_v2_executor to current_user with set true;
+grant create on schema codize_v2_internal to codize_v2_executor;
 
 create function codize_v2_internal.create_v2_project(
   p_owner_user_id uuid,
@@ -863,6 +864,7 @@ grant execute on function
   public.cancel_v2_current_change(uuid, uuid, uuid, bigint, uuid, text)
 to service_role;
 
+revoke create on schema codize_v2_internal from codize_v2_executor;
 revoke codize_v2_executor from current_user;
 
 comment on function public.create_v2_project(uuid, uuid, text, text, jsonb, uuid) is
