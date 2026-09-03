@@ -3,10 +3,21 @@ HTTP, and acknowledge semantics. Reuses the gate-route harness — projects
 become active through the real intake + roadmap routes, and gate history /
 unlocks are produced by real gate PASSes with a scripted LLM."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
-from app.core.config import get_settings
-from app.services.project_repository import get_profile_repository
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+from app.core.config import Settings, get_settings
+from app.services import project_repository
+from app.services.project_repository import (
+    RepositoryAuthenticationError,
+    RepositoryError,
+    SupabaseProfileRepository,
+    get_profile_repository,
+)
 from tests.fakes import InMemoryProfileRepository
 from tests.test_gate_routes import (  # noqa: F401  (client/gate_llm fixtures)
     FIVE_ANSWERS,
@@ -36,9 +47,150 @@ def ago(hours: float) -> str:
 def test_reconnection_routes_require_auth(client):
     use_profiles(client)
     for method, path in (("GET", "/reconnection"), ("POST", "/reconnection/acknowledge")):
-        resp = client.request(method, path)
+        resp = client.request(method, path, headers={"Origin": "http://localhost:3000"})
         assert resp.status_code == 401
-        assert resp.json()["error"]["status"] == 401
+        assert resp.json() == {
+            "error": {"status": 401, "message": "Missing bearer token."}
+        }
+        assert resp.headers["WWW-Authenticate"] == "Bearer"
+        assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_invalid_reconnection_token_is_rejected_before_profile_access(client):
+    class ProfileAccessMustNotRun:
+        async def get_profile(self, user_id: str) -> dict | None:
+            raise AssertionError("profile repository must not run")
+
+        async def set_last_login(self, user_id: str, last_login_at: str) -> dict:
+            raise AssertionError("profile repository must not run")
+
+    client.app_ref.dependency_overrides[get_profile_repository] = ProfileAccessMustNotRun
+
+    resp = client.get(
+        "/reconnection",
+        headers={
+            "Authorization": "Bearer invalid-token",
+            "Origin": "http://localhost:3000",
+        },
+    )
+
+    assert resp.status_code == 401
+    assert resp.json() == {
+        "error": {"status": 401, "message": "Invalid or expired token."}
+    }
+    assert resp.headers["WWW-Authenticate"] == "Bearer"
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+class FailingProfileRepository:
+    def __init__(self, error: RepositoryError) -> None:
+        self.error = error
+
+    async def get_profile(self, user_id: str) -> dict | None:
+        raise self.error
+
+    async def set_last_login(self, user_id: str, last_login_at: str) -> dict:
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [("GET", "/reconnection"), ("POST", "/reconnection/acknowledge")],
+)
+def test_upstream_profile_authentication_failure_is_controlled_401_with_cors(
+    client, method: str, path: str,
+):
+    leaked_detail = "sensitive upstream authentication response"
+    client.app_ref.dependency_overrides[get_profile_repository] = lambda: FailingProfileRepository(
+        RepositoryAuthenticationError(leaked_detail)
+    )
+    safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
+
+    resp = safe_client.request(
+        method,
+        path,
+        headers={**auth_headers(), "Origin": "http://localhost:3000"},
+    )
+
+    assert resp.status_code == 401
+    assert resp.json() == {
+        "error": {"status": 401, "message": "Invalid or expired token."}
+    }
+    assert resp.headers["WWW-Authenticate"] == "Bearer"
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert resp.headers["access-control-allow-credentials"] == "true"
+    assert leaked_detail not in resp.text
+    assert "summary" not in resp.text
+    assert "last_login_at" not in resp.text
+
+
+def test_non_auth_profile_repository_failure_remains_sanitized_500_with_cors(client):
+    leaked_detail = "database response with private profile content"
+    client.app_ref.dependency_overrides[get_profile_repository] = lambda: FailingProfileRepository(
+        RepositoryError(leaked_detail)
+    )
+    safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
+
+    resp = safe_client.get(
+        "/reconnection",
+        headers={**auth_headers(), "Origin": "http://localhost:3000"},
+    )
+
+    assert resp.status_code == 500
+    assert resp.json() == {
+        "error": {"status": 500, "message": "Internal server error."}
+    }
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert resp.headers["access-control-allow-credentials"] == "true"
+    assert leaked_detail not in resp.text
+
+
+def test_profile_repository_classifies_upstream_401_without_leaking_body(monkeypatch):
+    leaked_body = "sensitive Supabase response body"
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(401, json={"message": leaked_body})
+    )
+    async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        project_repository.httpx,
+        "AsyncClient",
+        lambda *, timeout: async_client(transport=transport, timeout=timeout),
+    )
+    repo = SupabaseProfileRepository(
+        Settings(
+            supabase_url="https://stub-project.supabase.co",
+            supabase_service_role_key="server-only-test-key",
+        )
+    )
+
+    with pytest.raises(RepositoryAuthenticationError) as caught:
+        asyncio.run(repo.get_profile(USER_A))
+
+    assert leaked_body not in str(caught.value)
+    assert "server-only-test-key" not in str(caught.value)
+
+
+def test_profile_repository_does_not_classify_unrelated_upstream_error_as_auth(monkeypatch):
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(403, json={"message": "forbidden"})
+    )
+    async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        project_repository.httpx,
+        "AsyncClient",
+        lambda *, timeout: async_client(transport=transport, timeout=timeout),
+    )
+    repo = SupabaseProfileRepository(
+        Settings(
+            supabase_url="https://stub-project.supabase.co",
+            supabase_service_role_key="server-only-test-key",
+        )
+    )
+
+    with pytest.raises(RepositoryError) as caught:
+        asyncio.run(repo.get_profile(USER_A))
+
+    assert type(caught.value) is RepositoryError
 
 
 def test_new_user_gets_controlled_not_needed_state(client):

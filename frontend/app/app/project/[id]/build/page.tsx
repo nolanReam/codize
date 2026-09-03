@@ -376,7 +376,6 @@ export default function BuildPage() {
       .then(async (result) => {
         resolveCommand("effort", identity.commandId);
         setEffortMessage(result.feedback.message);
-        setAnnouncement(result.feedback.message);
         await load();
       })
       .catch(async (reason) => {

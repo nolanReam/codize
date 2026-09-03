@@ -91,6 +91,10 @@ class RepositoryError(RuntimeError):
     Reaches the client only as a bare 500 — never with internal detail."""
 
 
+class RepositoryAuthenticationError(RepositoryError):
+    """PostgREST rejected the repository request as unauthenticated."""
+
+
 class _SupabaseRest:
     """Shared PostgREST client. Every subclass query must filter by user_id —
     the service-role key bypasses RLS, so the query IS the ownership check."""
@@ -116,6 +120,12 @@ class _SupabaseRest:
                 )
                 resp.raise_for_status()
                 return resp.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise RepositoryAuthenticationError(
+                    f"PostgREST {method} {path} authentication failed"
+                ) from e
+            raise RepositoryError(f"PostgREST {method} {path} failed") from e
         except httpx.HTTPError as e:
             raise RepositoryError(f"PostgREST {method} {path} failed") from e
 

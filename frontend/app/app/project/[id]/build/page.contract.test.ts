@@ -48,6 +48,13 @@ describe("V2 Build foundation contract", () => {
     expect(source).toContain('useState<EffortCategory | "">("")');
   });
 
+  it("announces effort feedback exactly once through its visible status notice", () => {
+    expect(source).toContain("setEffortMessage(result.feedback.message)");
+    expect(source).not.toContain("setAnnouncement(result.feedback.message)");
+    expect(source).toContain('effortMessage && data.build.build_stage !== "choose_effort"');
+    expect(source).toContain("data.build.effort_feedback?.message ?? effortMessage");
+  });
+
   it("renders one durable adaptive teaching task with progressive help", () => {
     expect(source).toContain("data.build.teaching.mode");
     expect(source).toContain('data.build.teaching.risk === "slowdown"');

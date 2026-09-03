@@ -22,4 +22,11 @@ describe("V2 app shell navigation contract", () => {
   it("keeps the mobile project and account summary touch target at least 44px tall", () => {
     expect(css).toMatch(/\.v2-mobile-menu summary\s*\{[^}]*min-height:\s*44px/);
   });
+
+  it("gives every mobile account-menu action its visible label as an accessible name", () => {
+    expect(source).toContain('<Link href="/app/projects" aria-label="Switch project">Switch project</Link>');
+    expect(source).toContain('<Link href={characterHref} aria-label="Character"');
+    expect(source).toContain('<Link href={settingsHref} aria-label="Settings"');
+    expect(source).toContain('<button type="button" aria-label="Sign out" onClick={onSignOut}>Sign out</button>');
+  });
 });

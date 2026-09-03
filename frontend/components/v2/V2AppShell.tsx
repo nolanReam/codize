@@ -139,10 +139,10 @@ export default function V2AppShell({
         <details className="v2-mobile-menu">
           <summary aria-label="Open account menu">{projectName}</summary>
           <div>
-            <Link href="/app/projects">Switch project</Link>
-            <Link href={characterHref} aria-current={characterActive ? "page" : undefined}>Character</Link>
-            <Link href={settingsHref} aria-current={settingsActive ? "page" : undefined}>Settings</Link>
-            <button type="button" onClick={onSignOut}>Sign out</button>
+            <Link href="/app/projects" aria-label="Switch project">Switch project</Link>
+            <Link href={characterHref} aria-label="Character" aria-current={characterActive ? "page" : undefined}>Character</Link>
+            <Link href={settingsHref} aria-label="Settings" aria-current={settingsActive ? "page" : undefined}>Settings</Link>
+            <button type="button" aria-label="Sign out" onClick={onSignOut}>Sign out</button>
           </div>
         </details>
       </header>
