@@ -29,4 +29,20 @@ describe("V2 draft setup resumability contract", () => {
     expect(setup).toContain("await onComplete()");
     expect(setup).not.toContain("localStorage");
   });
+
+  it("focuses and describes every incomplete setup field after validation", () => {
+    expect(setup).toContain('const validationErrorId = "v2-project-setup-validation-error"');
+    expect(setup).toContain("const contextRef = useRef<HTMLTextAreaElement>(null)");
+    expect(setup).toContain("const changeRef = useRef<HTMLInputElement>(null)");
+    expect(setup).toContain("const doneRef = useRef<HTMLTextAreaElement>(null)");
+    expect(setup).toContain("const firstInvalidField = invalid.context");
+    expect(setup).toContain("firstInvalidField?.focus()");
+    expect(setup).toContain("aria-invalid={invalidFields.context || undefined}");
+    expect(setup).toContain("aria-invalid={invalidFields.change || undefined}");
+    expect(setup).toContain("aria-invalid={invalidFields.done || undefined}");
+    expect(setup).toContain("aria-describedby={invalidFields.context ? validationErrorId : undefined}");
+    expect(setup).toContain("aria-describedby={invalidFields.change ? validationErrorId : undefined}");
+    expect(setup).toContain("aria-describedby={invalidFields.done ? validationErrorId : undefined}");
+    expect(setup).toContain("<div id={validationErrorId}>");
+  });
 });
