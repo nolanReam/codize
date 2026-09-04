@@ -111,6 +111,7 @@ class _SupabaseRest:
     async def _request(
         self, method: str, path: str, *,
         params: dict, json: dict | None = None, headers: dict | None = None,
+        classify_unauthorized_as_authentication: bool = False,
     ) -> list[dict]:
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -121,7 +122,13 @@ class _SupabaseRest:
                 resp.raise_for_status()
                 return resp.json()
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401:
+            # Reconnection deliberately treats only profile-boundary 401s as
+            # caller authentication failures. Every shared service-key-backed
+            # repository keeps the default server-failure classification.
+            if (
+                classify_unauthorized_as_authentication
+                and e.response.status_code == 401
+            ):
                 raise RepositoryAuthenticationError(
                     f"PostgREST {method} {path} authentication failed"
                 ) from e
@@ -307,7 +314,10 @@ class SupabaseUnlockRepository(_SupabaseRest):
 class SupabaseProfileRepository(_SupabaseRest):
     async def get_profile(self, user_id: str) -> dict | None:
         rows = await self._request(
-            "GET", "/profiles", params={"user_id": f"eq.{user_id}", "limit": "1"}
+            "GET",
+            "/profiles",
+            params={"user_id": f"eq.{user_id}", "limit": "1"},
+            classify_unauthorized_as_authentication=True,
         )
         return rows[0] if rows else None
 
@@ -319,6 +329,7 @@ class SupabaseProfileRepository(_SupabaseRest):
             params={"on_conflict": "user_id"},
             json={"user_id": user_id, "last_login_at": last_login_at},
             headers={"Prefer": "return=representation,resolution=merge-duplicates"},
+            classify_unauthorized_as_authentication=True,
         )
         if not rows:
             raise RepositoryError("profile upsert returned no row")

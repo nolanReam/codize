@@ -15,8 +15,13 @@ from app.services import project_repository
 from app.services.project_repository import (
     RepositoryAuthenticationError,
     RepositoryError,
+    SupabaseGateSessionRepository,
+    SupabaseProjectRepository,
     SupabaseProfileRepository,
+    SupabaseUnlockRepository,
     get_profile_repository,
+    get_project_repository,
+    get_unlock_repository,
 )
 from tests.fakes import InMemoryProfileRepository
 from tests.test_gate_routes import (  # noqa: F401  (client/gate_llm fixtures)
@@ -42,6 +47,27 @@ def use_profiles(client):
 
 def ago(hours: float) -> str:
     return (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+
+
+def mock_supabase_response(monkeypatch, status_code: int, body: dict) -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(status_code, json=body)
+    )
+    async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        project_repository.httpx,
+        "AsyncClient",
+        lambda *, timeout: async_client(transport=transport, timeout=timeout),
+    )
+
+
+def supabase_repository(repository_type):
+    return repository_type(
+        Settings(
+            supabase_url="https://stub-project.supabase.co",
+            supabase_service_role_key="server-only-test-key",
+        )
+    )
 
 
 def test_reconnection_routes_require_auth(client):
@@ -98,12 +124,12 @@ class FailingProfileRepository:
     [("GET", "/reconnection"), ("POST", "/reconnection/acknowledge")],
 )
 def test_upstream_profile_authentication_failure_is_controlled_401_with_cors(
-    client, method: str, path: str,
+    client, monkeypatch, method: str, path: str,
 ):
     leaked_detail = "sensitive upstream authentication response"
-    client.app_ref.dependency_overrides[get_profile_repository] = lambda: FailingProfileRepository(
-        RepositoryAuthenticationError(leaked_detail)
-    )
+    mock_supabase_response(monkeypatch, 401, {"message": leaked_detail})
+    profile_repo = supabase_repository(SupabaseProfileRepository)
+    client.app_ref.dependency_overrides[get_profile_repository] = lambda: profile_repo
     safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
 
     resp = safe_client.request(
@@ -142,26 +168,88 @@ def test_non_auth_profile_repository_failure_remains_sanitized_500_with_cors(cli
     }
     assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
     assert resp.headers["access-control-allow-credentials"] == "true"
+    assert "WWW-Authenticate" not in resp.headers
     assert leaked_detail not in resp.text
+
+
+def test_upstream_profile_403_is_controlled_sanitized_500(client, monkeypatch):
+    leaked_detail = "forbidden profile response with private content"
+    mock_supabase_response(monkeypatch, 403, {"message": leaked_detail})
+    profile_repo = supabase_repository(SupabaseProfileRepository)
+    client.app_ref.dependency_overrides[get_profile_repository] = lambda: profile_repo
+    safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
+
+    resp = safe_client.get(
+        "/reconnection",
+        headers={**auth_headers(), "Origin": "http://localhost:3000"},
+    )
+
+    assert resp.status_code == 500
+    assert resp.json() == {
+        "error": {"status": 500, "message": "Internal server error."}
+    }
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert resp.headers["access-control-allow-credentials"] == "true"
+    assert "WWW-Authenticate" not in resp.headers
+    assert leaked_detail not in resp.text
+    assert "summary" not in resp.text
+
+
+def test_upstream_project_401_is_controlled_sanitized_500(client, monkeypatch):
+    leaked_detail = "service credential rejected with private project content"
+    profiles = use_profiles(client)
+    profiles.seed(USER_A, ago(100))
+    mock_supabase_response(monkeypatch, 401, {"message": leaked_detail})
+    project_repo = supabase_repository(SupabaseProjectRepository)
+    client.app_ref.dependency_overrides[get_project_repository] = lambda: project_repo
+    safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
+
+    resp = safe_client.get(
+        "/reconnection",
+        headers={**auth_headers(), "Origin": "http://localhost:3000"},
+    )
+
+    assert resp.status_code == 500
+    assert resp.json() == {
+        "error": {"status": 500, "message": "Internal server error."}
+    }
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert resp.headers["access-control-allow-credentials"] == "true"
+    assert "WWW-Authenticate" not in resp.headers
+    assert leaked_detail not in resp.text
+    assert "summary" not in resp.text
+
+
+def test_upstream_unlock_401_is_controlled_sanitized_500(client, monkeypatch):
+    leaked_detail = "service credential rejected with private unlock content"
+    profiles = use_profiles(client)
+    activate_project(client)
+    profiles.seed(USER_A, ago(100))
+    mock_supabase_response(monkeypatch, 401, {"message": leaked_detail})
+    unlock_repo = supabase_repository(SupabaseUnlockRepository)
+    client.app_ref.dependency_overrides[get_unlock_repository] = lambda: unlock_repo
+    safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
+
+    resp = safe_client.get(
+        "/reconnection",
+        headers={**auth_headers(), "Origin": "http://localhost:3000"},
+    )
+
+    assert resp.status_code == 500
+    assert resp.json() == {
+        "error": {"status": 500, "message": "Internal server error."}
+    }
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert resp.headers["access-control-allow-credentials"] == "true"
+    assert "WWW-Authenticate" not in resp.headers
+    assert leaked_detail not in resp.text
+    assert "summary" not in resp.text
 
 
 def test_profile_repository_classifies_upstream_401_without_leaking_body(monkeypatch):
     leaked_body = "sensitive Supabase response body"
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(401, json={"message": leaked_body})
-    )
-    async_client = httpx.AsyncClient
-    monkeypatch.setattr(
-        project_repository.httpx,
-        "AsyncClient",
-        lambda *, timeout: async_client(transport=transport, timeout=timeout),
-    )
-    repo = SupabaseProfileRepository(
-        Settings(
-            supabase_url="https://stub-project.supabase.co",
-            supabase_service_role_key="server-only-test-key",
-        )
-    )
+    mock_supabase_response(monkeypatch, 401, {"message": leaked_body})
+    repo = supabase_repository(SupabaseProfileRepository)
 
     with pytest.raises(RepositoryAuthenticationError) as caught:
         asyncio.run(repo.get_profile(USER_A))
@@ -171,24 +259,35 @@ def test_profile_repository_classifies_upstream_401_without_leaking_body(monkeyp
 
 
 def test_profile_repository_does_not_classify_unrelated_upstream_error_as_auth(monkeypatch):
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(403, json={"message": "forbidden"})
-    )
-    async_client = httpx.AsyncClient
-    monkeypatch.setattr(
-        project_repository.httpx,
-        "AsyncClient",
-        lambda *, timeout: async_client(transport=transport, timeout=timeout),
-    )
-    repo = SupabaseProfileRepository(
-        Settings(
-            supabase_url="https://stub-project.supabase.co",
-            supabase_service_role_key="server-only-test-key",
-        )
-    )
+    mock_supabase_response(monkeypatch, 403, {"message": "forbidden"})
+    repo = supabase_repository(SupabaseProfileRepository)
 
     with pytest.raises(RepositoryError) as caught:
         asyncio.run(repo.get_profile(USER_A))
+
+    assert type(caught.value) is RepositoryError
+
+
+@pytest.mark.parametrize(
+    ("repository_type", "method_name", "args"),
+    [
+        (SupabaseProjectRepository, "get_project", (USER_A,)),
+        (SupabaseUnlockRepository, "list_unlocks", (USER_A, "project-id")),
+        (
+            SupabaseGateSessionRepository,
+            "list_phase_sessions",
+            (USER_A, "project-id", 1),
+        ),
+    ],
+)
+def test_service_credential_repository_401_remains_server_failure(
+    monkeypatch, repository_type, method_name: str, args: tuple,
+):
+    mock_supabase_response(monkeypatch, 401, {"message": "private upstream detail"})
+    repo = supabase_repository(repository_type)
+
+    with pytest.raises(RepositoryError) as caught:
+        asyncio.run(getattr(repo, method_name)(*args))
 
     assert type(caught.value) is RepositoryError
 
