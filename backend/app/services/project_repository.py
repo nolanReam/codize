@@ -91,10 +91,6 @@ class RepositoryError(RuntimeError):
     Reaches the client only as a bare 500 — never with internal detail."""
 
 
-class RepositoryAuthenticationError(RepositoryError):
-    """PostgREST rejected the repository request as unauthenticated."""
-
-
 class _SupabaseRest:
     """Shared PostgREST client. Every subclass query must filter by user_id —
     the service-role key bypasses RLS, so the query IS the ownership check."""
@@ -111,7 +107,6 @@ class _SupabaseRest:
     async def _request(
         self, method: str, path: str, *,
         params: dict, json: dict | None = None, headers: dict | None = None,
-        classify_unauthorized_as_authentication: bool = False,
     ) -> list[dict]:
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -122,16 +117,6 @@ class _SupabaseRest:
                 resp.raise_for_status()
                 return resp.json()
         except httpx.HTTPStatusError as e:
-            # Reconnection deliberately treats only profile-boundary 401s as
-            # caller authentication failures. Every shared service-key-backed
-            # repository keeps the default server-failure classification.
-            if (
-                classify_unauthorized_as_authentication
-                and e.response.status_code == 401
-            ):
-                raise RepositoryAuthenticationError(
-                    f"PostgREST {method} {path} authentication failed"
-                ) from e
             raise RepositoryError(f"PostgREST {method} {path} failed") from e
         except httpx.HTTPError as e:
             raise RepositoryError(f"PostgREST {method} {path} failed") from e
@@ -317,7 +302,6 @@ class SupabaseProfileRepository(_SupabaseRest):
             "GET",
             "/profiles",
             params={"user_id": f"eq.{user_id}", "limit": "1"},
-            classify_unauthorized_as_authentication=True,
         )
         return rows[0] if rows else None
 
@@ -329,7 +313,6 @@ class SupabaseProfileRepository(_SupabaseRest):
             params={"on_conflict": "user_id"},
             json={"user_id": user_id, "last_login_at": last_login_at},
             headers={"Prefer": "return=representation,resolution=merge-duplicates"},
-            classify_unauthorized_as_authentication=True,
         )
         if not rows:
             raise RepositoryError("profile upsert returned no row")

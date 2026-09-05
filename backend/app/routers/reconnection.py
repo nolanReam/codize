@@ -16,7 +16,6 @@ from app.services import reconnection_service
 from app.services.project_repository import (
     ProfileRepository,
     ProjectRepository,
-    RepositoryAuthenticationError,
     RepositoryError,
     UnlockRepository,
     get_profile_repository,
@@ -25,14 +24,6 @@ from app.services.project_repository import (
 )
 
 router = APIRouter(prefix="/reconnection")
-
-
-def _repository_auth_error() -> HTTPException:
-    return HTTPException(
-        status_code=401,
-        detail="Invalid or expired token.",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
 
 
 def _repository_error() -> HTTPException:
@@ -50,8 +41,6 @@ async def get_reconnection_state(
         return await reconnection_service.get_reconnection_state(
             profile_repo, project_repo, unlock_repo, user.user_id
         )
-    except RepositoryAuthenticationError as exc:
-        raise _repository_auth_error() from exc
     except RepositoryError as exc:
         raise _repository_error() from exc
 
@@ -63,7 +52,5 @@ async def acknowledge(
 ) -> dict:
     try:
         return await reconnection_service.acknowledge(profile_repo, user.user_id)
-    except RepositoryAuthenticationError as exc:
-        raise _repository_auth_error() from exc
     except RepositoryError as exc:
         raise _repository_error() from exc

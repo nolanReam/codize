@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings, get_settings
 from app.services import project_repository
 from app.services.project_repository import (
-    RepositoryAuthenticationError,
     RepositoryError,
     SupabaseGateSessionRepository,
     SupabaseProjectRepository,
@@ -37,6 +36,14 @@ from tests.test_gate_routes import (  # noqa: F401  (client/gate_llm fixtures)
 )
 
 HIGH_PASS = '{"verdict": "PASS", "reason": "Strong specific answer.", "score": 8}'
+UPSTREAM_LEAK_SENTINELS = (
+    "sensitive Supabase response body",
+    "select * from private_table",
+    "caller-bearer-token",
+    "server-only-test-key",
+    "student-private-content",
+    "httpx.HTTPStatusError internal detail",
+)
 
 
 def use_profiles(client):
@@ -70,40 +77,65 @@ def supabase_repository(repository_type):
     )
 
 
-def test_reconnection_routes_require_auth(client):
-    use_profiles(client)
-    for method, path in (("GET", "/reconnection"), ("POST", "/reconnection/acknowledge")):
-        resp = client.request(method, path, headers={"Origin": "http://localhost:3000"})
-        assert resp.status_code == 401
-        assert resp.json() == {
-            "error": {"status": 401, "message": "Missing bearer token."}
-        }
-        assert resp.headers["WWW-Authenticate"] == "Bearer"
-        assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+def upstream_failure_body() -> dict:
+    return {"message": " | ".join(UPSTREAM_LEAK_SENTINELS)}
 
 
-def test_invalid_reconnection_token_is_rejected_before_profile_access(client):
-    class ProfileAccessMustNotRun:
-        async def get_profile(self, user_id: str) -> dict | None:
-            raise AssertionError("profile repository must not run")
+def assert_sanitized_repository_failure(resp) -> None:
+    assert resp.status_code == 500
+    assert resp.json() == {
+        "error": {"status": 500, "message": "Internal server error."}
+    }
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert resp.headers["access-control-allow-credentials"] == "true"
+    assert "WWW-Authenticate" not in resp.headers
+    for sentinel in UPSTREAM_LEAK_SENTINELS:
+        assert sentinel not in resp.text
 
-        async def set_last_login(self, user_id: str, last_login_at: str) -> dict:
-            raise AssertionError("profile repository must not run")
 
-    client.app_ref.dependency_overrides[get_profile_repository] = ProfileAccessMustNotRun
+class RepositoryAccessMustNotRun:
+    async def get_profile(self, user_id: str) -> dict | None:
+        raise AssertionError("profile repository must not run")
 
-    resp = client.get(
-        "/reconnection",
-        headers={
-            "Authorization": "Bearer invalid-token",
-            "Origin": "http://localhost:3000",
-        },
-    )
+    async def set_last_login(self, user_id: str, last_login_at: str) -> dict:
+        raise AssertionError("profile repository must not run")
+
+    async def get_project(self, user_id: str) -> dict | None:
+        raise AssertionError("project repository must not run")
+
+    async def list_unlocks(self, user_id: str, project_id: str) -> list[dict]:
+        raise AssertionError("unlock repository must not run")
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "authorization", "message"),
+    [
+        ("GET", "/reconnection", None, "Missing bearer token."),
+        ("POST", "/reconnection/acknowledge", None, "Missing bearer token."),
+        ("GET", "/reconnection", "Bearer invalid-token", "Invalid or expired token."),
+        (
+            "POST",
+            "/reconnection/acknowledge",
+            "Bearer invalid-token",
+            "Invalid or expired token.",
+        ),
+    ],
+)
+def test_reconnection_routes_reject_caller_auth_before_repository_access(
+    client, method: str, path: str, authorization: str | None, message: str,
+):
+    blocker = RepositoryAccessMustNotRun()
+    client.app_ref.dependency_overrides[get_profile_repository] = lambda: blocker
+    client.app_ref.dependency_overrides[get_project_repository] = lambda: blocker
+    client.app_ref.dependency_overrides[get_unlock_repository] = lambda: blocker
+    headers = {"Origin": "http://localhost:3000"}
+    if authorization is not None:
+        headers["Authorization"] = authorization
+
+    resp = client.request(method, path, headers=headers)
 
     assert resp.status_code == 401
-    assert resp.json() == {
-        "error": {"status": 401, "message": "Invalid or expired token."}
-    }
+    assert resp.json() == {"error": {"status": 401, "message": message}}
     assert resp.headers["WWW-Authenticate"] == "Bearer"
     assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
 
@@ -123,11 +155,10 @@ class FailingProfileRepository:
     ("method", "path"),
     [("GET", "/reconnection"), ("POST", "/reconnection/acknowledge")],
 )
-def test_upstream_profile_authentication_failure_is_controlled_401_with_cors(
+def test_upstream_profile_401_is_controlled_sanitized_500_with_cors(
     client, monkeypatch, method: str, path: str,
 ):
-    leaked_detail = "sensitive upstream authentication response"
-    mock_supabase_response(monkeypatch, 401, {"message": leaked_detail})
+    mock_supabase_response(monkeypatch, 401, upstream_failure_body())
     profile_repo = supabase_repository(SupabaseProfileRepository)
     client.app_ref.dependency_overrides[get_profile_repository] = lambda: profile_repo
     safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
@@ -138,14 +169,7 @@ def test_upstream_profile_authentication_failure_is_controlled_401_with_cors(
         headers={**auth_headers(), "Origin": "http://localhost:3000"},
     )
 
-    assert resp.status_code == 401
-    assert resp.json() == {
-        "error": {"status": 401, "message": "Invalid or expired token."}
-    }
-    assert resp.headers["WWW-Authenticate"] == "Bearer"
-    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
-    assert resp.headers["access-control-allow-credentials"] == "true"
-    assert leaked_detail not in resp.text
+    assert_sanitized_repository_failure(resp)
     assert "summary" not in resp.text
     assert "last_login_at" not in resp.text
 
@@ -162,19 +186,12 @@ def test_non_auth_profile_repository_failure_remains_sanitized_500_with_cors(cli
         headers={**auth_headers(), "Origin": "http://localhost:3000"},
     )
 
-    assert resp.status_code == 500
-    assert resp.json() == {
-        "error": {"status": 500, "message": "Internal server error."}
-    }
-    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
-    assert resp.headers["access-control-allow-credentials"] == "true"
-    assert "WWW-Authenticate" not in resp.headers
+    assert_sanitized_repository_failure(resp)
     assert leaked_detail not in resp.text
 
 
 def test_upstream_profile_403_is_controlled_sanitized_500(client, monkeypatch):
-    leaked_detail = "forbidden profile response with private content"
-    mock_supabase_response(monkeypatch, 403, {"message": leaked_detail})
+    mock_supabase_response(monkeypatch, 403, upstream_failure_body())
     profile_repo = supabase_repository(SupabaseProfileRepository)
     client.app_ref.dependency_overrides[get_profile_repository] = lambda: profile_repo
     safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
@@ -184,22 +201,14 @@ def test_upstream_profile_403_is_controlled_sanitized_500(client, monkeypatch):
         headers={**auth_headers(), "Origin": "http://localhost:3000"},
     )
 
-    assert resp.status_code == 500
-    assert resp.json() == {
-        "error": {"status": 500, "message": "Internal server error."}
-    }
-    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
-    assert resp.headers["access-control-allow-credentials"] == "true"
-    assert "WWW-Authenticate" not in resp.headers
-    assert leaked_detail not in resp.text
+    assert_sanitized_repository_failure(resp)
     assert "summary" not in resp.text
 
 
 def test_upstream_project_401_is_controlled_sanitized_500(client, monkeypatch):
-    leaked_detail = "service credential rejected with private project content"
     profiles = use_profiles(client)
     profiles.seed(USER_A, ago(100))
-    mock_supabase_response(monkeypatch, 401, {"message": leaked_detail})
+    mock_supabase_response(monkeypatch, 401, upstream_failure_body())
     project_repo = supabase_repository(SupabaseProjectRepository)
     client.app_ref.dependency_overrides[get_project_repository] = lambda: project_repo
     safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
@@ -209,23 +218,15 @@ def test_upstream_project_401_is_controlled_sanitized_500(client, monkeypatch):
         headers={**auth_headers(), "Origin": "http://localhost:3000"},
     )
 
-    assert resp.status_code == 500
-    assert resp.json() == {
-        "error": {"status": 500, "message": "Internal server error."}
-    }
-    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
-    assert resp.headers["access-control-allow-credentials"] == "true"
-    assert "WWW-Authenticate" not in resp.headers
-    assert leaked_detail not in resp.text
+    assert_sanitized_repository_failure(resp)
     assert "summary" not in resp.text
 
 
 def test_upstream_unlock_401_is_controlled_sanitized_500(client, monkeypatch):
-    leaked_detail = "service credential rejected with private unlock content"
     profiles = use_profiles(client)
     activate_project(client)
     profiles.seed(USER_A, ago(100))
-    mock_supabase_response(monkeypatch, 401, {"message": leaked_detail})
+    mock_supabase_response(monkeypatch, 401, upstream_failure_body())
     unlock_repo = supabase_repository(SupabaseUnlockRepository)
     client.app_ref.dependency_overrides[get_unlock_repository] = lambda: unlock_repo
     safe_client = TestClient(client.app_ref, raise_server_exceptions=False)
@@ -235,27 +236,20 @@ def test_upstream_unlock_401_is_controlled_sanitized_500(client, monkeypatch):
         headers={**auth_headers(), "Origin": "http://localhost:3000"},
     )
 
-    assert resp.status_code == 500
-    assert resp.json() == {
-        "error": {"status": 500, "message": "Internal server error."}
-    }
-    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
-    assert resp.headers["access-control-allow-credentials"] == "true"
-    assert "WWW-Authenticate" not in resp.headers
-    assert leaked_detail not in resp.text
+    assert_sanitized_repository_failure(resp)
     assert "summary" not in resp.text
 
 
-def test_profile_repository_classifies_upstream_401_without_leaking_body(monkeypatch):
-    leaked_body = "sensitive Supabase response body"
-    mock_supabase_response(monkeypatch, 401, {"message": leaked_body})
+def test_profile_repository_401_remains_server_failure_without_leaking_body(monkeypatch):
+    mock_supabase_response(monkeypatch, 401, upstream_failure_body())
     repo = supabase_repository(SupabaseProfileRepository)
 
-    with pytest.raises(RepositoryAuthenticationError) as caught:
+    with pytest.raises(RepositoryError) as caught:
         asyncio.run(repo.get_profile(USER_A))
 
-    assert leaked_body not in str(caught.value)
-    assert "server-only-test-key" not in str(caught.value)
+    assert type(caught.value) is RepositoryError
+    for sentinel in UPSTREAM_LEAK_SENTINELS:
+        assert sentinel not in str(caught.value)
 
 
 def test_profile_repository_does_not_classify_unrelated_upstream_error_as_auth(monkeypatch):
@@ -283,13 +277,15 @@ def test_profile_repository_does_not_classify_unrelated_upstream_error_as_auth(m
 def test_service_credential_repository_401_remains_server_failure(
     monkeypatch, repository_type, method_name: str, args: tuple,
 ):
-    mock_supabase_response(monkeypatch, 401, {"message": "private upstream detail"})
+    mock_supabase_response(monkeypatch, 401, upstream_failure_body())
     repo = supabase_repository(repository_type)
 
     with pytest.raises(RepositoryError) as caught:
         asyncio.run(getattr(repo, method_name)(*args))
 
     assert type(caught.value) is RepositoryError
+    for sentinel in UPSTREAM_LEAK_SENTINELS:
+        assert sentinel not in str(caught.value)
 
 
 def test_new_user_gets_controlled_not_needed_state(client):
