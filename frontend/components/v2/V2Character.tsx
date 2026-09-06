@@ -23,10 +23,12 @@ export default function V2Character({ size = "medium" }: { size?: "mini" | "smal
       setLoadedAnimationFrames(0);
       setLoadAnimationFrames(false);
       if (!reducedMotion.matches) {
-        frameRequest = window.requestAnimationFrame(() => {
+        const requestId = window.requestAnimationFrame(() => {
+          if (frameRequest !== requestId) return;
           frameRequest = null;
           if (!reducedMotion.matches) setLoadAnimationFrames(true);
         });
+        frameRequest = requestId;
       }
     };
 

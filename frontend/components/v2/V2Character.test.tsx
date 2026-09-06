@@ -137,6 +137,60 @@ describe("V2Character", () => {
     await act(async () => root.unmount());
   });
 
+  it("keeps ownership of a newer frame request when a canceled callback runs late", async () => {
+    const motion = installMotionEnvironment(false);
+    const { container, root } = createCharacterRoot();
+
+    await act(async () => {
+      root.render(<V2Character size="medium" />);
+    });
+
+    const frameAId = [...motion.frameCallbacks.keys()][0];
+    const staleFrameACallback = motion.frameCallbacks.get(frameAId);
+    expect(staleFrameACallback).toBeDefined();
+
+    await act(async () => {
+      motion.setReducedMotion(true);
+    });
+    expect(motion.cancelAnimationFrame).toHaveBeenCalledWith(frameAId);
+
+    await act(async () => {
+      motion.setReducedMotion(false);
+    });
+    const frameBId = [...motion.frameCallbacks.keys()][0];
+    const staleFrameBCallback = motion.frameCallbacks.get(frameBId);
+    expect(frameBId).not.toBe(frameAId);
+    expect(staleFrameBCallback).toBeDefined();
+
+    await act(async () => {
+      staleFrameACallback?.(16);
+    });
+
+    let images = container.querySelectorAll("img");
+    expect(images).toHaveLength(1);
+    expect(images[0].getAttribute("src")).toBe(CODYBARA_IDLE_FRAMES[0]);
+    expect(images[0].classList).toContain("is-current");
+    expect(motion.setInterval).not.toHaveBeenCalled();
+
+    await act(async () => {
+      motion.setReducedMotion(true);
+    });
+    expect(motion.cancelAnimationFrame).toHaveBeenCalledTimes(2);
+    expect(motion.cancelAnimationFrame).toHaveBeenLastCalledWith(frameBId);
+    expect(motion.frameCallbacks.size).toBe(0);
+
+    await act(async () => {
+      staleFrameBCallback?.(32);
+    });
+    images = container.querySelectorAll("img");
+    expect(images).toHaveLength(1);
+    expect(images[0].getAttribute("src")).toBe(CODYBARA_IDLE_FRAMES[0]);
+    expect(images[0].classList).toContain("is-current");
+    expect(motion.setInterval).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+  });
+
   it("never schedules animation when reduced motion is active at mount", async () => {
     const motion = installMotionEnvironment(true);
     const { container, root } = createCharacterRoot();
