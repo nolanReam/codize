@@ -1,154 +1,39 @@
+import React from "react";
 import Link from "next/link";
-
-import BuildLoopPanel from "@/components/BuildLoopPanel";
-import GateScene from "@/components/GateScene";
-import PatchLoopScene from "@/components/PatchLoopScene";
-import Reveal from "@/components/Reveal";
-import TiltCard from "@/components/TiltCard";
-import TrapTerminal from "@/components/TrapTerminal";
-
-// Landing page — the 80% Trap, told as a sequence of centered scenes.
-// Static, no backend calls, no session needed.
+import LandingMotion from "../components/landing/LandingMotion";
+import { CapabilityAct, GapAct, InterruptionAct, ScopeAct } from "../components/landing/StormActs";
+import ProductProof from "../components/landing/ProductProof";
+import styles from "../components/landing/landing.module.css";
 
 export default function LandingPage() {
   return (
-    <div className="landing">
-      <header>
-        <div className="header-inner">
-          <div className="brand">
-            CODIZE<span>_</span>
-          </div>
-          <nav className="row">
-            <Link href="/login" className="btn small">
-              Sign in
-            </Link>
-          </nav>
-        </div>
+    <div id="scope-the-storm" className={styles.landing}>
+      <a className={styles.skip} href="#product-proof">Skip to how Codize helps</a>
+      <header className={styles.header}>
+        <Link href="/" className={styles.brand} aria-label="Codize home">CODIZE<span aria-hidden="true">_</span></Link>
+        <Link href="/login" prefetch={false} className={styles.signIn}>Sign in</Link>
       </header>
-
-      {/* Scene 1 — opening: the 80% trap, demonstrated */}
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">{"// the 80% trap"}</p>
-          <h1>
-            AI built your first <span className="hl">80%</span>.
-            <br />
-            Now you&rsquo;re stuck <em>fixing the rest</em>.
-          </h1>
-          <p className="sub">
-            Codize trains student builders to plan, prompt, review, verify, and defend
-            AI-generated code — so you stay the engineer when the project starts breaking.
-          </p>
-          <div className="ctas">
-            <Link href="/login" className="btn primary">
-              Stop Debugging Blindly
-            </Link>
-            <a href="#workflow" className="btn">
-              See the workflow
-            </a>
+      <main>
+        <section className={styles.hero} aria-labelledby="landing-thesis" data-storm-act="thesis">
+          <div className={styles.heroType}>
+            <h1 id="landing-thesis"><span>BUILD <br className={styles.mobileBreak} />WITH AI. </span><span>STAY IN <br className={styles.mobileBreak} />CONTROL.</span></h1>
+            <p>Codize is your AI coding mentor.<br />Build your idea. Understand it as you go.</p>
+            <Link href="/login" prefetch={false} className={styles.startLink}>Start one change <span aria-hidden="true">↗</span></Link>
           </div>
-        </div>
-        <div className="hero-stage">
-          <TiltCard>
-            <TrapTerminal />
-          </TiltCard>
-        </div>
-      </section>
-
-      {/* Scene 2 — descending into the patch loop (scroll-driven) */}
-      <PatchLoopScene />
-
-      {/* Credibility band — the trap is a named pattern, backed by research */}
-      <section className="proof" aria-label="Why the 80% Trap matters">
-        <div className="glass proof-card">
-          <p className="eyebrow">{"// why this matters"}</p>
-          <p>
-            The <strong>80% Trap</strong> is Codize&rsquo;s name for a real pattern — not a
-            measured statistic. AI tools generate plausible code fast, but research has found
-            that AI-assisted code can carry security weaknesses, and that builders using
-            assistants often believe their code is more secure than it is. The missing workflow
-            comes after generation: <strong>review, verify, explain</strong>. That&rsquo;s the
-            part Codize trains.
-          </p>
-          <div className="proof-cites">
-            <a href="https://arxiv.org/abs/2211.03622" target="_blank" rel="noreferrer">
-              Perry et al. — &ldquo;Do Users Write More Insecure Code with AI
-              Assistants?&rdquo; (CCS 2023)
-            </a>
-            <a href="https://arxiv.org/abs/2310.02059" target="_blank" rel="noreferrer">
-              Fu et al. — &ldquo;Security Weaknesses of Copilot-Generated Code in GitHub
-              Projects&rdquo; (2023)
-            </a>
+          <div className={styles.heroArt} aria-hidden="true">
+            <pre className={styles.heroFar}>{"              .       .\n    { }   .       /\n         src/        .\n  .        +       [ ]\n      .        =>\n           .       ."}</pre>
+            <pre className={styles.heroStructure}>{"       ┌──────────┐\n      /          /│\n     /   {  }   / │\n    ┌──────────┐  │\n    │          │  +\n    │  idea_   │ /\n    │          │/\n    └──────────┘"}</pre>
+            <span className={styles.heroBracket}>[<span>_</span>]</span>
           </div>
-        </div>
-      </section>
-
-      {/* Scene 3 — the Build Loop instrument panel (scroll-driven) */}
-      <BuildLoopPanel />
-
-      {/* Scene 4 — Project Defense, simulated turn by turn (scroll-driven) */}
-      <GateScene />
-
-      {/* Scene 5 — the payoff: the Defense Report */}
-      <section className="scene">
-        <Reveal className="scene-head">
-          <p className="eyebrow" style={{ "--i": 0 } as React.CSSProperties}>
-            {"// the payoff"}
-          </p>
-          <h2 style={{ "--i": 1 } as React.CSSProperties}>
-            Leave with <em>proof of process</em>.
-          </h2>
-          <p className="lead" style={{ "--i": 2 } as React.CSSProperties}>
-            Prompted. Mapped. Reviewed. Verified. Evidenced. Defended. Exportable.
-          </p>
-        </Reveal>
-        <Reveal className="report-stage">
-          <div className="glass report-doc" style={{ "--i": 0 } as React.CSSProperties}>
-            <div className="panel-bar">
-              <span className="panel-path">defense_report.md</span>
-              <span className="pill">markdown</span>
-            </div>
-            <div className="report-body mono">
-              <p className="rl h"># Project Defense Report</p>
-              <p className="rl dim">study planner &middot; phase 3 &middot; browser app</p>
-              <p className="rl">## Prompt Builder <span className="ok">&#10003;</span></p>
-              <p className="rl">## Bring Back What Changed <span className="ok">&#10003;</span></p>
-              <p className="rl">## Change Map <span className="dim">reviewed draft</span></p>
-              <p className="rl">## Review <span className="dim">kept 5 &middot; revised 1</span></p>
-              <p className="rl">## Verification <span className="dim">student-recorded results</span></p>
-              <p className="rl">## Evidence <span className="dim">student-provided support</span></p>
-              <p className="rl">## Project Defense <span className="ok">PASS</span></p>
-            </div>
-          </div>
-          <p className="report-note muted" style={{ "--i": 1 } as React.CSSProperties}>
-            Built from your own workflow record — take it to the demo, the interview, the judging
-            room.
-          </p>
-        </Reveal>
-      </section>
-
-      {/* Scene 6 — closing */}
-      <section className="closing">
-        <Reveal className="closing-inner">
-          <h2 style={{ "--i": 0 } as React.CSSProperties}>
-            Your workflow is <em>incomplete</em>.
-            <br />
-            <span className="hl">Codize helps you fix it.</span>
-          </h2>
-          <p className="lead" style={{ "--i": 1 } as React.CSSProperties}>
-            AI gets you to 80% fast. Stay in control of the rest.
-          </p>
-          <div className="ctas" style={{ "--i": 2, marginTop: 32 } as React.CSSProperties}>
-            <Link href="/login" className="btn primary">
-              Stop Debugging Blindly
-            </Link>
-          </div>
-        </Reveal>
-      </section>
-
-      <footer className="landing-footer muted">
-        Codize — an AI coding workflow trainer for student builders.
-      </footer>
+        </section>
+        <CapabilityAct />
+        <GapAct />
+        <InterruptionAct />
+        <ScopeAct />
+        <ProductProof />
+      </main>
+      <footer className={styles.footer}><span>CODIZE<span aria-hidden="true">_</span></span><p>One project. One current change. One useful habit.</p><Link href="/login" prefetch={false}>Sign in</Link></footer>
+      <LandingMotion />
     </div>
   );
 }

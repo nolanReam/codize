@@ -33,9 +33,9 @@ const v2Display = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "Codize — Stop debugging blindly",
+  title: "Codize — Build with AI. Stay in control.",
   description:
-    "Codize is an AI coding workflow trainer: plan, prompt, review, verify, and defend AI-generated code before your project collapses into patch loops.",
+    "Codize is an AI coding mentor for student builders. Scope one change, work with your coding AI, and understand what you build as you go.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
