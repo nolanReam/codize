@@ -15,11 +15,18 @@ export default function V2Character({ size = "medium" }: { size?: "mini" | "smal
     let frameRequest: number | null = null;
 
     const updateAnimation = () => {
+      if (frameRequest !== null) {
+        window.cancelAnimationFrame(frameRequest);
+        frameRequest = null;
+      }
       setFrame(0);
       setLoadedAnimationFrames(0);
       setLoadAnimationFrames(false);
       if (!reducedMotion.matches) {
-        frameRequest = window.requestAnimationFrame(() => setLoadAnimationFrames(true));
+        frameRequest = window.requestAnimationFrame(() => {
+          frameRequest = null;
+          if (!reducedMotion.matches) setLoadAnimationFrames(true);
+        });
       }
     };
 
@@ -28,6 +35,7 @@ export default function V2Character({ size = "medium" }: { size?: "mini" | "smal
     return () => {
       reducedMotion.removeEventListener("change", updateAnimation);
       if (frameRequest !== null) window.cancelAnimationFrame(frameRequest);
+      frameRequest = null;
     };
   }, []);
 

@@ -52,6 +52,6 @@ describe("V2 draft setup resumability contract", () => {
     expect(home).toContain('<h1 className="v2-user-title">{state.project.display_name}</h1>');
     expect(home).toContain('<h2 className="v2-user-title">{upNext.title}</h2>');
     expect(css).toContain(".v2-up-next-card { width: min(760px, 100%); padding: 32px; border-left-width: 3px;");
-    expect(css).toContain("overflow-wrap: anywhere");
+    expect(css).toMatch(/\.v2-page-header h1\.v2-user-title,\s*\.v2-build-header h1\.v2-user-title,\s*\.v2-card :is\(h1, h2\)\.v2-user-title\s*\{[^}]*overflow-wrap:\s*anywhere;?[^}]*\}/);
   });
 });

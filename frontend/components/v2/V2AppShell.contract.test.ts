@@ -25,9 +25,7 @@ describe("V2 app shell navigation contract", () => {
     }
     expect(source).toContain('<V2NavIcon name="character" />');
     expect(source).toContain('<V2NavIcon name="settings" />');
-    expect(source).toContain('className="v2-nav-icon"');
-    expect(source).toContain('aria-hidden="true"');
-    expect(source).toContain('focusable="false"');
+    expect(source).toMatch(/<svg className="v2-nav-icon"[^>]*aria-hidden="true"[^>]*focusable="false"[^>]*>/);
     expect(source).not.toContain("v2-nav-dot");
   });
 
