@@ -96,7 +96,7 @@ export default function ProjectPage() {
             <V2Character size="small" />
             <div>
               <p className="v2-eyebrow">Project</p>
-              <h1>{state.project.display_name}</h1>
+              <h1 className="v2-user-title">{state.project.display_name}</h1>
               <p>{state.project.lifecycle_state === "draft" ? "Finish setup to shape your first change." : state.currentChange ? "Ready to keep going?" : "Ready for the next piece?"}</p>
             </div>
           </header>
@@ -114,7 +114,7 @@ export default function ProjectPage() {
             <p className="v2-card-label">Up next</p>
             {upNext ? (
               <>
-                <h2>{upNext.title}</h2>
+                <h2 className="v2-user-title">{upNext.title}</h2>
                 {upNext.detail && <p>{upNext.detail}</p>}
                 {upNext.active ? (
                   <Link className="v2-button v2-button-primary" href={`/app/project/${id}/build`}>

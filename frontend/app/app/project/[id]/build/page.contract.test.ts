@@ -100,15 +100,26 @@ describe("V2 Build foundation contract", () => {
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
-  it("keeps the approved companion, message, and single-column stage composition", () => {
-    expect(source).toContain('<div className="v2-build-character">');
-    expect(source).toContain('<V2Character size="mini" />');
+  it("keeps one approved medium companion attached to the message and a single-column stage", () => {
+    expect(source).not.toContain('className="v2-build-character"');
+    expect(source).not.toContain('<V2Character size="mini" />');
+    expect(source.match(/<V2Character size="medium" \/>/g)).toHaveLength(1);
     expect(source).toContain('<section className="v2-agent-stage"');
     expect(css).toContain(".v2-build-page { width: min(1124px, 100%); margin: 0; }");
     expect(css).toContain(".v2-conversation { display: flex; width: min(820px, 100%);");
-    expect(css).toContain(".v2-character-message { display: grid; grid-template-columns: 36px minmax(0, 560px); width: min(720px, 100%);");
-    expect(css).toContain(".v2-agent-stage { width: min(760px, 100%); margin: 0; }");
+    expect(css).toContain(".v2-character-message { display: grid; grid-template-columns: 104px minmax(0, 620px); width: min(820px, 100%);");
+    expect(css).toContain(".v2-agent-stage { width: min(760px, 100%); margin: 0;");
     expect(css).toContain(".v2-agent-grid { display: grid; grid-template-columns: 1fr;");
     expect(css).not.toMatch(/\.v2-agent-grid\s*\{[^}]*repeat\(2/);
+  });
+
+  it("keeps signed-in motion restrained and explicitly reduced", () => {
+    expect(css).toContain("--v2-motion-enter: 220ms");
+    expect(css).toContain("--v2-motion-complete: 320ms");
+    expect(css).toContain(".v2-dialogue-response { animation: v2-dialogue-enter");
+    expect(css).toContain(".v2-conversation > :is(.v2-stage-card, .v2-review-stage, .v2-agent-stage)");
+    expect(css).toContain(".v2-complete-card { animation: v2-complete-enter");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*\.v2-dialogue-response,[\s\S]*animation: none !important/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*\.v2-project-switcher:active,[\s\S]*\.v2-bottom-nav a:active \{ transform: none !important/);
   });
 });

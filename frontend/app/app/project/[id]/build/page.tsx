@@ -532,7 +532,7 @@ export default function BuildPage() {
   }
 
   if (loadStatus === "completed" && completed) return <div className="v2-page v2-page-narrow"><V2Card className="v2-complete-card">
-    <p className="v2-card-label">Done</p><h1>{completed.goal}</h1>
+    <p className="v2-card-label">Done</p><h1 className="v2-user-title">{completed.goal}</h1>
     <p><span aria-hidden="true">✓</span> Checked: {completed.observation}</p>
     <div className="v2-action-row"><Link className="v2-button v2-button-primary" href={`/app/project/${id}`}>Back to Project</Link>
       <Link className="v2-button v2-button-secondary" href={`/app/project/${id}`}>Keep building</Link></div>
@@ -549,7 +549,7 @@ export default function BuildPage() {
           <header className={`v2-build-header${recoveryActive ? " is-recovery" : ""}`}>
             <div>
               <p className="v2-eyebrow">{recoveryActive ? "Recovery" : data.project.display_name}</p>
-              <h1>{data.change.goal_snapshot}</h1>
+              <h1 className="v2-user-title">{data.change.goal_snapshot}</h1>
               {recoveryActive && <p>Let’s figure out what happened before we change more code.</p>}
             </div>
             {data.build.selected_agent && <span className="v2-agent-badge">{data.build.selected_agent.display_name}</span>}
@@ -577,11 +577,8 @@ export default function BuildPage() {
                 ))}
               </ol>
             )}
-            <div className="v2-build-character">
-              <V2Character size="medium" />
-            </div>
             <div className="v2-character-message">
-              <V2Character size="mini" />
+              <V2Character size="medium" />
               <div>
                 {data.build.build_stage === "confirm_change" && <V2Dialogue soundEnabled={soundEnabled} text="Let’s keep this focused. Confirm the one change and the result you’ll check." />}
                 {data.build.build_stage === "intervention" && data.build.teaching && <V2Dialogue soundEnabled={soundEnabled} text={data.build.teaching.title} />}
@@ -771,7 +768,7 @@ export default function BuildPage() {
             )}
 
             {data.build.build_stage === "confirm_change" && <V2Card className="v2-stage-card">
-              <p className="v2-card-label">Current change</p><h2>{data.change.goal_snapshot}</h2>
+              <p className="v2-card-label">Current change</p><h2 className="v2-user-title">{data.change.goal_snapshot}</h2>
               <p><strong>Done when:</strong> {planItem?.intended_outcome}</p>
               <V2Button onClick={confirm} disabled={busy}>{busy ? "Starting…" : "Start"}</V2Button>
             </V2Card>}

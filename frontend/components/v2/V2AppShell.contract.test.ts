@@ -19,6 +19,18 @@ describe("V2 app shell navigation contract", () => {
     expect(source).toContain('settingsActive ? "v2-nav-link is-active" : "v2-nav-link"');
   });
 
+  it("keeps destination labels while rendering restrained decorative icons", () => {
+    for (const destination of ["project", "build", "learning", "history"]) {
+      expect(source).toContain(`icon: "${destination}"`);
+    }
+    expect(source).toContain('<V2NavIcon name="character" />');
+    expect(source).toContain('<V2NavIcon name="settings" />');
+    expect(source).toContain('className="v2-nav-icon"');
+    expect(source).toContain('aria-hidden="true"');
+    expect(source).toContain('focusable="false"');
+    expect(source).not.toContain("v2-nav-dot");
+  });
+
   it("keeps the mobile project and account summary touch target at least 44px tall", () => {
     expect(css).toMatch(/\.v2-mobile-menu summary\s*\{[^}]*min-height:\s*44px/);
   });

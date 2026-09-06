@@ -23,7 +23,7 @@ export default function V2Dialogue({ text, soundEnabled }: { text: string; sound
   }, [soundEnabled, text]);
 
   return (
-    <div className="v2-dialogue">
+    <div className="v2-dialogue v2-dialogue-response" key={text}>
       <p aria-live="polite">{visible}<span className="sr-only">{complete ? "" : " Message typing."}</span></p>
       {!complete && <button type="button" className="v2-inline-button" onClick={() => controller.current?.skip()}>
         Show full message
