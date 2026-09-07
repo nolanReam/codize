@@ -21,9 +21,9 @@ export default function LandingPage() {
             <Link href="/login" prefetch={false} className={styles.startLink}>Start one change <span aria-hidden="true">↗</span></Link>
           </div>
           <div className={styles.heroArt} aria-hidden="true">
-            <pre className={styles.heroFar}>{"              .       .\n    { }   .       /\n         src/        .\n  .        +       [ ]\n      .        =>\n           .       ."}</pre>
-            <pre className={styles.heroStructure}>{"       ┌──────────┐\n      /          /│\n     /   {  }   / │\n    ┌──────────┐  │\n    │          │  +\n    │  idea_   │ /\n    │          │/\n    └──────────┘"}</pre>
-            <span className={styles.heroBracket}>[<span>_</span>]</span>
+            <span className={styles.heroIdea}>A TEAM STAT TRACKER</span>
+            <span className={styles.heroConnector}>↓</span>
+            <div className={styles.heroFeature}><span>START WITH ONE PIECE</span><strong>Add a player</strong><span className={styles.heroInputs}>Name <i /> Jersey # <i /></span></div>
           </div>
         </section>
         <CapabilityAct />

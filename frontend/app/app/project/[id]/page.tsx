@@ -97,7 +97,7 @@ export default function ProjectPage() {
             <div>
               <p className="v2-eyebrow">Project</p>
               <h1 className="v2-user-title">{state.project.display_name}</h1>
-              <p>{state.project.lifecycle_state === "draft" ? "Finish setup to shape your first change." : state.currentChange ? "Ready to keep going?" : "Ready for the next piece?"}</p>
+              <p>{state.project.lifecycle_state === "draft" ? "Finish setup to choose what to build or improve first." : state.currentChange ? "Ready to keep going?" : "Ready for the next piece?"}</p>
             </div>
           </header>
 

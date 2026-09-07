@@ -5,7 +5,7 @@ import styles from "./landing.module.css";
 
 export default function ProductProof() {
   return <section id="product-proof" className={styles.proof} aria-labelledby="proof-title" data-storm-act="proof" tabIndex={-1}>
-    <div className={styles.proofIntro}><h2 id="proof-title">Your project.<br />Your thinking.<br /><em>A little backup.</em></h2><p>Keep your coding AI. Codize helps you scope the next change, write a clear prompt, and check the result.</p></div>
+    <div className={styles.proofIntro}><h2 id="proof-title" data-storm-enter>Your project.<br />Your thinking.<br /><em>A little backup.</em></h2><p data-storm-enter="after">Keep your coding AI. Codize helps you scope the next change, write a clear prompt, and check the result.</p></div>
     <figure className={styles.specimen}>
       <figcaption>INSIDE CODIZE <span>Build example · static preview</span></figcaption>
       <div className={styles.specimenHeader}><p>Volleyball Tracker</p><h3>Add the player form</h3></div>

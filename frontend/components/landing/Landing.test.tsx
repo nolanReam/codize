@@ -31,6 +31,15 @@ describe("Scope the Storm public contract", () => {
     expect(scope.textContent).toContain("Add a player’s nameand jersey number.");
     expect(Array.from(scope.querySelectorAll("li"), item => item.firstElementChild?.textContent)).toEqual(["PLAN", "PROMPT", "BUILD", "CHECK", "UNDERSTAND"]);
     expect(page.querySelector("[data-motion]")).toBeNull();
+    expect(page.querySelector("h1")?.closest("[data-storm-enter]")).toBeNull();
+    for (const entrance of page.querySelectorAll("[data-storm-enter]")) {
+      expect(entrance.textContent?.length).toBeGreaterThan(10);
+      expect(entrance.hasAttribute("hidden")).toBe(false);
+      expect(entrance.hasAttribute("data-entered")).toBe(false);
+      expect(entrance.getAttribute("style")).toBeNull();
+      expect(entrance.closest('[aria-hidden="true"]')).toBeNull();
+    }
+    expect(page.querySelector('[data-storm-act="silence"] [data-storm-enter]')).toBeNull();
     expect(page.textContent).not.toMatch(/80%|Project Defense|PASS\/FAIL|commit history|eight.stage|gate-controlled/i);
   });
 

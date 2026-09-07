@@ -20,7 +20,7 @@ export function AsciiField({ mode }: { mode: "speed" | "gap" | "scope" }) {
 export function CapabilityAct() {
   return <section className={styles.capability} aria-labelledby="capability-title" data-storm-act="speed" data-storm-pin>
     <div className={styles.speedStage} data-storm-stage>
-      <div className={styles.speedCopy}><h2 id="capability-title">An idea.<br />Then, <em>possibilities.</em></h2><p>With coding AI, you can make more than you thought.</p></div>
+      <div className={styles.speedCopy}><h2 id="capability-title" data-storm-enter>An idea.<br />Then, <em>possibilities.</em></h2><p data-storm-enter="after">With coding AI, you can make more than you thought.</p></div>
       <AsciiField mode="speed" />
       <div className={styles.intention}><span>YOUR IDEA</span><p>“A stat tracker for my team.”</p><span aria-hidden="true">{"> _"}</span></div>
     </div>
@@ -31,7 +31,7 @@ export function GapAct() {
   return <section className={styles.gap} aria-labelledby="gap-title" data-storm-act="gap">
     <AsciiField mode="gap" />
     <p className={styles.lostIntention}>“A stat tracker for my team.”</p>
-    <div className={styles.gapCopy}><h2 id="gap-title">Your project can grow<br /><em>faster than your<br />understanding.</em></h2><p>More files. More connections.<br />Where did your one idea go?</p></div>
+    <div className={styles.gapCopy}><h2 id="gap-title" data-storm-enter>Your project can grow<br /><em>faster than your<br />understanding.</em></h2><p>More files. More connections.<br />Where did your one idea go?</p></div>
     <span className={styles.gapBracket} aria-hidden="true">{'}'}</span>
   </section>;
 }

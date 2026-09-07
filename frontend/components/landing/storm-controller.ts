@@ -46,7 +46,7 @@ function paint(scene: Scene, progress: number, mobile: boolean, font: string) {
   const order = scene.kind === "scope" ? ease(between(progress, 0.46, 0.93)) : 0;
   const freeze = scene.kind === "scope" ? Math.min(progress, 0.28) : progress;
   const density = scene.kind === "speed" ? 0.12 + 0.88 * progress : 1;
-  const visibleCount = Math.round(fragments.length * density);
+  const visibleCount = Math.ceil(fragments.length * density);
   for (let index = 0; index < visibleCount; index++) {
     const part = fragments[index];
     const size = (mobile ? 12 : 15) + part.layer * (mobile ? 2 : 5);
@@ -60,6 +60,9 @@ function paint(scene: Scene, progress: number, mobile: boolean, font: string) {
     ctx.font = `${size}px ${font}`;
     ctx.fillStyle = scene.kind === "gap" && index % 7 === 0 ? "#b69b75" : ["#62596b", "#907d9c", "#b394c0"][part.layer];
     let opacity = scene.kind === "speed" ? 0.32 + part.layer * 0.2 : 0.36 + part.layer * 0.17;
+    // Fade in new fragments instead of popping them into the field as soon as
+    // their integer index is reached.
+    if (scene.kind === "speed") opacity *= clamp((fragments.length * density - index) / 5);
     if (scene.kind === "scope") {
       opacity *= 1 - 0.86 * between(progress, 0.22, 0.48);
       opacity *= 1 - order;
@@ -81,6 +84,7 @@ export function createStormController(root: HTMLElement): () => void {
     .filter(element => ["speed", "gap", "scope"].includes(element.dataset.stormAct ?? ""))
     .map(element => ({ element, kind: element.dataset.stormAct!, pin: element.hasAttribute("data-storm-pin"), top: 0, height: 0, stageHeight: 0, canvas: element.querySelector("canvas"), context: null, width: 0, canvasHeight: 0, ratio: 1, lensMaxScale: 1.38, verbs: Array.from(element.querySelectorAll<HTMLElement>("[data-storm-verb]")) }));
   const active = new Set<Scene>();
+  const entrances = Array.from(root.querySelectorAll<HTMLElement>("[data-storm-enter]"));
   let disposed = false;
   let frame: number | null = null;
   let mobile = false;
@@ -128,19 +132,19 @@ export function createStormController(root: HTMLElement): () => void {
       const style = scene.element.style;
       if (scene.kind === "scope") {
         const lock = ease(between(p, 0, 0.28));
-        const organize = ease(between(p, 0.48, 0.92));
+        const organize = ease(between(p, 0.46, 0.94));
         const spread = mobile ? 1 : Math.min(1, window.innerWidth / 1440);
         style.setProperty("--lens-x", `${(1 - lock) * (mobile ? -28 : -180 * spread)}px`);
         style.setProperty("--lens-y", `${(1 - lock) * (mobile ? 50 : 90)}px`);
         style.setProperty("--lens-scale", `${0.68 + lock * 0.32 + between(p, 0.35, 0.58) * (scene.lensMaxScale - 1)}`);
-        style.setProperty("--lens-opacity", `${1 - between(p, 0.51, 0.61)}`);
-        style.setProperty("--copy-opacity", `${between(p, 0.08, 0.24)}`);
-        style.setProperty("--focus-opacity", `${1 - between(p, 0.46, 0.55)}`);
+        style.setProperty("--lens-opacity", `${1 - ease(between(p, 0.48, 0.7))}`);
+        style.setProperty("--copy-opacity", `${ease(between(p, 0.02, 0.24))}`);
+        style.setProperty("--focus-opacity", `${1 - ease(between(p, 0.44, 0.64))}`);
         // These same five DOM fragments live in the storm, then become the
         // method. Their scale/placement resolves; no second set replaces them.
         style.setProperty("--method-opacity", `${0.18 + 0.82 * between(p, 0.5, 0.68)}`);
         style.setProperty("--verb-scale", `${0.32 + 0.68 * organize}`);
-        style.setProperty("--details-opacity", `${between(p, 0.82, 0.98)}`);
+        style.setProperty("--details-opacity", `${ease(between(p, 0.72, 0.98))}`);
         style.setProperty("--rule-opacity", `${between(p, 0.72, 0.98) * 0.16}`);
         scene.verbs.forEach((verb, index) => {
           const offsets = mobile ? [100, 8, 165, 25, 70] : [600, 20, 760, 420, 60];
@@ -183,6 +187,10 @@ export function createStormController(root: HTMLElement): () => void {
   const intersection = new IntersectionObserver(entries => {
     if (disposed) return;
     for (const entry of entries) {
+      const entrance = entry.target as HTMLElement;
+      if (entry.isIntersecting && entrance.hasAttribute("data-storm-enter") && !entrance.hasAttribute("data-entered")) {
+        entrance.dataset.entered = "true";
+      }
       const scene = scenes.find(item => item.element === entry.target);
       if (!scene) continue;
       if (entry.isIntersecting) active.add(scene); else active.delete(scene);
@@ -192,6 +200,7 @@ export function createStormController(root: HTMLElement): () => void {
   });
   const resize = new ResizeObserver(() => { if (!disposed) invalidate(); });
   for (const scene of scenes) { intersection.observe(scene.element); resize.observe(scene.element); }
+  for (const entrance of entrances) intersection.observe(entrance);
   resize.observe(root);
   window.addEventListener("scroll", schedule, { passive: true });
   window.addEventListener("resize", invalidate);
@@ -211,6 +220,7 @@ export function createStormController(root: HTMLElement): () => void {
     document.removeEventListener("visibilitychange", syncVisibility);
     motion.removeEventListener("change", syncMotion);
     delete root.dataset.motion;
+    for (const entrance of entrances) delete entrance.dataset.entered;
     for (const scene of scenes) {
       scene.element.removeAttribute("style");
       scene.verbs.forEach(verb => { verb.style.removeProperty("--verb-x"); verb.style.removeProperty("--verb-y"); });

@@ -86,7 +86,7 @@ export default function V2ProjectSetupForm({
     };
     if (invalid.context || invalid.change || invalid.done) {
       setInvalidFields(invalid);
-      setError("Fill in each field so your first change has a clear finish line.");
+      setError("Fill in each field so it’s clear what you want to build or improve and how you’ll check it.");
       const firstInvalidField = invalid.context
         ? contextRef.current
         : invalid.change
@@ -130,7 +130,7 @@ export default function V2ProjectSetupForm({
   return (
     <form onSubmit={submit} className="v2-setup-form">
       <p className="v2-card-label">Continue setup</p>
-      <h2>{isIdea ? "Shape your first useful change" : "Continue from what exists"}</h2>
+      <h2>{isIdea ? "Pick a first feature to build" : "Continue from what exists"}</h2>
       <p className="v2-muted">
         Project ID: <code>{project.project_id}</code>
       </p>
@@ -153,8 +153,9 @@ export default function V2ProjectSetupForm({
           }} />
       </label>
       <label>
-        What’s the first change?
+        What do you want to build or improve first?
         <input ref={changeRef} name="change" maxLength={200} value={change}
+          placeholder="For example, add a form for entering players"
           aria-invalid={invalidFields.change || undefined}
           aria-describedby={invalidFields.change ? validationErrorId : undefined}
           onChange={(event) => {

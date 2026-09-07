@@ -55,7 +55,7 @@ export default function ProjectsPage() {
       {showSetup && <V2Card className="v2-setup-card">
         {!intent ? <><p className="v2-card-label">Start here</p><h2>What are you bringing to Codize?</h2>
           <div className="v2-setup-choices">
-            <button type="button" onClick={() => setIntent("new_idea")}><strong>I have an idea</strong><small>Shape the first useful change.</small></button>
+            <button type="button" onClick={() => setIntent("new_idea")}><strong>I have an idea</strong><small>Pick a first feature to build.</small></button>
             <button type="button" onClick={() => setIntent("already_building")}><strong>I’m already building</strong><small>Continue from what exists.</small></button>
             <button type="button" disabled><strong>Something broke</strong><small>Recovery-first setup is deferred. Active changes recover inside Build.</small></button>
           </div></> : <form onSubmit={submit} className="v2-setup-form">

@@ -49,7 +49,7 @@ export default function LearningPage() {
           <header className="v2-page-header">
             <p className="v2-eyebrow">Learning</p>
             <h1>What you’re getting better at</h1>
-            <p>See the habits Codize has actual evidence for—without turning your work into a report card.</p>
+            <p>The habits you’re practicing as you build.</p>
           </header>
           {data.competencies.length === 0 ? (
             <V2Card className="v2-reflection-empty">
@@ -60,7 +60,7 @@ export default function LearningPage() {
             </V2Card>
           ) : (
             <>
-              <p className="v2-support-note">These are current support signals, not permanent badges. Codize can offer more help again whenever it is useful.</p>
+              <p className="v2-support-note">These are current support signals, not permanent badges. Help can change as you learn.</p>
               <div className="v2-learning-grid">
                 {data.competencies.map((competency) => (
                   <article className="v2-learning-card" key={competency.key}>
@@ -69,10 +69,10 @@ export default function LearningPage() {
                       <span className={`v2-status v2-status-${competency.status}`}>{statusLabels[competency.status]}</span>
                     </header>
                     <p>{competency.description}</p>
-                    <p className="v2-learning-summary">{competency.status_explanation}</p>
-                    <p className="v2-support-direction">Codize is currently giving <strong>{competency.support_direction}</strong> help here.</p>
                     <details className="v2-evidence-details">
                       <summary>Why this status</summary>
+                      <p className="v2-learning-summary">{competency.status_explanation}</p>
+                      <p className="v2-support-direction">Codize is currently giving <strong>{competency.support_direction}</strong> help here.</p>
                       <ol>
                         {competency.recent_evidence.map((evidence, index) => (
                           <li key={`${competency.key}:${evidence.observed_at}:${index}`}>

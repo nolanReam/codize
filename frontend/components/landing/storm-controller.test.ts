@@ -6,6 +6,10 @@ import { createFragments, createStormController } from "./storm-controller";
 function environment(enabled = true) {
   const root = document.createElement("div");
   root.innerHTML = '<section data-storm-act="scope" data-storm-pin><div data-storm-stage><div><pre>static storm</pre><canvas aria-hidden="true"></canvas></div><ol>' + Array.from({ length: 5 }, () => '<li data-storm-verb>verb</li>').join("") + '</ol></div></section>';
+  const entrance = document.createElement("h2");
+  entrance.dataset.stormEnter = "";
+  entrance.textContent = "Your project. Your thinking.";
+  root.append(entrance);
   document.body.append(root);
   const section = root.querySelector("section")!;
   const canvas = root.querySelector("canvas")!;
@@ -43,6 +47,8 @@ function environment(enabled = true) {
   const getContext = vi.spyOn(canvas, "getContext").mockReturnValue(context as unknown as CanvasRenderingContext2D);
   return {
     root, section, canvas, rect, pending, context, getContext, disconnectIO, disconnectRO, mediaListeners,
+    entrance,
+    enterText(value = true) { io([{ target: entrance, isIntersecting: value } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); },
     enter(value = true) { io([{ target: section, isIntersecting: value } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); },
     resize() { ro([], {} as ResizeObserver); },
     motion(value: boolean) { enabled = value; mediaListeners.forEach(fn => fn()); },
@@ -55,6 +61,22 @@ function environment(enabled = true) {
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("storm motion ownership", () => {
+  it("enhances readable text once without replaying on scroll or retaining state after cleanup", () => {
+    const env = environment();
+    const dispose = createStormController(env.root);
+    expect(env.entrance.textContent).toBe("Your project. Your thinking.");
+    expect(env.entrance.hasAttribute("data-entered")).toBe(false);
+    env.enterText();
+    expect(env.entrance.dataset.entered).toBe("true");
+    env.enterText(false);
+    expect(env.entrance.dataset.entered).toBe("true");
+    env.motion(false);
+    expect(env.root.hasAttribute("data-motion")).toBe(false);
+    expect(env.entrance.hasAttribute("hidden")).toBe(false);
+    dispose();
+    env.enterText();
+    expect(env.entrance.hasAttribute("data-entered")).toBe(false);
+  });
   it("does no Canvas or RAF work before activation, coalesces scroll, and has no idle loop", () => {
     const env = environment();
     const dispose = createStormController(env.root);
