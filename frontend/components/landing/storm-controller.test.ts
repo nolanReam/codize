@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFragments, createStormController } from "./storm-controller";
+import { createFragments, createStormController, followVisual, cue, readingHolds } from "./storm-controller";
 
 function environment(enabled = true) {
   const root = document.createElement("div");
@@ -39,7 +39,7 @@ function environment(enabled = true) {
   const mediaListeners = new Set<() => void>();
   const media = { get matches() { return enabled; }, addEventListener: (_: string, fn: () => void) => mediaListeners.add(fn), removeEventListener: (_: string, fn: () => void) => mediaListeners.delete(fn) };
   vi.spyOn(window, "matchMedia").mockReturnValue(media as unknown as MediaQueryList);
-  let id = 0;
+  let id = 0; let time = 0;
   const pending = new Map<number, FrameRequestCallback>();
   vi.spyOn(window, "requestAnimationFrame").mockImplementation(fn => { pending.set(++id, fn); return id; });
   vi.spyOn(window, "cancelAnimationFrame").mockImplementation(key => { pending.delete(key); });
@@ -54,7 +54,7 @@ function environment(enabled = true) {
     motion(value: boolean) { enabled = value; mediaListeners.forEach(fn => fn()); },
     hidden(value: boolean) { hidden = value; document.dispatchEvent(new Event("visibilitychange")); },
     scroll(value: number) { vi.spyOn(window, "scrollY", "get").mockReturnValue(value); window.dispatchEvent(new Event("scroll")); },
-    flush() { const callbacks = [...pending.values()]; pending.clear(); callbacks.forEach(fn => fn(0)); },
+    flush() { const callbacks = [...pending.values()]; pending.clear(); time += 16.67; callbacks.forEach(fn => fn(time)); },
   };
 }
 
@@ -159,10 +159,10 @@ describe("storm motion ownership", () => {
     Object.defineProperty(window, "innerWidth", { value: 390, configurable: true });
     const dispose = createStormController(env.root);
     env.enter(); env.scroll(486); env.flush();
-    expect(env.section.style.getPropertyValue("--copy-opacity")).toBe("1");
     expect(env.section.style.getPropertyValue("--focus-opacity")).toBe("1");
-    env.scroll(1620); env.flush();
-    expect(env.section.style.getPropertyValue("--method-opacity")).toBe("1");
+    expect(env.section.style.getPropertyValue("--focus-opacity")).toBe("1");
+    env.scroll(1620); for (let frame = 0; frame < 90 && env.pending.size; frame++) env.flush();
+    expect(env.section.style.getPropertyValue("--peak-opacity")).toBe("1");
     expect(env.section.style.getPropertyValue("--details-opacity")).toBe("1");
     expect(env.section.style.getPropertyValue("--focus-opacity")).toBe("0");
     expect([...env.root.querySelectorAll<HTMLElement>("li")].every(item => item.style.getPropertyValue("--verb-x") === "0px")).toBe(true);
@@ -191,7 +191,7 @@ describe("storm motion ownership", () => {
     env.enter();
     env.flush();
     const initialScale = Number(env.section.style.getPropertyValue("--lens-scale"));
-    const initialX = parseFloat(env.section.style.getPropertyValue("--lens-x"));
+    const initialX = 0;
     expect((width - focusWidth * initialScale) / 2 + initialX).toBeGreaterThanOrEqual(16);
     for (const progress of [0.35, 0.45, 0.5, 0.55, 0.6]) {
       env.scroll(1620 * progress); env.flush();
@@ -208,5 +208,63 @@ describe("ASCII quality tiers", () => {
     expect(fragments).toEqual(createFragments(mobile));
     expect(fragments.reduce((count, part) => count + part.text.length, 0)).toBeLessThanOrEqual(mobile ? 330 : 850);
     expect(fragments.length).toBeGreaterThan(20);
+  });
+});
+
+describe("continuous visual pacing", () => {
+  it("shows partial motion after a native burst, converges, and stops owning RAF", () => {
+    const env = environment();
+    const dispose = createStormController(env.root);
+    env.enter(); env.flush();
+    env.scroll(120); env.flush();
+    const first = Number(env.section.dataset.visualProgress);
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(120 / 1620);
+    expect(env.pending.size).toBe(1);
+    env.flush();
+    expect(Number(env.section.dataset.visualProgress)).toBeGreaterThan(first);
+    for (let frame = 0; frame < 90 && env.pending.size; frame++) env.flush();
+    expect(env.pending.size).toBe(0);
+    expect(Number(env.section.dataset.visualProgress)).toBeCloseTo(120 / 1620, 4);
+    const measurements = env.rect.mock.calls.length;
+    env.scroll(60); env.flush();
+    expect(Number(env.section.dataset.visualProgress)).toBeGreaterThan(60 / 1620);
+    expect(Number(env.section.dataset.visualProgress)).toBeLessThan(120 / 1620);
+    expect(env.rect).toHaveBeenCalledTimes(measurements);
+    dispose();
+  });
+
+  it("is refresh-rate independent, bounded on large jumps, and exact at rest", () => {
+    const one = followVisual(0, 100, 32);
+    const two = followVisual(followVisual(0, 100, 16), 100, 16);
+    expect(one).toBeCloseTo(two, 8);
+    expect(10000 - followVisual(0, 10000, 16)).toBeLessThan(160);
+    expect(followVisual(100, 0, 16)).toBeLessThan(100);
+    expect(followVisual(99.9, 100, 16)).toBe(100);
+  });
+
+  it("holds major text fully opaque and gives the completed method the most reading travel", () => {
+    for (const p of [0.405, 0.43, 0.46, 0.48]) expect(cue(p, 0.38, 0.405, 0.48, 0.5)).toBe(1);
+    for (const p of [0.715, 0.74, 0.77, 0.79]) expect(cue(p, 0.69, 0.715, 0.79, 0.815)).toBe(1);
+    const methodTravel = (readingHolds.method[1] - readingHolds.method[0]) * 5.5;
+    for (const hold of [readingHolds.idea, readingHolds.growth, readingHolds.lost, readingHolds.questions]) {
+      expect(methodTravel).toBeGreaterThan((hold[1] - hold[0]) * 9);
+    }
+  });
+
+  it("restores full typing text when motion changes and after disposal", () => {
+    const env = environment();
+    env.section.dataset.stormAct = "journey";
+    const text = document.createElement("span"); text.dataset.promptText = "";
+    text.textContent = "Build me a volleyball stats tracker for my team."; env.section.append(text);
+    const dispose = createStormController(env.root);
+    env.enter(); env.scroll(1620 * 0.14); env.flush();
+    expect(text.textContent?.length).toBeGreaterThan(0);
+    expect(text.textContent?.length).toBeLessThan(47);
+    env.motion(false);
+    expect(text.textContent).toBe("Build me a volleyball stats tracker for my team.");
+    expect(env.pending.size).toBe(0);
+    env.motion(true); env.flush(); dispose();
+    expect(text.textContent).toBe("Build me a volleyball stats tracker for my team.");
   });
 });

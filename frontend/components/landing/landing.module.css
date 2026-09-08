@@ -1,111 +1,116 @@
+/* Static semantic posters are the baseline. The motion controller opts into
+   pinned composition only on sufficiently tall, normal-motion viewports. */
 .landing {
-  --storm-ink: #f4f1f6;
-  --storm-soft: #b7b0bf;
-  --storm-accent: #b394c0;
+  --storm-ink: #f4f1f6; --storm-soft: #b7b0bf; --storm-accent: #b394c0;
   --storm-gutter: clamp(24px, 5.55vw, 96px);
-  background: var(--v2-canvas);
-  color: var(--storm-ink);
-  font-family: var(--font-v2-sans), sans-serif;
-  overflow: clip;
-  isolation: isolate;
+  background: var(--v2-canvas); color: var(--storm-ink);
+  font-family: var(--font-v2-sans), sans-serif; overflow: clip; isolation: isolate;
 }
 .landing ::selection { color: var(--v2-canvas); background: var(--storm-accent); }
 .landing h1, .landing h2, .landing h3, .landing p, .landing pre, .landing figure { margin: 0; }
 .landing h1, .landing h2, .landing h3 { text-wrap: balance; }
-.landing h2 { font-family: var(--font-v2-sans), sans-serif; font-weight: 500; letter-spacing: -0.055em; line-height: 1.1; }
+.landing h2 { font-weight: 500; letter-spacing: -0.055em; line-height: 1.1; }
 .landing em { color: var(--storm-accent); font-style: normal; }
-.landing a { color: inherit; text-underline-offset: 7px; scroll-margin-block: 16px; }
+.landing a { color: inherit; text-underline-offset: 7px; scroll-margin-block: 100px; }
 .landing a:focus-visible, .proof:focus-visible { outline: 2px solid var(--storm-accent); outline-offset: 7px; }
 .landing a:active { opacity: 0.8; }
-.signIn, .startLink, .finalLink, .footer a { transition: color 240ms ease, border-color 240ms ease, opacity 180ms ease; }
-.startLink span, .finalLink > span { transition: transform 260ms cubic-bezier(0.25, 0.1, 0.25, 1); }
-@media (hover: hover) {
-  .signIn:hover, .footer a:hover { color: var(--storm-accent); }
-  .startLink:hover, .finalLink:hover { border-color: var(--storm-ink); }
-  .startLink:hover span, .finalLink:hover > span { transform: translate(2px, -2px); }
-}
-.skip { position: absolute; top: 16px; left: 24px; z-index: 20; padding: 14px; background: var(--v2-surface); transform: translateY(-200%); }
+.signIn, .startLink, .finalLink, .footer a { transition: color 200ms ease, border-color 200ms ease; }
+@media (hover: hover) { .signIn:hover, .footer a:hover { color: var(--storm-accent); } .startLink:hover, .finalLink:hover { border-color: var(--storm-ink); } }
+.skip { position: fixed; top: 16px; left: 24px; z-index: 30; padding: 14px; background: var(--v2-surface); transform: translateY(-200%); }
 .skip:focus { transform: none; }
-.header { position: absolute; z-index: 5; top: 0; left: 0; width: 100%; padding: 36px var(--storm-gutter); display: flex; align-items: center; justify-content: space-between; }
-.brand { font-family: var(--font-v2-display), monospace; font-size: 24px; letter-spacing: -1px; }
+.header { position: fixed; z-index: 20; top: 0; left: 0; width: 100%; padding: 14px var(--storm-gutter); display: flex; align-items: center; justify-content: space-between; background: var(--v2-canvas); border-bottom: 1px solid rgba(183,176,191,0.08); }
+.brand { font-family: var(--font-v2-display), monospace; font-size: 21px; letter-spacing: -1px; }
 .brand span, .footer > span span { color: var(--storm-accent); }
 .signIn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-size: 15px; }
-.hero { position: relative; min-height: 900px; min-height: 100svh; padding: max(160px, 22svh) var(--storm-gutter) 100px; display: flex; align-items: flex-start; }
+.hero { position: relative; min-height: 100svh; padding: max(150px, 24svh) var(--storm-gutter) 110px; display: grid; grid-template-columns: 1.35fr 1fr; align-items: center; gap: 16px; }
 .heroType { position: relative; z-index: 2; }
-.hero h1 { font-family: var(--font-v2-display), monospace; font-size: clamp(32px, 4.15vw, 70px); font-weight: 400; letter-spacing: -0.065em; line-height: 1.55; }
-.hero h1 > span { display: block; }
+.hero h1 { font: 400 clamp(30px, 3.65vw, 64px)/1.6 var(--font-v2-display), monospace; letter-spacing: -0.065em; word-spacing: -0.22em; }
+.hero h1 > span { display: block; white-space: nowrap; }
 .hero h1 > span:last-child { color: var(--storm-accent); }
-.hero h1, .scopeHeading h2 { word-spacing: -0.22em; }
 .mobileBreak { display: none; }
 .heroType > p { font-size: clamp(17px, 1.4vw, 21px); line-height: 1.65; color: var(--storm-soft); margin-top: 32px; }
-.startLink { display: inline-flex; gap: 36px; align-items: center; min-height: 48px; margin-top: 28px; border-bottom: 1px solid var(--storm-accent); font-size: 16px; }
+.startLink { display: inline-flex; gap: 32px; align-items: center; min-height: 48px; margin-top: 28px; border-bottom: 1px solid var(--storm-accent); font-size: 16px; }
 .startLink span { font-size: 24px; color: var(--storm-accent); }
-.heroArt { position: absolute; right: 6%; bottom: 9%; width: 310px; pointer-events: none; font-family: var(--font-v2-mono), monospace; }
-.heroIdea { display: block; color: var(--storm-soft); font-size: 12px; letter-spacing: 0.06em; }
-.heroConnector { display: block; margin: 14px 0 14px 24px; color: var(--storm-accent); font-size: 24px; }
-.heroFeature { position: relative; padding: 24px; border-inline: 2px solid var(--storm-accent); background: linear-gradient(var(--storm-accent), var(--storm-accent)) left top / 16px 2px no-repeat, linear-gradient(var(--storm-accent), var(--storm-accent)) right top / 16px 2px no-repeat, linear-gradient(var(--storm-accent), var(--storm-accent)) left bottom / 16px 2px no-repeat, linear-gradient(var(--storm-accent), var(--storm-accent)) right bottom / 16px 2px no-repeat; }
-.heroFeature > span:first-child { font-size: 10px; color: var(--storm-accent); }
-.heroFeature strong { display: block; margin: 12px 0 20px; font-size: 22px; font-weight: 400; color: var(--storm-ink); }
-.heroInputs { display: flex; align-items: center; gap: 8px; color: var(--storm-soft); font-size: 11px; }
-.heroInputs i { height: 16px; width: 42px; border-bottom: 1px solid #796884; }
-.heroInputs i:last-child { width: 22px; }
-.capability { position: relative; }
-.speedStage { min-height: 100svh; position: relative; padding: 100px var(--storm-gutter); display: flex; align-items: flex-start; flex-direction: column; justify-content: center; overflow: clip; }
-.speedCopy { position: relative; z-index: 2; max-width: 650px; background: var(--v2-canvas); }
-.speedCopy h2 { font-size: clamp(40px, 5.2vw, 80px); }
-.speedCopy p { margin-top: 24px; font-size: 18px; max-width: 32ch; color: var(--storm-soft); }
-.intention { position: relative; z-index: 2; margin-top: 56px; padding: 24px 0 24px 24px; border-left: 1px solid var(--storm-accent); background: var(--v2-canvas); max-width: 100%; }
-.intention > span { font: 12px var(--font-v2-mono), monospace; color: var(--storm-accent); }
-.intention > p { font: 22px/1.6 var(--font-v2-mono), monospace; margin: 12px 28px 16px 0; }
-.field { position: absolute; pointer-events: none; overflow: hidden; }
+.heroArt { width: min(100%, 600px); pointer-events: none; mix-blend-mode: lighten; }
+.heroArt img { display: block; width: 100%; height: auto; aspect-ratio: 800 / 605; object-fit: contain; }
+.semanticPrompt, .semanticQuestions { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.journey, .scope { position: relative; }
+.journeyStage > section { position: relative; padding: 110px var(--storm-gutter); }
+.journeyStage h2 { font-size: clamp(38px, 5.6vw, 80px); }
+.ideaBeat { min-height: 90svh; }
+.agentWindow { position: relative; width: min(580px, 100%); margin: 70px 5% 0 auto; background: #141316; border: 1px solid #46404b; border-radius: 12px; box-shadow: 0 26px 60px #0004; font-family: var(--font-v2-mono), monospace; }
+.agentChrome { padding: 18px 22px; border-bottom: 1px solid #302d34; display: flex; justify-content: space-between; font-size: 11px; color: var(--storm-soft); }
+.agentChrome i { display: inline-block; width: 6px; height: 6px; background: var(--storm-accent); margin-right: 8px; }
+.agentConversation { height: 160px; padding: 30px; position: relative; }
+.agentMark { color: var(--storm-accent); font-size: 26px; }
+.agentWelcome { margin-top: 16px !important; font-size: 15px; color: var(--storm-soft); }
+.agentWorking { position: absolute; bottom: -20px; left: 28px; font-size: 11px; color: var(--storm-soft); opacity: 0; }
+.agentPrompt { position: relative; margin: 10px 20px; padding: 18px 48px 18px 18px; min-height: 90px; border: 1px solid #4c4352; border-radius: 8px; font-size: 15px; line-height: 1.7; background: #1c191f; }
+.sendMark { position: absolute; right: 12px; bottom: 14px; color: var(--storm-accent); font-size: 22px; }
+.agentFoot { display: flex; justify-content: space-between; margin: 18px 24px; color: #a29aaa; font-size: 10px; }
+.agentEmptyPrompt { display: none; position: absolute; bottom: 40px; left: 20px; right: 20px; min-height: 90px; padding: 18px; border: 1px solid #403947; border-radius: 8px; font-size: 12px; color: var(--storm-soft); }
+.agentEmptyPrompt span { float: right; color: var(--storm-accent); }
+.typingCaret { display: none; vertical-align: baseline; width: 2px; height: 1em; margin-left: 3px; background: var(--storm-accent); }
+.projectStorm { position: relative; height: 600px; margin-top: 40px; }
+.field, .artifacts { position: absolute; inset: 0; pointer-events: none; overflow: clip; }
 .field canvas { display: none; width: 100%; height: 100%; }
 .field[data-canvas-ready] canvas { display: block; }
 .field[data-canvas-ready] .asciiFallback { display: none; }
-.asciiFallback { font: 18px/1.8 var(--font-v2-mono), monospace; letter-spacing: 0.16em; white-space: pre; color: #807589; transform: rotate(-12deg) scale(1.3); transform-origin: center; }
-.speedField { width: 60%; height: 86%; right: -5%; top: 7%; }
-.speedField .asciiFallback { margin-left: 30%; opacity: 0.6; }
-.gap { position: relative; min-height: 120svh; display: flex; align-items: center; justify-content: flex-end; padding: 100px var(--storm-gutter); overflow: clip; }
-.gapField { inset: 0; }
-.gapField .asciiFallback { column-count: 2; width: 160%; font-size: 25px; opacity: 0.45; }
-.lostIntention { position: absolute; top: 10%; left: var(--storm-gutter); z-index: 2; font: 14px var(--font-v2-mono), monospace; color: var(--storm-soft); background: var(--v2-canvas); padding: 8px 0; }
-.gapCopy { position: relative; z-index: 2; padding: 36px 0 36px 40px; background: var(--v2-canvas); }
-.gapCopy h2 { font-size: clamp(38px, 4.7vw, 72px); }
-.gapCopy h2 em { color: #d9b77f; }
-.gapCopy p { margin-top: 28px; font-size: 19px; color: var(--storm-soft); }
-.gapBracket { position: absolute; left: 3%; top: 22%; font: 400px/1 var(--font-v2-mono), monospace; color: #302a32; pointer-events: none; }
-.interruption { min-height: 75svh; padding: 100px var(--storm-gutter); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; text-align: center; background: var(--v2-canvas); position: relative; }
-.caret { font: 24px var(--font-v2-mono), monospace; color: var(--storm-accent); }
-.interruption h2 { font-size: clamp(28px, 3.4vw, 48px); letter-spacing: -0.045em; line-height: 1.3; }
-.interruption h2 span { color: var(--storm-soft); }
-.scope { position: relative; }
-.scopeStage { padding: 72px var(--storm-gutter); }
-.scopeHeading { position: relative; z-index: 3; background: var(--v2-canvas); }
-.scopeHeading > p { font: 12px/1.5 var(--font-v2-mono), monospace; color: var(--storm-accent); letter-spacing: 0.12em; margin-bottom: 18px; }
-.scopeHeading h2 { font: 400 clamp(24px, 3.2vw, 44px)/1.5 var(--font-v2-display), monospace; letter-spacing: -0.06em; }
-.scopeComposition { position: relative; display: grid; gap: 48px; }
-.stormPoster { position: relative; height: 420px; overflow: hidden; margin-top: 36px; }
-.scopeField { inset: 0; }
-.scopeField .asciiFallback { text-align: center; font-size: 22px; line-height: 1.4; }
-.staticStormLabel { position: absolute; bottom: 20px; left: 0; color: var(--storm-soft); background: var(--v2-canvas); padding: 8px; }
-.focusChange { position: relative; width: min(650px, 100%); margin: 0 auto; padding: 52px 36px; }
-.lens { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.lens i { position: absolute; width: 44px; height: 44px; border: 2px solid var(--storm-accent); }
+.asciiFallback { padding: 40px 0; font: 18px/3 var(--font-v2-mono), monospace; color: #807589; opacity: 0.5; white-space: pre; }
+.connections { position: absolute; inset: 0; width: 100%; height: 100%; fill: var(--storm-accent); stroke: #927e9f; stroke-width: 1; opacity: 0.5; }
+.connections path { fill: none; }
+.request, .fileWindow { position: absolute; background: #19171e; border: 1px solid #504558; border-radius: 6px; font-family: var(--font-v2-mono), monospace; }
+.request { width: 250px; padding: 17px; }
+.request > span { display: flex; justify-content: space-between; color: var(--storm-accent); font-size: 9px; letter-spacing: 0.06em; }
+.request i { font-style: normal; }
+.request p { font-size: 13px; line-height: 1.65; margin-top: 14px; }
+.request:nth-of-type(1) { left: 8%; top: 32%; }
+.request:nth-of-type(2) { right: 7%; top: 27%; }
+.request:nth-of-type(3) { left: 18%; top: 65%; }
+.request:nth-of-type(4) { right: 17%; top: 78%; }
+.fileWindow { width: 265px; }
+.fileWindow > div { padding: 12px 16px; border-bottom: 1px solid #42394b; font-size: 11px; color: #d5c6dd; display: flex; justify-content: space-between; }
+.fileWindow pre { padding: 18px; font-size: 11px; line-height: 1.8; color: #aaa0b3; }
+.fileWindow:nth-of-type(5) { left: 3%; top: 12%; transform: rotate(-5deg); }
+.fileWindow:nth-of-type(6) { right: 4%; top: 36%; width: 220px; transform: rotate(4deg); }
+.fileWindow:nth-of-type(7) { left: 16%; top: 68%; transform: rotate(2deg); }
+.fileWindow:nth-of-type(8) { right: 19%; top: 8%; transform: rotate(-3deg); }
+.fileWindow:nth-of-type(9) { right: 23%; top: 60%; transform: rotate(6deg); }
+.growthBeat h2 { max-width: 960px; }
+.growthBeat em { color: #d9b77f; }
+.filesBeat { text-align: right; }
+.connectionsBeat { padding-top: 30px !important; }
+.lostBeat { text-align: center; }
+.interruption { min-height: 75svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 32px; text-align: center; }
+.caret { font: 20px var(--font-v2-mono), monospace; color: var(--storm-accent); }
+.interruption h2 { font-size: clamp(28px, 4vw, 58px); line-height: 1.5; }
+.visualQuestions > span:last-of-type { color: var(--storm-soft); }
+.visualQuestions { display: block; width: min(700px, calc(100vw - 48px)); text-align: left; }
+.visualQuestions > span { display: block; min-height: 1.5em; }
+.visualQuestions > br, .visualQuestions > .typingCaret { display: none !important; }
+.scopeStage { padding: 100px var(--storm-gutter); }
+.codizeEntrance { font-size: clamp(38px, 5.6vw, 80px); letter-spacing: -0.055em; line-height: 1.15; margin-bottom: 100px !important; }
+.scopeHeading { position: relative; z-index: 5; }
+.scopeHeading h2 { font: 400 clamp(24px, 3.2vw, 44px)/1.6 var(--font-v2-display), monospace; letter-spacing: -0.06em; word-spacing: -0.22em; }
+.scopeComposition { position: relative; display: grid; gap: 80px; }
+.stormPoster { position: absolute; inset: 0; opacity: 0.3; }
+.focusChange { position: relative; z-index: 2; width: min(560px, 100%); margin: 80px auto 0; padding: 42px 24px; }
+.lens { position: absolute; inset: 0; pointer-events: none; }
+.lens i { position: absolute; width: 36px; height: 36px; border: 2px solid var(--storm-accent); }
 .lens i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
 .lens i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
 .lens i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
 .lens i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
-.focusCopy { position: relative; z-index: 1; background: var(--v2-canvas); text-align: center; }
-.focusLabel { font: 12px/1.6 var(--font-v2-mono), monospace; letter-spacing: 0.14em; color: var(--storm-accent); }
-.focusCopy h3 { font: 500 clamp(28px, 3.1vw, 44px)/1.25 var(--font-v2-sans), sans-serif; letter-spacing: -0.045em; margin: 20px 0; }
-.focusCopy > p:last-child { color: var(--storm-soft); font-size: 17px; line-height: 1.6; }
+.focusCopy { position: relative; background: var(--v2-canvas); text-align: center; }
+.focusLabel { font: 11px/1.6 var(--font-v2-mono), monospace; letter-spacing: 0.12em; color: var(--storm-accent); }
+.focusCopy h3 { font: 500 clamp(26px, 3vw, 42px)/1.3 var(--font-v2-sans), sans-serif; letter-spacing: -0.045em; margin-top: 18px; }
 .method { position: relative; z-index: 3; width: min(1050px, 100%); margin: 0 auto; }
-.methodIntro { color: var(--storm-soft); font-size: 18px; padding: 16px 0 24px; }
 .method ol { list-style: none; margin: 0; padding: 0; }
 .method li { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px 0; border-top: 1px solid var(--v2-border); }
-.verb { font: 400 clamp(24px, 3.3vw, 48px)/1.25 var(--font-v2-display), monospace; letter-spacing: -0.06em; }
+.verb { font: 400 clamp(24px, 3.3vw, 46px)/1.3 var(--font-v2-display), monospace; letter-spacing: -0.06em; }
 .method li:last-child .verb { color: var(--storm-accent); }
 .verbExplanation { color: var(--storm-soft); font-size: 15px; }
-.methodEnd { padding-top: 22px; color: var(--storm-accent); font: 14px/1.5 var(--font-v2-mono), monospace; }
+.methodEnd { padding-top: 28px; color: var(--storm-accent); font: 14px/1.5 var(--font-v2-mono), monospace; }
 .proof { position: relative; padding: 120px var(--storm-gutter) 80px; min-height: 130svh; display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 64px; align-content: center; align-items: center; }
 .proofIntro h2 { font-size: clamp(36px, 4vw, 60px); }
 .proofIntro > p { max-width: 34ch; margin-top: 28px; color: var(--storm-soft); font-size: 17px; line-height: 1.7; }
@@ -124,105 +129,112 @@
 .specimenAnswer > span { font: 10px var(--font-v2-mono), monospace; color: var(--storm-soft); }
 .specimenAnswer > p { margin-top: 10px; font-size: 14px; line-height: 1.6; }
 .specimenNote { margin-top: 20px !important; color: var(--storm-soft); font-size: 13px; }
-.ending { grid-column: 1 / -1; text-align: center; padding-top: 28px; }
-.ending > p:first-child { font-size: 18px; color: var(--storm-soft); margin-bottom: 12px; }
-.finalLink { display: inline-flex; min-height: 60px; gap: 32px; align-items: center; border-bottom: 1px solid var(--storm-accent); font-size: clamp(24px, 2.3vw, 34px); letter-spacing: -0.04em; }
+
+.proof { min-height: 115svh; padding-block: 180px; scroll-margin-top: 90px; }
+.ending { min-height: 85svh; padding: 180px var(--storm-gutter); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.ending h2 { font-size: clamp(26px, 3.6vw, 52px); }
+.finalLink { display: inline-flex; min-height: 60px; gap: 24px; align-items: center; border-bottom: 1px solid var(--storm-accent); font-size: clamp(19px, 2vw, 28px); margin-top: 38px; letter-spacing: -0.035em; }
 .finalLink > span { color: var(--storm-accent); }
-.endingSupport { margin-top: 26px !important; color: var(--storm-soft); font-size: 14px; line-height: 1.7; }
+.endingSupport { margin-top: 32px !important; color: var(--storm-soft); font-size: 15px; line-height: 1.8; }
 .footer { display: flex; gap: 24px; justify-content: space-between; align-items: center; padding: 32px var(--storm-gutter); border-top: 1px solid var(--v2-border); color: var(--storm-soft); font-size: 12px; }
 .footer > span { font: 12px var(--font-v2-display), monospace; }
 .footer a { min-height: 44px; display: inline-flex; align-items: center; }
 
-/* Enhancement is opt-in after geometry is available. CSS alone always presents
-   the three complete posters; JS never owns meaningful copy or DOM order. */
 @media (prefers-reduced-motion: no-preference) and (min-height: 700px) {
-  .landing[data-motion="on"] .capability { height: 220svh; }
-  .landing[data-motion="on"] .speedStage { position: sticky; top: 0; height: 100svh; }
-  .landing[data-motion="on"] .scope { height: 350svh; }
-  .landing[data-motion="on"] .scopeStage { position: sticky; top: 0; height: 100svh; padding-top: 6svh; padding-bottom: 5svh; overflow: clip; }
-  .landing[data-motion="on"] .scopeComposition { height: 72svh; display: grid; place-items: center; gap: 0; }
-  .landing[data-motion="on"] .stormPoster { position: absolute; inset: -20px calc(-1 * var(--storm-gutter)); height: auto; margin: 0; }
-  .landing[data-motion="on"] .staticStormLabel { display: none; }
-  .landing[data-motion="on"] .focusChange { grid-area: 1 / 1; opacity: var(--focus-opacity, 1); }
-  .landing[data-motion="on"] .lens { transform: translate(var(--lens-x, 0px), var(--lens-y, 0px)) scale(var(--lens-scale, 1)); opacity: var(--lens-opacity, 1); }
-  .landing[data-motion="on"] .focusCopy { opacity: var(--copy-opacity, 1); }
-  .landing[data-motion="on"] .method { grid-area: 1 / 1; opacity: var(--method-opacity, 0); }
-  .landing[data-motion="on"] .method li { transform: translate(var(--verb-x, 0px), var(--verb-y, 0px)); border-color: rgba(255, 255, 255, var(--rule-opacity, 0)); }
-  .landing[data-motion="on"] .verb { transform: scale(var(--verb-scale, 1)); transform-origin: left center; display: inline-block; }
-  .landing[data-motion="on"] .verbExplanation, .landing[data-motion="on"] .methodIntro, .landing[data-motion="on"] .methodEnd { opacity: var(--details-opacity, 0); }
-  .landing[data-motion="on"] .gapField { clip-path: inset(0 0 var(--gap-cut, 0%) 0); }
-  /* Visible HTML is the baseline. A finite entrance starts only once in view;
-     neither an observer failure nor disabled JS can leave the text hidden. */
-  .landing[data-motion="on"] [data-storm-enter][data-entered] { animation: text-arrive 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
-  .landing[data-motion="on"] [data-storm-enter="after"][data-entered] { animation-delay: 100ms; }
+  .landing[data-motion="on"] .journey { height: 1000svh; }
+  .landing[data-motion="on"] .journeyStage, .landing[data-motion="on"] .scopeStage { position: sticky; top: 0; height: 100svh; overflow: clip; }
+  .landing[data-motion="on"] .journeyStage > section { position: absolute; inset: 0; padding: 0; min-height: 0; }
+  .landing[data-motion="on"] .journeyStage h2 { position: absolute; margin: 0; }
+  .landing[data-motion="on"] .ideaBeat h2 { left: var(--storm-gutter); top: 18%; opacity: var(--idea-opacity, 0); }
+  .landing[data-motion="on"] .agentWindow { position: absolute; right: 14%; top: 38%; margin: 0; transform: translateY(var(--agent-y, 100vh)) scale(var(--agent-scale, 1)); opacity: var(--agent-opacity, 0); }
+  .landing[data-motion="on"] .agentPrompt { transform: translateY(var(--prompt-y, 0px)); }
+  .landing[data-motion="on"] .agentWelcome, .landing[data-motion="on"] .agentMark { opacity: var(--welcome-opacity, 1); }
+  .landing[data-motion="on"] .agentWorking { opacity: var(--working-opacity, 0); }
+  .landing[data-motion="on"] .agentEmptyPrompt { display: block; opacity: var(--working-opacity, 0); }
+  .landing[data-motion="on"] [data-question][data-typing="true"]::after { content: ""; display: inline-block; width: 2px; height: 0.85em; margin-left: 5px; background: var(--storm-accent); opacity: var(--cursor-opacity, 1); }
+  .landing[data-motion="on"] .typingCaret { display: inline-block; opacity: var(--cursor-opacity, 1); }
+  .landing[data-motion="on"] .expansionBeat h2 { left: var(--storm-gutter); top: 16%; opacity: var(--possibilities-opacity, 0); z-index: 5; }
+  .landing[data-motion="on"] .projectStorm { position: absolute; inset: 0; height: auto; margin: 0; opacity: var(--storm-opacity, 0); }
+  .landing[data-motion="on"] .request, .landing[data-motion="on"] .fileWindow { transform: translate(var(--artifact-x, 0px), var(--artifact-y, 0px)) scale(var(--artifact-scale, 1)) rotate(var(--artifact-rotate, 0deg)); opacity: var(--artifact-opacity, 0); }
+  .landing[data-motion="on"] .connections { opacity: var(--connections-opacity, 0); stroke-dasharray: 1; stroke-dashoffset: var(--connections-dash, 1); }
+  .landing[data-motion="on"] .growthBeat h2 { left: 12%; right: 10%; top: 35%; opacity: var(--growth-opacity, 0); }
+  .landing[data-motion="on"] .filesBeat h2 { right: 10%; top: 25%; opacity: var(--files-opacity, 0); font-size: clamp(36px, 4.5vw, 64px); }
+  .landing[data-motion="on"] .connectionsBeat h2 { left: 9%; top: 70%; opacity: var(--connection-label-opacity, 0); font-size: clamp(36px, 4.5vw, 64px); }
+  .landing[data-motion="on"] .lostBeat h2 { left: 12%; right: 12%; top: 36%; opacity: var(--lost-opacity, 0); }
+  .landing[data-motion="on"] .interruption { opacity: var(--silence-opacity, 0); }
+  .landing[data-motion="on"] .interruption h2 { position: relative; }
+  .landing[data-motion="on"] .scope { height: 650svh; }
+  .landing[data-motion="on"] .scopeStage { padding-top: 110px; padding-bottom: 50px; }
+  .landing[data-motion="on"] .codizeEntrance { position: absolute; left: 15%; top: 36%; margin: 0 !important; opacity: var(--codize-opacity, 1); }
+  .landing[data-motion="on"] .scopeHeading { opacity: var(--peak-opacity, 0); transform: translateY(var(--peak-y, 18px)); }
+  .landing[data-motion="on"] .scopeComposition { height: calc(100svh - 220px); display: grid; place-items: center; gap: 0; }
+  .landing[data-motion="on"] .stormPoster { inset: -110px calc(-1 * var(--storm-gutter)); opacity: 1; }
+  .landing[data-motion="on"] .focusChange { grid-area: 1 / 1; margin: 0; opacity: var(--focus-opacity, 0); transform: scale(var(--focus-scale, 0.96)); }
+  .landing[data-motion="on"] .lens { transform: scale(var(--lens-scale, 1)); }
+  .landing[data-motion="on"] .method { grid-area: 1 / 1; }
+  .landing[data-motion="on"] .method li { transform: translate(var(--verb-x, 0px), var(--verb-y, 0px)); opacity: var(--verb-opacity, 0); border-color: rgba(255,255,255,var(--rule-opacity,0)); }
+  .landing[data-motion="on"] .verb { display: inline-block; transform: scale(var(--verb-scale, 1)); transform-origin: left center; }
+  .landing[data-motion="on"] .verbExplanation, .landing[data-motion="on"] .methodEnd { opacity: var(--details-opacity, 0); }
+  .landing[data-motion="on"] [data-storm-enter][data-entered] { animation: text-arrive 500ms ease-out backwards; }
 }
-@keyframes text-arrive { from { opacity: 0.25; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@media (min-width: 1600px) { .heroArt { right: 8%; bottom: 13%; } }
-@media (max-width: 900px) {
-  .proof { grid-template-columns: 1fr; gap: 40px; padding-top: 88px; }
-  .proofIntro { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 32px; }
-  .proofIntro > p { margin-top: 0; }
+@keyframes text-arrive { from { opacity: 0.4; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 1000px) {
+  .hero { grid-template-columns: 1fr; padding-top: 150px; gap: 45px; }
+  .hero h1 { font-size: clamp(29px, 5.6vw, 46px); }
+  .heroArt { width: 400px; max-width: 70%; justify-self: end; }
+  .proof { grid-template-columns: 1fr; gap: 64px; }
   .specimen { width: min(660px, 100%); justify-self: end; }
-  .heroArt { width: 290px; right: 4%; bottom: 6%; }
-  .verbExplanation { max-width: 20ch; }
 }
 @media (max-width: 600px) {
-  .header { padding-top: 24px; }
-  .brand { font-size: 19px; }
-  .hero { padding-top: 152px; padding-bottom: 220px; min-height: 100svh; }
-  .hero h1 { font-size: clamp(27px, 8.2vw, 45px); line-height: 1.52; letter-spacing: -0.07em; }
+  .header { padding-block: 10px; }
+  .brand { font-size: 18px; }
+  .hero { padding-top: 125px; padding-bottom: 50px; gap: 32px; }
+  .hero h1 { font-size: clamp(25px, 7.6vw, 41px); line-height: 1.58; letter-spacing: -0.07em; }
+  .hero h1 > span { white-space: normal; }
   .mobileBreak { display: initial; }
   .hero h1 > span + span { margin-top: 12px; }
-  .heroType > p { font-size: 15px; margin-top: 28px; }
-  .startLink { margin-top: 16px; font-size: 15px; min-height: 48px; }
-  .heroArt { width: 240px; bottom: 20px; right: 24px; }
-  .heroIdea { font-size: 10px; }
-  .heroConnector { margin-block: 6px; font-size: 20px; }
-  .heroFeature { padding: 16px; }
-  .heroFeature > span:first-child { font-size: 9px; }
-  .heroFeature strong { font-size: 18px; margin: 10px 0 12px; }
-  .heroInputs { font-size: 10px; gap: 6px; }
-  .speedStage { padding: 72px var(--storm-gutter); justify-content: flex-start; min-height: 95svh; }
-  .speedCopy h2 { font-size: clamp(37px, 10vw, 58px); }
-  .speedCopy > p { font-size: 16px; max-width: 27ch; }
-  .speedField { inset: 31% -20% 0 -15%; width: auto; height: auto; }
-  .intention { margin-top: 220px; padding: 16px 0 16px 18px; }
-  .intention > p { font-size: 15px; margin-right: 12px; }
-  .gap { min-height: 110svh; padding-top: 170px; padding-bottom: 120px; align-items: center; }
-  .gapCopy { padding: 24px 0; }
-  .gapCopy h2 { font-size: clamp(31px, 8.1vw, 48px); }
-  .gapCopy p { font-size: 16px; }
-  .gapBracket { font-size: 280px; top: 8%; left: -45px; }
-  .gapField .asciiFallback { font-size: 18px; }
-  .lostIntention { top: 7%; font-size: 12px; }
-  .interruption { min-height: 65svh; padding: 80px 24px; gap: 28px; }
-  .interruption h2 { font-size: 28px; }
-  .scopeStage { padding: 48px var(--storm-gutter); }
-  .scopeHeading > p { font-size: 9px; letter-spacing: 0.08em; }
-  .scopeHeading h2 { font-size: clamp(19px, 5.3vw, 29px); }
-  .scopeComposition { gap: 40px; }
-  .stormPoster { height: 310px; }
-  .staticStormLabel { font-size: 13px; }
-  .focusChange { padding: 40px 18px; }
-  .focusCopy h3 { font-size: 28px; }
-  .focusCopy > p:last-child { font-size: 15px; }
-  .focusLabel { font-size: 10px; }
-  .lens i { width: 28px; height: 28px; }
-  .methodIntro { font-size: 14px; padding-bottom: 22px; }
-  .method li { display: block; padding: 13px 0; }
-  .verb { display: block; font-size: clamp(20px, 6vw, 31px); }
-  .verbExplanation { display: block; max-width: none; font-size: 12px; margin-top: 8px; }
-  .methodEnd { font-size: 12px; padding-top: 20px; }
-  .proof { padding-top: 80px; padding-bottom: 60px; gap: 36px; }
-  .proofIntro { display: block; }
+  .heroType > p { font-size: 15px; margin-top: 24px; }
+  .startLink { font-size: 15px; margin-top: 18px; gap: 24px; }
+  .heroArt { width: 260px; max-width: 85%; justify-self: center; }
+  .journeyStage > section { padding: 90px var(--storm-gutter); }
+  .journeyStage h2 { font-size: clamp(35px, 9.3vw, 52px); }
+  .agentWindow { margin: 55px auto 0; }
+  .agentChrome { padding: 16px; font-size: 10px; }
+  .agentConversation { height: 150px; padding: 24px; }
+  .agentWelcome { font-size: 13px; }
+  .agentPrompt { margin-inline: 12px; padding: 14px 36px 14px 14px; font-size: 13px; min-height: 104px; }
+  .agentFoot { margin-inline: 18px; }
+  .projectStorm { height: 480px; }
+  .request { width: 195px; padding: 13px; }
+  .request p { font-size: 12px; }
+  .request:nth-of-type(3), .request:nth-of-type(4), .fileWindow:nth-of-type(8), .fileWindow:nth-of-type(9) { display: none; }
+  .request:nth-of-type(1) { left: 5%; top: 31%; }
+  .request:nth-of-type(2) { right: 5%; top: 64%; }
+  .fileWindow { width: 195px; }
+  .fileWindow pre { font-size: 9px; padding: 12px; }
+  .fileWindow:nth-of-type(5) { top: 16%; left: 3%; }
+  .fileWindow:nth-of-type(6) { top: 42%; right: 2%; width: 180px; }
+  .fileWindow:nth-of-type(7) { top: 71%; left: 7%; }
+  .connections { width: 130%; left: -15%; }
+  .scopeStage { padding: 90px var(--storm-gutter); }
+  .codizeEntrance { font-size: 38px; }
+  .scopeHeading h2 { font-size: clamp(18px, 5.1vw, 28px); }
+  .focusChange { padding: 32px 15px; }
+  .focusLabel { font-size: 9px; letter-spacing: 0.07em; }
+  .focusCopy h3 { font-size: 25px; }
+  .method li { display: block; padding: 14px 0; }
+  .verb { display: block; font-size: clamp(20px, 6vw, 28px); }
+  .verbExplanation { display: block; font-size: 12px; margin-top: 8px; }
+  .methodEnd { font-size: 12px; padding-top: 22px; }
+  .proof { padding-block: 120px; gap: 54px; }
   .proofIntro h2 { font-size: 40px; }
-  .proofIntro > p { margin-top: 24px; font-size: 16px; }
+  .proofIntro > p { font-size: 16px; }
   .specimen { padding: 20px 16px; }
   .specimen figcaption { display: block; font-size: 10px; padding-bottom: 18px; }
   .specimen figcaption span { display: block; margin-top: 6px; }
   .specimenHeader { margin: 22px 0; }
   .specimenHeader h3 { font-size: 14px; }
-  .specimenDialogue { grid-template-columns: 48px minmax(0, 1fr); gap: 10px; }
+  .specimenDialogue { grid-template-columns: 48px minmax(0,1fr); gap: 10px; }
   .character { width: 48px; height: 64px; }
   .character > span, .character > img { width: 48px; height: 48px; }
   .specimenDialogue > div { padding: 12px; }
@@ -230,25 +242,25 @@
   .specimenAnswer { margin-left: 58px; }
   .specimenAnswer > p { font-size: 13px; }
   .specimenNote { font-size: 12px; }
-  .ending { padding-top: 24px; }
-  .ending > p:first-child { font-size: 15px; }
-  .endingSupport { font-size: 12px; }
-  .footer { flex-wrap: wrap; gap: 12px; padding-top: 24px; padding-bottom: 24px; }
+  .ending { min-height: 80svh; padding-block: 130px; }
+  .ending h2 { max-width: 12ch; font-size: 36px; }
+  .finalLink { gap: 16px; font-size: 20px; }
+  .footer { flex-wrap: wrap; gap: 12px; }
   .footer p { order: 3; width: 100%; font-size: 10px; }
 }
 @media (prefers-reduced-motion: no-preference) and (min-height: 700px) and (max-width: 600px) {
-  .landing[data-motion="on"] .capability { height: 190svh; }
-  .landing[data-motion="on"] .scope { height: 240svh; }
-  .landing[data-motion="on"] .scopeStage { padding-top: 7svh; }
-  .landing[data-motion="on"] .scopeComposition { height: 77svh; }
-}
-@media (prefers-reduced-motion: reduce), (max-height: 699px) {
-  .hero { min-height: 720px; }
-  .capability .speedStage { min-height: 720px; }
-  .interruption { min-height: 420px; }
-  .scopeComposition { gap: 64px; }
-  .stormPoster { border-bottom: 1px solid var(--v2-border); }
+  .landing[data-motion="on"] .ideaBeat h2 { top: 20%; }
+  .landing[data-motion="on"] .agentWindow { left: var(--storm-gutter); right: var(--storm-gutter); width: auto; top: 38%; }
+  .landing[data-motion="on"] .expansionBeat h2 { top: 16%; right: var(--storm-gutter); }
+  .landing[data-motion="on"] .growthBeat h2 { left: var(--storm-gutter); right: var(--storm-gutter); top: 35%; }
+  .landing[data-motion="on"] .filesBeat h2 { right: var(--storm-gutter); font-size: 36px; }
+  .landing[data-motion="on"] .connectionsBeat h2 { left: var(--storm-gutter); top: 73%; font-size: 34px; }
+  .landing[data-motion="on"] .lostBeat h2 { left: var(--storm-gutter); right: var(--storm-gutter); }
+  .landing[data-motion="on"] .interruption h2 { font-size: clamp(24px, 6.9vw, 32px); }
+  .landing[data-motion="on"] .scopeStage { padding-top: 100px; }
+  .landing[data-motion="on"] .scopeComposition { height: calc(100svh - 185px); }
+  .landing[data-motion="on"] .codizeEntrance { left: var(--storm-gutter); right: var(--storm-gutter); top: 34%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .landing a, .startLink span, .finalLink > span { transition: none; transform: none; }
+  .landing a { transition: none; }
 }

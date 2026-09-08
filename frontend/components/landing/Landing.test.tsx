@@ -23,7 +23,7 @@ describe("Scope the Storm public contract", () => {
     const page = renderPage();
     expect(page.querySelectorAll("h1")).toHaveLength(1);
     expect(page.querySelector("h1")?.textContent).toBe("BUILD WITH AI. STAY IN CONTROL.");
-    expect(Array.from(page.querySelectorAll("[data-storm-act]"), element => element.getAttribute("data-storm-act"))).toEqual(["thesis", "speed", "gap", "silence", "scope", "proof"]);
+    expect(Array.from(page.querySelectorAll("[data-storm-act]"), element => element.getAttribute("data-storm-act"))).toEqual(["thesis", "journey", "scope", "proof", "ending"]);
     for (const section of page.querySelectorAll("section")) {
       expect(page.querySelector(`#${section.getAttribute("aria-labelledby")}`)).not.toBeNull();
     }
@@ -45,7 +45,7 @@ describe("Scope the Storm public contract", () => {
 
   it("preserves real auth destinations and an accessible shortcut to product proof", () => {
     const page = renderPage();
-    const authLinks = Array.from(page.querySelectorAll("a")).filter(link => /Start one change|Sign in/.test(link.textContent ?? ""));
+    const authLinks = Array.from(page.querySelectorAll("a")).filter(link => /Start your first project|Sign in/.test(link.textContent ?? ""));
     expect(authLinks).toHaveLength(4);
     expect(authLinks.every(link => link.getAttribute("href") === "/login")).toBe(true);
     expect(page.querySelector('a[href="#product-proof"]')).not.toBeNull();
@@ -54,7 +54,7 @@ describe("Scope the Storm public contract", () => {
 
   it("keeps decoration hidden from assistive technology and content outside Canvas", () => {
     const page = renderPage();
-    expect(page.querySelectorAll("canvas")).toHaveLength(3);
+    expect(page.querySelectorAll("canvas")).toHaveLength(2);
     for (const canvas of page.querySelectorAll("canvas")) {
       expect(canvas.getAttribute("aria-hidden")).toBe("true");
       expect(canvas.parentElement?.getAttribute("aria-hidden")).toBe("true");
@@ -64,13 +64,28 @@ describe("Scope the Storm public contract", () => {
     expect(page.querySelector("#scope")?.querySelector("h3")?.closest('[aria-hidden="true"]')).toBeNull();
   });
 
+  it("preserves a supplied looping hero with a native reduced-motion picture source", () => {
+    const page = renderPage();
+    const picture = page.querySelector("picture")!;
+    expect(picture.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(picture.querySelector("source")?.getAttribute("media")).toBe("(prefers-reduced-motion: no-preference)");
+    expect(picture.querySelector("source")?.getAttribute("srcset")).toBe("/landing/codize-hero-ascii.gif");
+    expect(picture.querySelector("img")?.getAttribute("src")).toBe("/landing/codize-hero-ascii-still.png");
+    expect(picture.querySelector("img")?.getAttribute("alt")).toBe("");
+    expect(page.querySelectorAll("[data-agent-window]")).toHaveLength(1);
+    expect(page.querySelector("[data-agent-window]")?.querySelectorAll("input, textarea, button, [tabindex]")).toHaveLength(0);
+    expect(page.querySelector("[data-prompt-text]")?.textContent).toBe("Build me a volleyball stats tracker for my team.");
+    expect(page.textContent).not.toMatch(/Start one change|ONE CURRENT CHANGE|Pick one change/);
+    expect(page.querySelector('[data-storm-act="ending"]')?.previousElementSibling?.id).toBe("product-proof");
+  });
+
   it("labels the static specimen and renders only a lazy canonical character frame after resolution", () => {
     const page = renderPage();
     const proof = page.querySelector("#product-proof")!;
     expect(proof.querySelector("figcaption")?.textContent).toContain("static preview");
     expect(proof.querySelectorAll("button, input, textarea")).toHaveLength(0);
     expect(proof.textContent).toContain("AN EXAMPLE ANSWER");
-    expect(page.querySelectorAll("img")).toHaveLength(1);
+    expect(page.querySelectorAll("img")).toHaveLength(2);
     expect(proof.querySelector("img")?.getAttribute("src")).toContain("codybara_idle_01.png");
     expect(proof.querySelector("img")?.getAttribute("loading")).toBe("lazy");
     expect(page.querySelector('link[rel="preload"][as="image"]')).toBeNull();

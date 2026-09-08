@@ -35,7 +35,7 @@ const v2Display = Press_Start_2P({
 export const metadata: Metadata = {
   title: "Codize — Build with AI. Stay in control.",
   description:
-    "Codize is an AI coding mentor for student builders. Scope one change, work with your coding AI, and understand what you build as you go.",
+    "Codize is an AI coding mentor for student builders. Focus on one feature, work with your coding AI, and understand what you build as you go.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
