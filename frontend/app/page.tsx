@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import LandingMotion from "../components/landing/LandingMotion";
+import HeroAnimation from "../components/landing/HeroAnimation";
 import { StoryAct, ScopeAct } from "../components/landing/StormActs";
 import ProductProof from "../components/landing/ProductProof";
 import styles from "../components/landing/landing.module.css";
@@ -21,12 +22,7 @@ export default function LandingPage() {
             <Link href="/login" prefetch={false} className={styles.startLink}>Start your first project <span aria-hidden="true">↗</span></Link>
           </div>
           <div className={styles.heroArt} aria-hidden="true">
-            <picture>
-              <source media="(prefers-reduced-motion: no-preference)" srcSet="/landing/codize-hero-ascii.gif" type="image/gif" />
-              {/* The supplied GIF is served byte-for-byte; the browser selects a still under reduced motion. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/landing/codize-hero-ascii-still.png" width="800" height="605" alt="" decoding="async" />
-            </picture>
+            <HeroAnimation />
           </div>
         </section>
         <StoryAct />

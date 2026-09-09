@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import LandingPage from "../../app/page";
+import HeroAnimation from "./HeroAnimation";
 import LandingCharacter from "./LandingCharacter";
 
 vi.mock("next/link", () => ({ default: ({ prefetch: _prefetch, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean }) => <a {...props} /> }));
@@ -64,14 +65,26 @@ describe("Scope the Storm public contract", () => {
     expect(page.querySelector("#scope")?.querySelector("h3")?.closest('[aria-hidden="true"]')).toBeNull();
   });
 
-  it("preserves a supplied looping hero with a native reduced-motion picture source", () => {
+  it("serves optimized decorative video while preserving the still for reduced motion", () => {
     const page = renderPage();
-    const picture = page.querySelector("picture")!;
-    expect(picture.closest('[aria-hidden="true"]')).not.toBeNull();
-    expect(picture.querySelector("source")?.getAttribute("media")).toBe("(prefers-reduced-motion: no-preference)");
-    expect(picture.querySelector("source")?.getAttribute("srcset")).toBe("/landing/codize-hero-ascii.gif");
-    expect(picture.querySelector("img")?.getAttribute("src")).toBe("/landing/codize-hero-ascii-still.png");
-    expect(picture.querySelector("img")?.getAttribute("alt")).toBe("");
+    const video = page.querySelector("video")!;
+    expect(video.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(video.getAttribute("poster")).toBe("/landing/codize-hero-ascii-still.png");
+    expect(video.getAttribute("preload")).toBe("metadata");
+    expect(video.hasAttribute("autoplay")).toBe(true);
+    expect(video.hasAttribute("muted")).toBe(true);
+    expect(video.hasAttribute("loop")).toBe(true);
+    expect(video.hasAttribute("playsinline")).toBe(true);
+    expect(video.hasAttribute("controls")).toBe(false);
+    expect(video.getAttribute("tabindex")).toBe("-1");
+    expect(video.getAttribute("aria-hidden")).toBe("true");
+    expect(Array.from(video.querySelectorAll("source"), source => ({
+      media: source.getAttribute("media"), src: source.getAttribute("src"), type: source.getAttribute("type"),
+    }))).toEqual([
+      { media: "(prefers-reduced-motion: no-preference)", src: "/landing/codize-hero-ascii.webm", type: "video/webm; codecs=vp9" },
+      { media: "(prefers-reduced-motion: no-preference)", src: "/landing/codize-hero-ascii.mp4", type: "video/mp4" },
+    ]);
+    expect(page.querySelector('source[src$=".gif"]')).toBeNull();
     expect(page.querySelectorAll("[data-agent-window]")).toHaveLength(1);
     expect(page.querySelector("[data-agent-window]")?.querySelectorAll("input, textarea, button, [tabindex]")).toHaveLength(0);
     expect(page.querySelector("[data-prompt-text]")?.textContent).toBe("Build me a volleyball stats tracker for my team.");
@@ -85,7 +98,7 @@ describe("Scope the Storm public contract", () => {
     expect(proof.querySelector("figcaption")?.textContent).toContain("static preview");
     expect(proof.querySelectorAll("button, input, textarea")).toHaveLength(0);
     expect(proof.textContent).toContain("AN EXAMPLE ANSWER");
-    expect(page.querySelectorAll("img")).toHaveLength(2);
+    expect(page.querySelectorAll("img")).toHaveLength(1);
     expect(proof.querySelector("img")?.getAttribute("src")).toContain("codybara_idle_01.png");
     expect(proof.querySelector("img")?.getAttribute("loading")).toBe("lazy");
     expect(page.querySelector('link[rel="preload"][as="image"]')).toBeNull();
@@ -122,5 +135,37 @@ describe("landing character activation", () => {
     expect(disconnect).toHaveBeenCalledOnce();
     act(() => intersect(true));
     expect(container.childElementCount).toBe(0);
+  });
+});
+
+describe("hero media preference changes", () => {
+  it("stops animated playback when reduced motion turns on and restarts when it turns off", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    let reduced = false;
+    const listeners = new Set<EventListener>();
+    vi.spyOn(window, "matchMedia").mockReturnValue({
+      get matches() { return reduced; },
+      addEventListener: (_type: string, listener: EventListener) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: EventListener) => listeners.delete(listener),
+    } as unknown as MediaQueryList);
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    act(() => root.render(<HeroAnimation />));
+    expect(listeners).toHaveLength(1);
+
+    act(() => { reduced = true; listeners.forEach(listener => listener(new Event("change"))); });
+    expect(pause).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenCalledOnce();
+    expect(play).not.toHaveBeenCalled();
+
+    act(() => { reduced = false; listeners.forEach(listener => listener(new Event("change"))); });
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(play).toHaveBeenCalledOnce();
+    act(() => root.unmount());
+    expect(listeners).toHaveLength(0);
   });
 });

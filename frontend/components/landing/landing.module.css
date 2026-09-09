@@ -32,7 +32,7 @@
 .startLink { display: inline-flex; gap: 32px; align-items: center; min-height: 48px; margin-top: 28px; border-bottom: 1px solid var(--storm-accent); font-size: 16px; }
 .startLink span { font-size: 24px; color: var(--storm-accent); }
 .heroArt { width: min(100%, 600px); pointer-events: none; mix-blend-mode: lighten; }
-.heroArt img { display: block; width: 100%; height: auto; aspect-ratio: 800 / 605; object-fit: contain; }
+.heroArt video { display: block; width: 100%; height: auto; aspect-ratio: 800 / 605; object-fit: contain; }
 .semanticPrompt, .semanticQuestions { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .journey, .scope { position: relative; }
 .journeyStage > section { position: relative; padding: 110px var(--storm-gutter); }
