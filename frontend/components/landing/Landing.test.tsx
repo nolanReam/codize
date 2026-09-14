@@ -78,6 +78,8 @@ describe("Scope the Storm public contract", () => {
     expect(video.hasAttribute("controls")).toBe(false);
     expect(video.getAttribute("tabindex")).toBe("-1");
     expect(video.getAttribute("aria-hidden")).toBe("true");
+    expect(video.getAttribute("width")).toBe("1124");
+    expect(video.getAttribute("height")).toBe("818");
     expect(Array.from(video.querySelectorAll("source"), source => ({
       media: source.getAttribute("media"), src: source.getAttribute("src"), type: source.getAttribute("type"),
     }))).toEqual([
@@ -90,6 +92,16 @@ describe("Scope the Storm public contract", () => {
     expect(page.querySelector("[data-prompt-text]")?.textContent).toBe("Build me a volleyball stats tracker for my team.");
     expect(page.textContent).not.toMatch(/Start one change|ONE CURRENT CHANGE|Pick one change/);
     expect(page.querySelector('[data-storm-act="ending"]')?.previousElementSibling?.id).toBe("product-proof");
+  });
+
+  it("connects named project panels and keeps the interruption visually quiet", () => {
+    const page = renderPage();
+    const fileIds = new Set(Array.from(page.querySelectorAll<HTMLElement>("[data-storm-file]"), panel => panel.dataset.stormFile));
+    const connections = Array.from(page.querySelectorAll<SVGPathElement>("[data-storm-connection]"));
+    expect(connections).toHaveLength(4);
+    expect(connections.every(path => fileIds.has(path.dataset.from) && fileIds.has(path.dataset.to))).toBe(true);
+    expect(page.textContent).not.toContain("[ _ ]");
+    expect(Array.from(page.querySelectorAll("[data-full-text]"), line => line.getAttribute("data-full-text"))).toEqual(["What changed?", "Could you explain it?"]);
   });
 
   it("labels the static specimen and renders only a lazy canonical character frame after resolution", () => {

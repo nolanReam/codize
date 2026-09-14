@@ -31,8 +31,8 @@
 .heroType > p { font-size: clamp(17px, 1.4vw, 21px); line-height: 1.65; color: var(--storm-soft); margin-top: 32px; }
 .startLink { display: inline-flex; gap: 32px; align-items: center; min-height: 48px; margin-top: 28px; border-bottom: 1px solid var(--storm-accent); font-size: 16px; }
 .startLink span { font-size: 24px; color: var(--storm-accent); }
-.heroArt { width: min(100%, 600px); pointer-events: none; mix-blend-mode: lighten; }
-.heroArt video { display: block; width: 100%; height: auto; aspect-ratio: 800 / 605; object-fit: contain; }
+.heroArt { width: min(100%, 640px); pointer-events: none; }
+.heroArt video { display: block; width: 100%; height: auto; aspect-ratio: 1124 / 818; object-fit: contain; }
 .semanticPrompt, .semanticQuestions { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .journey, .scope { position: relative; }
 .journeyStage > section { position: relative; padding: 110px var(--storm-gutter); }
@@ -57,37 +57,37 @@
 .field[data-canvas-ready] canvas { display: block; }
 .field[data-canvas-ready] .asciiFallback { display: none; }
 .asciiFallback { padding: 40px 0; font: 18px/3 var(--font-v2-mono), monospace; color: #807589; opacity: 0.5; white-space: pre; }
-.connections { position: absolute; inset: 0; width: 100%; height: 100%; fill: var(--storm-accent); stroke: #927e9f; stroke-width: 1; opacity: 0.5; }
-.connections path { fill: none; }
+.connections { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: #a38caf; stroke-width: 1; opacity: 0.5; overflow: visible; }
+.connections path { fill: none; vector-effect: non-scaling-stroke; }
 .request, .fileWindow { position: absolute; background: #19171e; border: 1px solid #504558; border-radius: 6px; font-family: var(--font-v2-mono), monospace; }
 .request { width: 250px; padding: 17px; }
 .request > span { display: flex; justify-content: space-between; color: var(--storm-accent); font-size: 9px; letter-spacing: 0.06em; }
 .request i { font-style: normal; }
 .request p { font-size: 13px; line-height: 1.65; margin-top: 14px; }
-.request:nth-of-type(1) { left: 8%; top: 32%; }
-.request:nth-of-type(2) { right: 7%; top: 27%; }
-.request:nth-of-type(3) { left: 18%; top: 65%; }
-.request:nth-of-type(4) { right: 17%; top: 78%; }
+.request:nth-of-type(1) { left: 8%; top: 35%; }
+.request:nth-of-type(2) { right: 7%; top: 22%; }
+.request:nth-of-type(3) { left: 14%; top: 74%; }
+.request:nth-of-type(4) { right: 8%; top: 79%; }
 .fileWindow { width: 265px; }
 .fileWindow > div { padding: 12px 16px; border-bottom: 1px solid #42394b; font-size: 11px; color: #d5c6dd; display: flex; justify-content: space-between; }
 .fileWindow pre { padding: 18px; font-size: 11px; line-height: 1.8; color: #aaa0b3; }
-.fileWindow:nth-of-type(5) { left: 3%; top: 12%; transform: rotate(-5deg); }
-.fileWindow:nth-of-type(6) { right: 4%; top: 36%; width: 220px; transform: rotate(4deg); }
-.fileWindow:nth-of-type(7) { left: 16%; top: 68%; transform: rotate(2deg); }
-.fileWindow:nth-of-type(8) { right: 19%; top: 8%; transform: rotate(-3deg); }
-.fileWindow:nth-of-type(9) { right: 23%; top: 60%; transform: rotate(6deg); }
+.fileWindow[data-storm-file="player-form"] { left: 4%; top: 12%; transform: rotate(-4deg); }
+.fileWindow[data-storm-file="source-tree"] { right: 4%; top: 40%; width: 220px; transform: rotate(3deg); }
+.fileWindow[data-storm-file="stats"] { right: 20%; top: 69%; transform: rotate(2deg); }
+.fileWindow[data-storm-file="storage"] { left: 29%; top: 6%; transform: rotate(-3deg); }
+.fileWindow[data-storm-file="team-page"] { left: 37%; top: 43%; transform: rotate(2deg); }
 .growthBeat h2 { max-width: 960px; }
 .growthBeat em { color: #d9b77f; }
 .filesBeat { text-align: right; }
 .connectionsBeat { padding-top: 30px !important; }
 .lostBeat { text-align: center; }
-.interruption { min-height: 75svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 32px; text-align: center; }
-.caret { font: 20px var(--font-v2-mono), monospace; color: var(--storm-accent); }
+.interruption { min-height: 75svh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .interruption h2 { font-size: clamp(28px, 4vw, 58px); line-height: 1.5; }
-.visualQuestions > span:last-of-type { color: var(--storm-soft); }
-.visualQuestions { display: block; width: min(700px, calc(100vw - 48px)); text-align: left; }
-.visualQuestions > span { display: block; min-height: 1.5em; }
-.visualQuestions > br, .visualQuestions > .typingCaret { display: none !important; }
+.visualQuestions { display: grid; justify-items: center; width: min(700px, calc(100vw - 48px)); text-align: center; }
+.questionLine { position: relative; display: block; width: max-content; min-height: 1.5em; text-align: center; }
+.questionLine::before { content: attr(data-full-text); visibility: hidden; }
+.questionLine > span { position: absolute; inset: 0; white-space: nowrap; text-align: center; }
+.questionLine:last-child { color: var(--storm-soft); }
 .scopeStage { padding: 100px var(--storm-gutter); }
 .codizeEntrance { font-size: clamp(38px, 5.6vw, 80px); letter-spacing: -0.055em; line-height: 1.15; margin-bottom: 100px !important; }
 .scopeHeading { position: relative; z-index: 5; }
@@ -147,7 +147,7 @@
   .landing[data-motion="on"] .journeyStage h2 { position: absolute; margin: 0; }
   .landing[data-motion="on"] .ideaBeat h2 { left: var(--storm-gutter); top: 18%; opacity: var(--idea-opacity, 0); }
   .landing[data-motion="on"] .agentWindow { position: absolute; right: 14%; top: 38%; margin: 0; transform: translateY(var(--agent-y, 100vh)) scale(var(--agent-scale, 1)); opacity: var(--agent-opacity, 0); }
-  .landing[data-motion="on"] .agentPrompt { transform: translateY(var(--prompt-y, 0px)); }
+  .landing[data-motion="on"] .agentPrompt { transform: translateY(var(--prompt-y, 0px)); opacity: var(--prompt-opacity, 1); }
   .landing[data-motion="on"] .agentWelcome, .landing[data-motion="on"] .agentMark { opacity: var(--welcome-opacity, 1); }
   .landing[data-motion="on"] .agentWorking { opacity: var(--working-opacity, 0); }
   .landing[data-motion="on"] .agentEmptyPrompt { display: block; opacity: var(--working-opacity, 0); }
@@ -156,7 +156,8 @@
   .landing[data-motion="on"] .expansionBeat h2 { left: var(--storm-gutter); top: 16%; opacity: var(--possibilities-opacity, 0); z-index: 5; }
   .landing[data-motion="on"] .projectStorm { position: absolute; inset: 0; height: auto; margin: 0; opacity: var(--storm-opacity, 0); }
   .landing[data-motion="on"] .request, .landing[data-motion="on"] .fileWindow { transform: translate(var(--artifact-x, 0px), var(--artifact-y, 0px)) scale(var(--artifact-scale, 1)) rotate(var(--artifact-rotate, 0deg)); opacity: var(--artifact-opacity, 0); }
-  .landing[data-motion="on"] .connections { opacity: var(--connections-opacity, 0); stroke-dasharray: 1; stroke-dashoffset: var(--connections-dash, 1); }
+  .landing[data-motion="on"] .connections { opacity: var(--connections-opacity, 0); }
+  .landing[data-motion="on"] .connections path { stroke-dasharray: 1; stroke-dashoffset: var(--connections-dash, 1); }
   .landing[data-motion="on"] .growthBeat h2 { left: 12%; right: 10%; top: 35%; opacity: var(--growth-opacity, 0); }
   .landing[data-motion="on"] .filesBeat h2 { right: 10%; top: 25%; opacity: var(--files-opacity, 0); font-size: clamp(36px, 4.5vw, 64px); }
   .landing[data-motion="on"] .connectionsBeat h2 { left: 9%; top: 70%; opacity: var(--connection-label-opacity, 0); font-size: clamp(36px, 4.5vw, 64px); }
@@ -207,15 +208,14 @@
   .projectStorm { height: 480px; }
   .request { width: 195px; padding: 13px; }
   .request p { font-size: 12px; }
-  .request:nth-of-type(3), .request:nth-of-type(4), .fileWindow:nth-of-type(8), .fileWindow:nth-of-type(9) { display: none; }
-  .request:nth-of-type(1) { left: 5%; top: 31%; }
-  .request:nth-of-type(2) { right: 5%; top: 64%; }
+  .request:nth-of-type(3), .request:nth-of-type(4), .fileWindow[data-storm-file="source-tree"], .fileWindow[data-storm-file="storage"], .connections [data-mobile-hidden="true"] { display: none; }
+  .request:nth-of-type(1) { right: 3%; left: auto; top: 29%; }
+  .request:nth-of-type(2) { left: 3%; right: auto; top: 61%; }
   .fileWindow { width: 195px; }
   .fileWindow pre { font-size: 9px; padding: 12px; }
-  .fileWindow:nth-of-type(5) { top: 16%; left: 3%; }
-  .fileWindow:nth-of-type(6) { top: 42%; right: 2%; width: 180px; }
-  .fileWindow:nth-of-type(7) { top: 71%; left: 7%; }
-  .connections { width: 130%; left: -15%; }
+  .fileWindow[data-storm-file="player-form"] { top: 14%; left: 3%; }
+  .fileWindow[data-storm-file="team-page"] { top: 43%; left: 25%; }
+  .fileWindow[data-storm-file="stats"] { top: 72%; right: 3%; }
   .scopeStage { padding: 90px var(--storm-gutter); }
   .codizeEntrance { font-size: 38px; }
   .scopeHeading h2 { font-size: clamp(18px, 5.1vw, 28px); }

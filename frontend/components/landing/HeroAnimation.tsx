@@ -31,8 +31,8 @@ export default function HeroAnimation() {
     playsInline
     preload="metadata"
     poster="/landing/codize-hero-ascii-still.png"
-    width="800"
-    height="605"
+    width="1124"
+    height="818"
     aria-hidden="true"
     tabIndex={-1}
   >

@@ -267,4 +267,19 @@ describe("continuous visual pacing", () => {
     env.motion(true); env.flush(); dispose();
     expect(text.textContent).toBe("Build me a volleyball stats tracker for my team.");
   });
+
+  it("dismantles the agent UI before the connection beat and reconstructs it in reverse", () => {
+    const env = environment();
+    env.section.dataset.stormAct = "journey";
+    const agent = document.createElement("div"); agent.dataset.agentWindow = ""; env.section.append(agent);
+    const dispose = createStormController(env.root);
+    env.enter(); env.scroll(1620 * 0.53); for (let frame = 0; frame < 90 && env.pending.size; frame++) env.flush();
+    expect(Number(env.section.style.getPropertyValue("--agent-opacity"))).toBe(0);
+    expect(Number(env.section.style.getPropertyValue("--working-opacity"))).toBe(0);
+    expect(Number(env.section.style.getPropertyValue("--prompt-opacity"))).toBe(0);
+    env.scroll(1620 * 0.3); for (let frame = 0; frame < 90 && env.pending.size; frame++) env.flush();
+    expect(Number(env.section.style.getPropertyValue("--agent-opacity"))).toBeGreaterThan(0.9);
+    expect(Number(env.section.style.getPropertyValue("--prompt-opacity"))).toBe(1);
+    dispose();
+  });
 });

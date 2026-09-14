@@ -4,18 +4,36 @@ import styles from "./landing.module.css";
 export const ideaPrompt = "Build me a volleyball stats tracker for my team.";
 const requests = ["Can you also add player profiles?", "Add game history.", "Could you add charts?", "Add team login."];
 const files = [
-  ["PlayerForm.tsx", "function PlayerForm() {\n  return <form>\n    <input name=\"player\" />\n  </form>\n}"],
-  ["src/", "components/\n  PlayerForm.tsx\n  TeamPage.tsx\nlib/\n  stats.ts\n  storage.ts"],
-  ["stats.ts", "function total(games) {\n  return games.reduce(\n    (sum, game) =>\n      sum + game.kills, 0\n  )\n}"],
-  ["storage.ts", "const save = (players) => {\n  localStorage.setItem(\n    'players',\n    JSON.stringify(players)\n  )\n}"],
-  ["TeamPage.tsx", "<Team>\n  <PlayerList />\n  <GameHistory />\n  <StatsChart />\n</Team>"],
-];
+  ["player-form", "PlayerForm.tsx", "function PlayerForm() {\n  return <form>\n    <input name=\"player\" />\n  </form>\n}"],
+  ["source-tree", "src/", "components/\n  PlayerForm.tsx\n  TeamPage.tsx\nlib/\n  stats.ts\n  storage.ts"],
+  ["stats", "stats.ts", "function total(games) {\n  return games.reduce(\n    (sum, game) =>\n      sum + game.kills, 0\n  )\n}"],
+  ["storage", "storage.ts", "const save = (players) => {\n  localStorage.setItem(\n    'players',\n    JSON.stringify(players)\n  )\n}"],
+  ["team-page", "TeamPage.tsx", "<Team>\n  <PlayerList />\n  <GameHistory />\n  <StatsChart />\n</Team>"],
+] as const;
+
+const connections = [
+  ["player-form", "right", "team-page", "left", false],
+  ["team-page", "right", "stats", "top", false],
+  ["storage", "bottom", "team-page", "top", true],
+  ["team-page", "right", "source-tree", "left", true],
+] as const;
 
 function ProjectArtifacts() {
   return <div className={styles.artifacts} aria-hidden="true">
-    <svg className={styles.connections} viewBox="0 0 1000 700" preserveAspectRatio="none"><path pathLength="1" d="M180 170 L740 290 L640 560 L160 470 M740 290 L800 130 M180 170 L160 470" /><circle cx="180" cy="170" r="4" /><circle cx="740" cy="290" r="4" /><circle cx="640" cy="560" r="4" /></svg>
+    <svg className={styles.connections} preserveAspectRatio="none">
+      {connections.map(([from, fromSide, to, toSide, mobileHidden]) => <path
+        key={`${from}-${to}`}
+        pathLength="1"
+        data-storm-connection
+        data-from={from}
+        data-from-side={fromSide}
+        data-to={to}
+        data-to-side={toSide}
+        data-mobile-hidden={mobileHidden ? "true" : undefined}
+      />)}
+    </svg>
     {requests.map((request, index) => <div key={request} className={styles.request} data-storm-request style={{ "--artifact-index": index } as React.CSSProperties}><span>CODING AI <i>↗</i></span><p>{request}</p></div>)}
-    {files.map(([name, code], index) => <div key={name} className={styles.fileWindow} data-storm-file style={{ "--artifact-index": index } as React.CSSProperties}><div>{name}<span>···</span></div><pre>{code}</pre></div>)}
+    {files.map(([id, name, code], index) => <div key={id} className={styles.fileWindow} data-storm-file={id} style={{ "--artifact-index": index } as React.CSSProperties}><div>{name}<span>···</span></div><pre>{code}</pre></div>)}
   </div>;
 }
 
@@ -52,8 +70,7 @@ export function StoryAct() {
       <section className={styles.connectionsBeat} aria-labelledby="connections-title" data-story-beat="connections"><h2 id="connections-title">More connections.</h2></section>
       <section className={styles.lostBeat} aria-labelledby="lost-title" data-story-beat="lost"><h2 id="lost-title">Where did your<br />one idea go?</h2></section>
       <section className={styles.interruption} aria-labelledby="interruption-title" data-story-beat="silence">
-        <span aria-hidden="true" className={styles.caret}>[ _ ]</span>
-        <h2 id="interruption-title"><span className={styles.semanticQuestions}>What changed? Could you explain it?</span><span className={styles.visualQuestions} aria-hidden="true"><span data-question="first">What changed?</span><br /><span data-question="second">Could you explain it?</span><i className={styles.typingCaret} /></span></h2>
+        <h2 id="interruption-title"><span className={styles.semanticQuestions}>What changed? Could you explain it?</span><span className={styles.visualQuestions} aria-hidden="true"><span className={styles.questionLine} data-full-text="What changed?"><span data-question="first">What changed?</span></span><span className={styles.questionLine} data-full-text="Could you explain it?"><span data-question="second">Could you explain it?</span></span></span></h2>
       </section>
     </div>
   </div>;

@@ -30,8 +30,38 @@ type Scene = {
   canvas: HTMLCanvasElement | null; context: CanvasRenderingContext2D | null;
   width: number; canvasHeight: number; ratio: number; visual: number | null; lensMaxScale: number;
   verbs: HTMLElement[]; requests: HTMLElement[]; files: HTMLElement[]; origins: { x: number; y: number }[];
+  connections: SVGPathElement[];
   typed: { element: HTMLElement; text: string; start: number; end: number }[];
 };
+type Point = { x: number; y: number };
+type Motion = { x: number; y: number };
+
+function panelAnchor(node: HTMLElement, side: string, motion: Motion): Point {
+  const left = node.offsetLeft + motion.x, top = node.offsetTop + motion.y;
+  if (side === "left") return { x: left, y: top + node.offsetHeight / 2 };
+  if (side === "right") return { x: left + node.offsetWidth, y: top + node.offsetHeight / 2 };
+  if (side === "top") return { x: left + node.offsetWidth / 2, y: top };
+  return { x: left + node.offsetWidth / 2, y: top + node.offsetHeight };
+}
+
+function alignConnections(scene: Scene, motion = new Map<string, Motion>()) {
+  const svg = scene.connections[0]?.ownerSVGElement;
+  const host = svg?.parentElement;
+  if (svg && host?.clientWidth && host.clientHeight) svg.setAttribute("viewBox", `0 0 ${host.clientWidth} ${host.clientHeight}`);
+  const panels = new Map(scene.files.map(node => [node.dataset.stormFile!, node]));
+  for (const path of scene.connections) {
+    const from = panels.get(path.dataset.from ?? ""), to = panels.get(path.dataset.to ?? "");
+    if (!from || !to) continue;
+    const a = panelAnchor(from, path.dataset.fromSide ?? "right", motion.get(from.dataset.stormFile!) ?? { x: 0, y: 0 });
+    const b = panelAnchor(to, path.dataset.toSide ?? "left", motion.get(to.dataset.stormFile!) ?? { x: 0, y: 0 });
+    const horizontal = path.dataset.fromSide === "left" || path.dataset.fromSide === "right";
+    const bend = horizontal ? Math.max(30, Math.abs(b.x - a.x) * 0.42) : Math.max(30, Math.abs(b.y - a.y) * 0.42);
+    const c1 = horizontal ? { x: a.x + (path.dataset.fromSide === "left" ? -bend : bend), y: a.y } : { x: a.x, y: a.y + (path.dataset.fromSide === "top" ? -bend : bend) };
+    const toHorizontal = path.dataset.toSide === "left" || path.dataset.toSide === "right";
+    const c2 = toHorizontal ? { x: b.x + (path.dataset.toSide === "left" ? -bend : bend), y: b.y } : { x: b.x, y: b.y + (path.dataset.toSide === "top" ? -bend : bend) };
+    path.setAttribute("d", `M ${a.x} ${a.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${b.x} ${b.y}`);
+  }
+}
 // Integrated slopes keep background motion continuous and slow during holds.
 function stormTravel(p: number) {
   return [[0, 0.39, 1], [0.39, 0.49, 0.08], [0.49, 0.7, 1], [0.7, 0.8, 0.04]]
@@ -72,6 +102,7 @@ export function createStormController(root: HTMLElement): () => void {
     verbs: Array.from(element.querySelectorAll<HTMLElement>("[data-storm-verb]")),
     requests: Array.from(element.querySelectorAll<HTMLElement>("[data-storm-request]")),
     files: Array.from(element.querySelectorAll<HTMLElement>("[data-storm-file]")),
+    connections: Array.from(element.querySelectorAll<SVGPathElement>("[data-storm-connection]")),
     typed: Array.from(element.querySelectorAll<HTMLElement>("[data-prompt-text], [data-question]")).map(node => ({
       element: node, text: node.textContent ?? "",
       start: node.hasAttribute("data-prompt-text") ? 0.115 : node.dataset.question === "first" ? 0.824 : 0.864,
@@ -101,7 +132,8 @@ export function createStormController(root: HTMLElement): () => void {
           y: originY - node.offsetTop - node.offsetHeight / 2,
         }));
       }
-      if (!active.has(scene) || !scene.canvas) continue;
+      alignConnections(scene);
+      if (!motion.matches || !active.has(scene) || !scene.canvas) continue;
       scene.width = scene.canvas.parentElement!.clientWidth; scene.canvasHeight = scene.canvas.parentElement!.clientHeight;
       scene.ratio = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2);
       const width = Math.round(scene.width * scene.ratio), height = Math.round(scene.canvasHeight * scene.ratio);
@@ -119,10 +151,12 @@ export function createStormController(root: HTMLElement): () => void {
       const settled = 1 - Math.pow(1 - between(p, 0.025, 0.105), 2);
       set("idea-opacity", Math.max(0.15, ramp(p, 0, 0.025)) * (1 - ramp(p, 0.245, 0.275)));
       set("agent-y", (1 - settled) * scene.stageHeight * 0.8 - ramp(p, 0.28, 0.64) * 75, "px");
-      set("agent-opacity", ramp(p, 0.025, 0.07) * (1 - quiet * 0.85) * (1 - ramp(p, 0.79, 0.815)));
+      set("agent-opacity", ramp(p, 0.025, 0.07) * (1 - quiet * 0.85) * (1 - ramp(p, 0.425, 0.525)));
       set("agent-scale", 1 - ramp(p, 0.28, 0.65) * 0.14);
       set("prompt-y", -ramp(p, 0.21, 0.235) * 112, "px");
-      set("welcome-opacity", 1 - ramp(p, 0.205, 0.22)); set("working-opacity", ramp(p, 0.232, 0.244));
+      set("welcome-opacity", 1 - ramp(p, 0.205, 0.22));
+      set("working-opacity", ramp(p, 0.232, 0.244) * (1 - ramp(p, 0.34, 0.4)));
+      set("prompt-opacity", 1 - ramp(p, 0.43, 0.5));
       set("possibilities-opacity", cue(p, 0.255, 0.28, 0.35, 0.385));
       set("storm-opacity", ramp(p, 0.265, 0.29) * (1 - ramp(p, 0.795, 0.815)));
       set("growth-opacity", growth); set("lost-opacity", lost);
@@ -131,16 +165,21 @@ export function createStormController(root: HTMLElement): () => void {
       set("connections-opacity", ramp(p, 0.575, 0.615) * 0.6 * (1 - quiet * 0.9));
       set("connections-dash", 1 - ramp(p, 0.575, 0.64)); set("silence-opacity", ramp(p, 0.815, 0.824));
       const travel = stormTravel(p);
+      const fileMotion = new Map<string, Motion>();
       [...scene.requests, ...scene.files].forEach((node, index) => {
         const file = index >= scene.requests.length, n = file ? index - scene.requests.length : index;
         const origin = scene.origins[index] ?? { x: 0, y: 0 };
         const start = file ? 0.355 + n * 0.026 : 0.272 + n * 0.024, appear = ramp(p, start, start + 0.04);
         node.style.setProperty("--artifact-opacity", `${appear * (1 - quiet * 0.92) * (file ? 0.88 : 1 - ramp(p, 0.43, 0.68) * 0.5)}`);
-        node.style.setProperty("--artifact-x", `${(1 - appear) * origin.x + Math.sin(index * 2 + travel * 7) * (mobile ? 9 : 34)}px`);
-        node.style.setProperty("--artifact-y", `${(1 - appear) * origin.y + Math.cos(index * 2 + travel * 8) * (mobile ? 14 : 42)}px`);
+        const x = (1 - appear) * origin.x + Math.sin(index * 2 + travel * 7) * (mobile ? 9 : 34);
+        const y = (1 - appear) * origin.y + Math.cos(index * 2 + travel * 8) * (mobile ? 14 : 42);
+        node.style.setProperty("--artifact-x", `${x}px`);
+        node.style.setProperty("--artifact-y", `${y}px`);
         node.style.setProperty("--artifact-scale", `${0.7 + 0.3 * appear}`);
-        node.style.setProperty("--artifact-rotate", `${file ? (n % 2 ? 1 : -1) * (2 + travel * 4) : 0}deg`);
+        node.style.setProperty("--artifact-rotate", `${file ? (n % 2 ? 1 : -1) * (2 + travel * 4) * (1 - ramp(p, 0.53, 0.575)) : 0}deg`);
+        if (file && node.dataset.stormFile) fileMotion.set(node.dataset.stormFile, { x, y });
       });
+      alignConnections(scene, fileMotion);
       scene.typed.forEach(({ element, text, start, end }) => {
         const next = text.slice(0, Math.floor(between(p, start, end) * text.length));
         if (element.textContent !== next) element.textContent = next;
@@ -189,7 +228,7 @@ export function createStormController(root: HTMLElement): () => void {
     });
     frame = owned;
   }
-  function invalidate() { dirtyGeometry = true; schedule(); }
+  function invalidate() { dirtyGeometry = true; if (motion.matches) schedule(); else measure(); }
   function restoreText() { scenes.forEach(scene => scene.typed.forEach(item => { item.element.textContent = item.text; delete item.element.dataset.typing; })); }
   function syncMotion() {
     cancel();
