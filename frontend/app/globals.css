@@ -21,7 +21,7 @@
   --danger-bg: #1f1015;
   --mono: var(--font-mono, "IBM Plex Mono"), ui-monospace, "Cascadia Code", Consolas, monospace;
   --sans: var(--font-sans, "DM Sans"), system-ui, -apple-system, "Segoe UI", sans-serif;
-  --display: var(--font-display, "Space Grotesk"), var(--sans);
+  --display: var(--font-v2-sans, "Inter"), sans-serif;
   --glow: rgba(139, 107, 250, 0.35);
 }
 
@@ -2114,7 +2114,7 @@ pre.output {
 /* one type family on the landing: headlines are the body face (DM Sans) at
    larger sizes and heavier weight — never a stylistically separate family.
    Overriding --display keeps every landing display-usage (terminal overlay,
-   build-loop titles) in the same system; the app interior keeps Space Grotesk. */
+   build-loop titles) in the same system; the shared display token uses Inter. */
 .landing { --display: var(--sans); }
 .landing h1,
 .landing .scene-head h2,

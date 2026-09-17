@@ -5,7 +5,6 @@ import {
   IBM_Plex_Mono,
   Inter,
   Press_Start_2P,
-  Space_Grotesk,
 } from "next/font/google";
 
 import "./globals.css";
@@ -17,7 +16,6 @@ const mono = IBM_Plex_Mono({
   variable: "--font-mono",
   display: "swap",
 });
-const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", display: "swap" });
 const v2Sans = Inter({ subsets: ["latin"], variable: "--font-v2-sans", display: "swap" });
 const v2Mono = DM_Mono({
   subsets: ["latin"],
@@ -42,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${sans.variable} ${mono.variable} ${display.variable} ${v2Sans.variable} ${v2Mono.variable} ${v2Display.variable}`}
+      className={`${sans.variable} ${mono.variable} ${v2Sans.variable} ${v2Mono.variable} ${v2Display.variable}`}
     >
       <body>{children}</body>
     </html>
