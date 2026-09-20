@@ -34,7 +34,16 @@ export default function LandingPage() {
           <p className={styles.endingSupport}>Build with your AI.<br />Come back to check, understand,<br />or work out what broke.</p>
         </section>
       </main>
-      <footer className={styles.footer}><span>CODIZE<span aria-hidden="true">_</span></span><p>One project. One feature. One useful habit.</p><Link href="/login" prefetch={false}>Sign in</Link></footer>
+      <footer className={styles.footer}>
+        <span>CODIZE<span aria-hidden="true">_</span></span>
+        <p>One project. One feature. One useful habit.</p>
+        <nav aria-label="Public information">
+          <Link href="/why-codize">Why Codize</Link>
+          <Link href="/how-it-works">How it works</Link>
+          <a href="mailto:codizeapp@gmail.com">Contact</a>
+          <Link href="/login" prefetch={false}>Sign in</Link>
+        </nav>
+      </footer>
       <LandingMotion />
     </div>
   );

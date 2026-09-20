@@ -23,4 +23,12 @@ describe("post-auth V2 routing contract", () => {
     expect(layout).toContain("await getSupabase().auth.signOut()");
     expect(layout).toContain("sessionStorage.removeItem(RECONNECT_FLAG)");
   });
+
+  it("reserves signup-adjacent help without claiming legal acceptance", () => {
+    expect(login).toContain("Questions about the upcoming pilot?");
+    expect(login).toContain("mailto:codizeapp@gmail.com");
+    expect(login).not.toMatch(/agree to (?:the )?terms|accept(?:ed|ance)?_?version|legal acceptance/i);
+    expect(login).not.toContain('href="/terms"');
+    expect(login).not.toContain('href="/privacy"');
+  });
 });

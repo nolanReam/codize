@@ -116,6 +116,11 @@ export default function LoginPage() {
           <button className="btn primary" style={{ width: "100%" }} disabled={busy}>
             {busy ? "Working…" : mode === "signin" ? "Sign in" : "Sign up"}
           </button>
+          {mode === "signup" && (
+            <p className="auth-signup-note">
+              Questions about the upcoming pilot? <a href="mailto:codizeapp@gmail.com">codizeapp@gmail.com</a>
+            </p>
+          )}
         </form>
 
         <p className="muted" style={{ marginTop: 16 }}>

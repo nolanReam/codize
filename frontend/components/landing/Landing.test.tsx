@@ -51,6 +51,12 @@ describe("Scope the Storm public contract", () => {
     expect(authLinks.every(link => link.getAttribute("href") === "/login")).toBe(true);
     expect(page.querySelector('a[href="#product-proof"]')).not.toBeNull();
     expect(page.querySelector("#product-proof")?.getAttribute("tabindex")).toBe("-1");
+    expect(page.querySelector('footer a[href="/why-codize"]')).not.toBeNull();
+    expect(page.querySelector('footer a[href="/how-it-works"]')).not.toBeNull();
+    expect(page.querySelector('footer a[href="mailto:codizeapp@gmail.com"]')).not.toBeNull();
+    expect(page.querySelector('footer a[href="/privacy"]')).toBeNull();
+    expect(page.querySelector('footer a[href="/terms"]')).toBeNull();
+    expect(page.querySelector('footer a[href="/accessibility"]')).toBeNull();
   });
 
   it("keeps decoration hidden from assistive technology and content outside Canvas", () => {
