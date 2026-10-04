@@ -15,7 +15,7 @@ export const PUBLIC_CONTACT = "codizeapp@gmail.com";
 
 const publicLinks = [
   { href: "/why-codize", label: "Why Codize" },
-  { href: "/how-it-works", label: "How it works" },
+  { href: "/how-it-works", label: "How It Works" },
 ] as const;
 
 export default function PublicDocumentLayout({
@@ -42,11 +42,11 @@ export default function PublicDocumentLayout({
               {link.label}
             </Link>
           ))}
-          <Link href="/login" prefetch={false} className={styles.signIn}>Sign in</Link>
         </nav>
+        <Link href="/login" prefetch={false} className={styles.signIn}>Sign in</Link>
       </header>
 
-      <main id="main-content" className={styles.main}>
+      <main id="main-content" className={styles.main} tabIndex={-1}>
         <section className={styles.hero} aria-labelledby="public-page-title">
           <p className={styles.eyebrow}>{eyebrow}</p>
           <h1 id="public-page-title">{title}</h1>
@@ -56,12 +56,10 @@ export default function PublicDocumentLayout({
       </main>
 
       <footer className={styles.footer}>
-        <div>
-          <Link href="/" className={styles.footerBrand} aria-label="Codize home">
-            CODIZE<span aria-hidden="true">_</span>
-          </Link>
-          <p>One project. One feature. One useful habit.</p>
-        </div>
+        <Link href="/" className={styles.footerBrand} aria-label="Codize home">
+          CODIZE<span aria-hidden="true">_</span>
+        </Link>
+        <p>One project. One feature. One useful habit.</p>
         <nav aria-label="Footer">
           {publicLinks.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}
           <a href={`mailto:${PUBLIC_CONTACT}`}>Contact</a>

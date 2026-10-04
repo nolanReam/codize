@@ -12,6 +12,10 @@ export default function LandingPage() {
       <a className={styles.skip} href="#product-proof">Skip to how Codize helps</a>
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Codize home">CODIZE<span aria-hidden="true">_</span></Link>
+        <nav className={styles.headerNav} aria-label="Public pages">
+          <Link href="/why-codize">Why Codize</Link>
+          <Link href="/how-it-works">How It Works</Link>
+        </nav>
         <Link href="/login" prefetch={false} className={styles.signIn}>Sign in</Link>
       </header>
       <main>
@@ -39,7 +43,7 @@ export default function LandingPage() {
         <p>One project. One feature. One useful habit.</p>
         <nav aria-label="Public information">
           <Link href="/why-codize">Why Codize</Link>
-          <Link href="/how-it-works">How it works</Link>
+          <Link href="/how-it-works">How It Works</Link>
           <a href="mailto:codizeapp@gmail.com">Contact</a>
           <Link href="/login" prefetch={false}>Sign in</Link>
         </nav>
