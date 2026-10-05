@@ -157,12 +157,14 @@ async def list_project_refs(
     v2_repo: V2Repository,
     legacy_repo: ProjectRepository,
     owner_user_id: str,
+    *,
+    include_legacy: bool = True,
 ) -> ProjectRefsResponse:
     refs: list[ProjectRefView] = []
 
     # V1 can truthfully open only its maintained active/newest row. Reuse that
     # exact adapter behavior and never enumerate arbitrary legacy rows.
-    legacy = await legacy_repo.get_project(owner_user_id)
+    legacy = await legacy_repo.get_project(owner_user_id) if include_legacy else None
     if legacy is not None:
         try:
             legacy_id = UUID(str(legacy["id"]))

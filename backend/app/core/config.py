@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     # --- Public config ---
     app_env: str = "development"
+    # Deployment-wide boundary; never derived from a request or user claim.
+    codize_pilot_v2_only: bool = False
     supabase_url: str = ""
     supabase_anon_key: str = ""
     # Comma-separated explicit origins — never "*" (credentials + wildcard is

@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.deps.auth import CurrentUser, require_user
 from app.schemas.v2 import (
@@ -127,6 +127,7 @@ async def save_setup_draft(
 
 @router.get("/project-refs", response_model=ProjectRefsResponse)
 async def list_project_refs(
+    request: Request,
     user: CurrentUser = Depends(require_user),
     repo: V2Repository = Depends(get_v2_repository),
     legacy_repo: ProjectRepository = Depends(get_project_repository),
@@ -135,6 +136,7 @@ async def list_project_refs(
         repo,
         legacy_repo,
         user.user_id,
+        include_legacy=not request.app.state.pilot_v2_only,
     )
 
 

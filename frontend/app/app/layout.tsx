@@ -13,9 +13,10 @@ import Tutorial, { TUTORIAL_SEEN_KEY } from "@/components/Tutorial";
 import V2AppShell from "@/components/v2/V2AppShell";
 import { acknowledgeReconnection, getReconnection } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
+import { isV2AppPath } from "@/lib/app-routes";
 import type { ReconnectionSummary } from "@/lib/types";
 
-// One reconnection check per browser session. The contract (backend M11):
+// One V1 reconnection check per browser session. The contract (backend M11):
 // GET first on every login, THEN acknowledge — immediately when no modal is
 // needed, on the "Let's keep building" click when it is. Never acknowledge
 // before the GET, or the modal is silently suppressed.
@@ -24,6 +25,7 @@ const RECONNECT_FLAG = "codize:reconnection-checked";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const isV2Path = isV2AppPath(pathname);
   const [email, setEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -51,7 +53,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       // M17 makes adaptive entry the first-use task. The broader tutorial
       // remains available from Help without covering that focused decision.
 
-      if (!sessionStorage.getItem(RECONNECT_FLAG)) {
+      if (!isV2Path && !sessionStorage.getItem(RECONNECT_FLAG)) {
         try {
           const state = await getReconnection();
           if (cancelled) return;
@@ -75,7 +77,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, isV2Path]);
 
   const closeTutorial = useCallback(() => {
     localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
@@ -102,12 +104,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!ready || !userId) return <div className="loading" style={{ padding: 40 }}>checking session</div>;
-
-  const isV2Path =
-    pathname === "/app/projects" ||
-    pathname.startsWith("/app/project/") ||
-    pathname === "/app/character" ||
-    pathname === "/app/settings";
 
   if (isV2Path) {
     return (
